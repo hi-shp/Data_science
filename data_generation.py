@@ -279,9 +279,10 @@ def simulate_once(a, g, k):
 def batch_simulation_parallel():
 
     avoid_values = [1.0 + 0.2*i for i in range(10)]
-    gps_values = [5.0 + i for i in range(10)]
-    gap_values = [3.0 + i for i in range(5)]
+    gps_values   = [5.0 + i for i in range(10)]
+    gap_values   = [3.0 + i for i in range(5)]
 
+    # 총 파라미터 반복 횟수 (각 조합마다 10회 실행)
     params = []
     for a in avoid_values:
         for g in gps_values:
@@ -289,28 +290,44 @@ def batch_simulation_parallel():
                 for _ in range(10):
                     params.append((a, g, k))
 
+    total = len(params)
+
+    import multiprocessing
+    from multiprocessing import Pool
     num_cores = multiprocessing.cpu_count()
     print("Detected CPU cores:", num_cores)
 
+    from collections import defaultdict
+    partial_results = defaultdict(list)
+
+    finished = 0
+
     with Pool(processes=num_cores) as p:
-        results = p.starmap(simulate_once, params)
+        for (a, g, k, res) in p.imap_unordered(run_and_tag, params):
 
-    idx = 0
-    f = open("results.csv", "w", newline="")
-    w = csv.writer(f)
-    w.writerow(["avoid_scale", "gps_gain", "gap_gain", "success_rate"])
+            finished += 1
+            key = (a, g, k)
+            partial_results[key].append(res)
 
-    for a in avoid_values:
-        for g in gps_values:
-            for k in gap_values:
-                trials = results[idx:idx+10]
-                idx += 10
-                suc = sum(trials) / 10.0
-                print(a, g, k, suc)
-                w.writerow([a, g, k, suc])
+            if len(partial_results[key]) == 10:
+                success_rate = sum(partial_results[key]) / 10.0
+                progress = (finished / total) * 100
+                print(f"[{a}, {g}, {k}] 완주율={success_rate:.2f}  |  {finished}/{total} ({progress:.1f}%)")
 
-    f.close()
+    with open("results.csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["avoid_scale", "gps_gain", "gap_gain", "success_rate"])
+
+        for (a, g, k), arr in partial_results.items():
+            if len(arr) == 10:
+                w.writerow([a, g, k, sum(arr)/10.0])
+
     print("Saved results.csv")
+
+def run_and_tag(arg):
+    a, g, k = arg
+    r = simulate_once(a, g, k)
+    return (a, g, k, r)
 
 
 if __name__ == "__main__":
