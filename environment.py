@@ -37,7 +37,7 @@ class BoatEnv:
         
         self.obs_n = 80
         self.obs_r = 17
-        self.min_obs = 125
+        self.min_obs = 120
         
         self.grid = init_grid()
         self.clusters = []
