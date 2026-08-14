@@ -5,7 +5,7 @@ import datetime
 import os
 from environment import BoatEnv
 from perception import lidar_hits_np, update_grid, extract_clusters_from_grid, match_clusters
-from navigation import find_gap
+from navigation import find_gap, target_is_clear
 from utils import wrap, make_bezier_path, pure_pursuit
 
 def run():
@@ -38,23 +38,27 @@ def run():
             env.clusters, env.cluster_ids, new_c
         )
 
-        dx = env.target[0] - env.boat_pos[0]
-        dy = env.target[1] - env.boat_pos[1]
-        gps_head = math.atan2(dy, dx)
+        # 목적지까지 직선 경로가 뚫려있는지 최우선 검사
+        if target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
+            env.current_wp = None
+            env.next_wp = None
+            new_wp = None
+        else:
+            # 막혀있을 때만 1차 웨이포인트 탐색 (gps_head 대신 env.target 좌표 전달)
+            new_wp = find_gap(
+                env.clusters, env.cluster_ids,
+                env.boat_pos, env.boat_heading,
+                env.target, env.visited,
+                env.grid, env.dynamic_obstacles
+            )
 
-        new_wp = find_gap(
-            env.clusters, env.cluster_ids,
-            env.boat_pos, env.boat_heading,
-            gps_head, env.visited,
-            env.grid, env.dynamic_obstacles
-        )
-
+        # 기존 웨이포인트 도달 시 삭제 로직
         if env.current_wp is not None:
             should_clear = False
             vec_to_wp = env.current_wp["pos"] - env.boat_pos
             dnow = np.linalg.norm(vec_to_wp)
             
-            if dnow < 22:
+            if dnow < 75:
                 should_clear = True
                 
             wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
@@ -69,6 +73,7 @@ def run():
                 env.visited.add((p[1], p[0]))
                 env.current_wp = None
 
+        # 새 웨이포인트로 갱신하는 로직 (가중치 튜닝 반영)
         if new_wp is not None:
             if env.current_wp is None:
                 env.current_wp = new_wp
@@ -81,16 +86,17 @@ def run():
                     ang_curr = math.atan2(vec_curr[1], vec_curr[0])
                     ang_new = math.atan2(vec_new[1], vec_new[0])
                     angle_diff = abs(wrap(ang_new - ang_curr))
-                    threshold = 1
-                    """
+                    
+                    threshold = 1.0
                     if angle_diff > np.deg2rad(45):
                         threshold = 1.2
                     if angle_diff > np.deg2rad(80):
-                        threshold = 2
+                        threshold = 2.0
 
                     if new_wp["score"] > env.current_wp["score"] * threshold:
-                        env.current_wp = new_wp"""
+                        env.current_wp = new_wp
                         
+        # 2차 웨이포인트 탐색
         if env.current_wp is not None:
             temp_visited = env.visited.copy()
             temp_visited.add(env.current_wp["pair"])
@@ -99,42 +105,15 @@ def run():
             vec = env.current_wp["pos"] - env.boat_pos
             next_head = math.atan2(vec[1], vec[0])
             
-            dx_next = env.target[0] - env.current_wp["pos"][0]
-            dy_next = env.target[1] - env.current_wp["pos"][1]
-            next_gps_head = math.atan2(dy_next, dx_next)
-            
+            # 여기서도 next_gps_head 대신 env.target 직접 전달
             env.next_wp = find_gap(
                 env.clusters, env.cluster_ids,
                 env.current_wp["pos"], next_head,
-                next_gps_head, temp_visited,
+                env.target, temp_visited,
                 env.grid, env.dynamic_obstacles
             )
         else:
             env.next_wp = None
-        
-        dist_to_final = np.linalg.norm(env.target - env.boat_pos)
-        dist_x = abs(env.target[0] - env.boat_pos[0])
-
-        if dist_x < 200:
-            dx_t = env.target[0] - env.boat_pos[0]
-            dy_t = env.target[1] - env.boat_pos[1]
-            t_angle = math.atan2(dy_t, dx_t)
-            rel_t = wrap(t_angle - env.boat_heading)
-            
-            if abs(rel_t) < np.pi/2:
-                beam_idx = int((rel_t + np.pi/2) / np.pi * (env.lidar_beams - 1))
-                beam_idx = np.clip(beam_idx, 0, env.lidar_beams - 1)
-                
-                is_clear = True
-                check_range = 2
-                for i in range(beam_idx - check_range, beam_idx + check_range + 1):
-                    if 0 <= i < env.lidar_beams:
-                        if dists[i] < dist_to_final: 
-                            is_clear = False
-                            break
-                
-                if is_clear:
-                    env.current_wp = None
 
         env.path_timer += env.dt
         if env.path_timer >= 0.01:

@@ -3,33 +3,64 @@ import math
 from utils import wrap
 from config import GRID, GRID_W, GRID_H
 
-def front_is_clear(boat_pos, boat_heading, obstacles, check_dist=300, fov=np.deg2rad(25)):
+def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25):
+    # 1. 보트 위치에서 목적지까지 직선 상에 장애물이 없는지 직접 검사
     bx, by = boat_pos
-    for (ox, oy, r) in obstacles:
-        dx = ox - bx
-        dy = oy - by
-        dist = math.sqrt(dx*dx + dy*dy)
-        if dist > check_dist:
-            continue
-        ang = math.atan2(dy, dx)
-        rel = wrap(ang - boat_heading)
-        if abs(rel) < fov:
-            return False
-    return True
+    tx, ty = target_pos
+    vx = tx - bx
+    vy = ty - by
+    dist_t2 = vx * vx + vy * vy
+    
+    if dist_t2 < 1e-6:
+        return True
+        
+    ox = obstacles[:, 0]
+    oy = obstacles[:, 1]
+    orad = obstacles[:, 2] + boat_radius + 10  # 10px 안전 여유
+    
+    px = ox - bx
+    py = oy - by
+    
+    # 선분 상에 투영되는 비율 t 계산
+    t = (px * vx + py * vy) / dist_t2
+    
+    # [핵심 버그 수정 1] 보트 뒤쪽(t < 0)이나 목적지 너머(t > 1)의 장애물 무시
+    # 정확히 보트와 목적지 사이(0 <= t <= 1)에 있는 장애물만 진짜 막힌 것으로 판정
+    valid = (t >= 0.0) & (t <= 1.0)
+    
+    if not np.any(valid):
+        return True
+        
+    cx = bx + t[valid] * vx
+    cy = by + t[valid] * vy
+    d2 = (ox[valid] - cx)**2 + (oy[valid] - cy)**2
+    
+    return not np.any(d2 <= orad[valid]**2)
 
-def find_gap(clusters, ids, boat_pos, boat_heading, gps_heading, visited, grid, obstacles):
-    if front_is_clear(boat_pos, boat_heading, obstacles):
+def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, obstacles):
+    bx, by = boat_pos
+    tx, ty = target_pos
+    dx_t = tx - bx
+    dy_t = ty - by
+    dist_to_target = math.hypot(dx_t, dy_t)
+    gps_heading = math.atan2(dy_t, dx_t)
+
+    if dist_to_target < 150 or target_is_clear(boat_pos, target_pos, obstacles):
         return None
         
-    bx, by = boat_pos
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])
     
     items = []
     for i, c in enumerate(clusters):
         v = c - boat_pos
         dist = np.linalg.norm(v)
+        if dist > dist_to_target + 50:
+            continue
+            
         ang = wrap(math.atan2(v[1], v[0]) - boat_heading)
-        if abs(ang) < np.pi/2:
+        # [핵심 버그 수정 2] 시야각을 좌우 90도에서 144도(np.pi * 0.8)로 대폭 확장
+        # 옆에 있는 틈새도 놓치지 않고 볼 수 있게 함
+        if abs(ang) < np.pi * 0.8:
             items.append((ang, dist, c, ids[i]))
             
     if len(items) < 2:
@@ -113,7 +144,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, gps_heading, visited, grid, 
                 min_clear = d
                 
         min_clear = max(min_clear, 0)
-        path_clear = min(min_clear / 120, 1)**2.5
+        path_clear = min(min_clear / 150, 1)**2.5 
         
         cnt = 0
         for (ox2, oy2, r2) in obs_f:
@@ -121,11 +152,26 @@ def find_gap(clusters, ids, boat_pos, boat_heading, gps_heading, visited, grid, 
                 cnt += 1
         cluster_pen = math.exp(-0.5 * cnt)
         
+        dir_x = mx - bx
+        dir_y = my - by
+        depth_pen = 1.0
+        if distm > 10:
+            norm_x = dir_x / distm
+            norm_y = dir_y / distm
+            past_x = mx + norm_x * 120
+            past_y = my + norm_y * 120
+            
+            past_blocked = 0
+            for (ox2, oy2, r2) in obs_f:
+                if (ox2 - past_x)**2 + (oy2 - past_y)**2 < 80*80:
+                    past_blocked += 1
+            
+            depth_pen = math.exp(-1.5 * past_blocked)
+        
         gap_w = np.linalg.norm(c2 - c1)
         width_w = min(gap_w / 90, 1)
-        small_gap = math.exp(-gap_w / 40)
         
-        sc = heading_align**4.5 * forward_proj**1.5 * lateral_full**2 * path_clear**2.5 * width_w**1.2 * cluster_pen * small_gap
+        sc = heading_align**5 * forward_proj**3 * lateral_full**0.5 * path_clear**1.5 * width_w**0.2 * cluster_pen * depth_pen
         
         if sc > best_sc:
             best_sc = sc
@@ -134,12 +180,12 @@ def find_gap(clusters, ids, boat_pos, boat_heading, gps_heading, visited, grid, 
     return best
 
 def reactive_avoidance(dists, angles):
-    SAFE = 360
-    sigma = 120
+    SAFE = 450
+    sigma = 200 
     a = 0.
     for d, ang in zip(dists, angles):
         if d < SAFE:
             w = math.exp(-(d / sigma)**2)
-            front = max(1.1 - abs(ang) / (math.pi/2), 0.4)
+            front = max(1.2 - abs(ang) / (math.pi/2), 0.3)
             a -= w * front * math.sin(ang)
     return a
