@@ -56,7 +56,7 @@ class BoatEnv:
         self.next_bezier_path = None
         self.pursuit_target = None
         self.next_pursuit_target = None
-        self.wakes = []
+        self.wakes = [] # [x, y, radius, alpha, type, life, max_life, angle_offset]
         
         self.obstacles = np.array([])
         self.dynamic_obstacles = np.array([])
@@ -183,6 +183,44 @@ class BoatEnv:
         self.boat_ang_vel += ang_acc * self.dt
         self.boat_ang_vel *= 0.84
         self.boat_heading += self.boat_ang_vel * self.dt
+
+        # 디테일한 파도 생성 로직
+        if vel_norm > 3:
+            h = self.boat_heading
+            intensity = min(1.0, vel_norm / 15.0) # 속도에 따른 파도 강도
+            
+            # 1. 중앙 프로펠러 난류 (자주 발생, 짧게 유지)
+            if self.frame % 2 == 0:
+                px = self.boat_pos[0] - math.cos(h) * 25
+                py = self.boat_pos[1] - math.sin(h) * 25
+                # x, y, 반경, 알파, 타입(0=중앙), 현재수명, 최대수명, 각도오프셋
+                self.wakes.append([px + random.uniform(-3, 3), py + random.uniform(-3, 3), 
+                                   1.0 + intensity, 180 * intensity, 0, 0, 40, 0])
+
+            # 2. 좌우 V자 주 파도 (Kelvin Wake)
+            if self.frame % 4 == 0:
+                spread_angle = 0.55 # 파도가 퍼지는 기본 각도
+                
+                # 좌측 주 파도
+                lx = self.boat_pos[0] - math.cos(h + 0.3) * 15
+                ly = self.boat_pos[1] - math.sin(h + 0.3) * 15
+                self.wakes.append([lx, ly, 1.5, 140 * intensity, 1, 0, 100, spread_angle])
+                
+                # 우측 주 파도
+                rx = self.boat_pos[0] - math.cos(h - 0.3) * 15
+                ry = self.boat_pos[1] - math.sin(h - 0.3) * 15
+                self.wakes.append([rx, ry, 1.5, 140 * intensity, -1, 0, 100, -spread_angle])
+
+            # 3. 바깥쪽 잔물결 (속도가 높을 때만 추가 생성)
+            if vel_norm > 8 and self.frame % 6 == 0:
+                outer_angle = 0.8
+                lx_o = self.boat_pos[0] - math.cos(h + 0.5) * 10
+                ly_o = self.boat_pos[1] - math.sin(h + 0.5) * 10
+                self.wakes.append([lx_o, ly_o, 1.0, 90 * intensity, 2, 0, 80, outer_angle])
+                
+                rx_o = self.boat_pos[0] - math.cos(h - 0.5) * 10
+                ry_o = self.boat_pos[1] - math.sin(h - 0.5) * 10
+                self.wakes.append([rx_o, ry_o, 1.0, 90 * intensity, -2, 0, 80, -outer_angle])
 
     def collide(self):
         ox = self.dynamic_obstacles[:, 0]
