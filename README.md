@@ -86,7 +86,7 @@ Windows 환경의 VS Code 터미널(PowerShell) 기준 실행 방법입니다.
 VS Code 터미널(Ctrl + `)에서 아래 명령어를 입력하여 저장소를 클론합니다.
 
 ```powershell
-git clone [https://github.com/hi-shp/data_science.git](https://github.com/hi-shp/data_science.git)
+git clone https://github.com/hi-shp/data_science.git
 ```
 
 ---
