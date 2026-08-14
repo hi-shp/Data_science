@@ -75,12 +75,67 @@
 
 ---
 
-## 6. 설치 및 실행 (Quick Start)
+## 6. 설치 및 실행 가이드 (Quick Start)
 
-### Prerequisites
-* Python 3.8+
-* Pygame, NumPy, SciPy, Scikit-learn
+Windows 환경의 VS Code 터미널(PowerShell) 기준 실행 방법입니다.
 
-### Execution
-```bash
-python simulation.py
+---
+
+### 6.1 저장소 복제
+
+VS Code 터미널(Ctrl + `)에서 아래 명령어를 입력하여 저장소를 클론합니다.
+
+```powershell
+git clone [https://github.com/hi-shp/data_science.git](https://github.com/hi-shp/data_science.git)
+```
+
+---
+
+### 6.2 가상환경 생성 및 활성화
+
+1. 가상환경 생성
+```powershell
+python -m venv venv
+```
+
+2. 가상환경 활성화 (PowerShell)
+```powershell
+.\venv\Scripts\Activate.ps1
+```
+
+> 스크립트 실행 권한 오류 발생 시 해결:
+> Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass 입력 후 활성화 스크립트 재실행
+
+---
+
+### 6.3 필수 라이브러리 설치
+
+```powershell
+python -m pip install --upgrade pip
+pip install pygame numpy scikit-learn
+```
+
+---
+
+### 6.4 프로그램 실행
+
+- 실시간 2D 자율주행 시뮬레이터 실행 (GUI)
+```powershell
+python main.py
+```
+
+- 파라미터 조합별 병렬 데이터 생성 실행 (CLI)
+```powershell
+python data_generation.py
+```
+
+---
+
+### 6.5 대시보드 인터페이스 조작
+
+시뮬레이터 창 하단의 체크박스를 클릭하여 각 시각화 레이어를 토글할 수 있습니다.
+
+- Show 1st Path Set: 현재 추종 중인 1차 베지어 경로 및 조향 타깃 표시
+- Show 2nd Path Set: 다음 장애물 통과를 위한 2차 베지어 경로 표시
+- Show LiDAR Hits: 라이다 장애물 감지 포인트 표시
+- Show LiDAR Range: 라이다 탐색 반경 및 레이 라인 표시
