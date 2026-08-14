@@ -38,13 +38,11 @@ def run():
             env.clusters, env.cluster_ids, new_c
         )
 
-        # 목적지까지 직선 경로가 뚫려있는지 최우선 검사
         if target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
             env.current_wp = None
             env.next_wp = None
             new_wp = None
         else:
-            # 막혀있을 때만 1차 웨이포인트 탐색 (gps_head 대신 env.target 좌표 전달)
             new_wp = find_gap(
                 env.clusters, env.cluster_ids,
                 env.boat_pos, env.boat_heading,
@@ -52,13 +50,12 @@ def run():
                 env.grid, env.dynamic_obstacles
             )
 
-        # 기존 웨이포인트 도달 시 삭제 로직
         if env.current_wp is not None:
             should_clear = False
             vec_to_wp = env.current_wp["pos"] - env.boat_pos
             dnow = np.linalg.norm(vec_to_wp)
             
-            if dnow < 75:
+            if dnow < 25:
                 should_clear = True
                 
             wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
@@ -73,13 +70,12 @@ def run():
                 env.visited.add((p[1], p[0]))
                 env.current_wp = None
 
-        # 새 웨이포인트로 갱신하는 로직 (가중치 튜닝 반영)
         if new_wp is not None:
             if env.current_wp is None:
                 env.current_wp = new_wp
             else:
                 dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                if dist_to_curr > 100:
+                if dist_to_curr > 80:
                     vec_curr = env.current_wp["pos"] - env.boat_pos
                     vec_new = new_wp["pos"] - env.boat_pos
                     
@@ -87,16 +83,11 @@ def run():
                     ang_new = math.atan2(vec_new[1], vec_new[0])
                     angle_diff = abs(wrap(ang_new - ang_curr))
                     
-                    threshold = 1.0
-                    if angle_diff > np.deg2rad(45):
-                        threshold = 1.2
-                    if angle_diff > np.deg2rad(80):
-                        threshold = 2.0
+                    threshold = 1.1
 
                     if new_wp["score"] > env.current_wp["score"] * threshold:
                         env.current_wp = new_wp
                         
-        # 2차 웨이포인트 탐색
         if env.current_wp is not None:
             temp_visited = env.visited.copy()
             temp_visited.add(env.current_wp["pair"])
@@ -105,7 +96,6 @@ def run():
             vec = env.current_wp["pos"] - env.boat_pos
             next_head = math.atan2(vec[1], vec[0])
             
-            # 여기서도 next_gps_head 대신 env.target 직접 전달
             env.next_wp = find_gap(
                 env.clusters, env.cluster_ids,
                 env.current_wp["pos"], next_head,
@@ -139,9 +129,18 @@ def run():
                 env.next_bezier_path = None
                 env.next_pursuit_target = None
 
+        visual_target = env.pursuit_target
+
+        if env.current_wp is not None and env.next_pursuit_target is not None and env.pursuit_target is not None:
+            dist_to_wp = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
+            if dist_to_wp < 85:
+                env.pursuit_target = env.next_pursuit_target
+
         steer = env.update_steering(dists)
         if steer is None:
             steer = 0
+
+        env.pursuit_target = visual_target
 
         L, R = env.get_pwm(steer)
         env.step(L, R)

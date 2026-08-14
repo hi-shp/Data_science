@@ -4,7 +4,6 @@ from utils import wrap
 from config import GRID, GRID_W, GRID_H
 
 def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25):
-    # 1. 보트 위치에서 목적지까지 직선 상에 장애물이 없는지 직접 검사
     bx, by = boat_pos
     tx, ty = target_pos
     vx = tx - bx
@@ -16,18 +15,14 @@ def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25):
         
     ox = obstacles[:, 0]
     oy = obstacles[:, 1]
-    orad = obstacles[:, 2] + boat_radius + 10  # 10px 안전 여유
+    # 직선 판정 안전 여유를 10에서 2로 줄여 목적지 직진을 훨씬 쉽게 허용함
+    orad = obstacles[:, 2] + boat_radius + 2 
     
     px = ox - bx
     py = oy - by
-    
-    # 선분 상에 투영되는 비율 t 계산
     t = (px * vx + py * vy) / dist_t2
     
-    # [핵심 버그 수정 1] 보트 뒤쪽(t < 0)이나 목적지 너머(t > 1)의 장애물 무시
-    # 정확히 보트와 목적지 사이(0 <= t <= 1)에 있는 장애물만 진짜 막힌 것으로 판정
     valid = (t >= 0.0) & (t <= 1.0)
-    
     if not np.any(valid):
         return True
         
@@ -54,12 +49,11 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     for i, c in enumerate(clusters):
         v = c - boat_pos
         dist = np.linalg.norm(v)
-        if dist > dist_to_target + 50:
+        # 클러스터가 목적지보다 멀리 있으면 무시 (엄격하게 차단)
+        if dist > dist_to_target + 15:
             continue
             
         ang = wrap(math.atan2(v[1], v[0]) - boat_heading)
-        # [핵심 버그 수정 2] 시야각을 좌우 90도에서 144도(np.pi * 0.8)로 대폭 확장
-        # 옆에 있는 틈새도 놓치지 않고 볼 수 있게 함
         if abs(ang) < np.pi * 0.8:
             items.append((ang, dist, c, ids[i]))
             
@@ -93,6 +87,10 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         rel = mid - boat_pos
         distm = np.linalg.norm(rel) + 1e-6
         
+        # 웨이포인트(mid)가 목적지보다 멀어지면 무조건 제외하여 엉뚱한 우회 방지
+        if distm > dist_to_target + 15:
+            continue
+            
         gx = int(mx // GRID)
         gy = int(my // GRID)
         blocked = False
