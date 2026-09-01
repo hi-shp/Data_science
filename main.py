@@ -43,9 +43,7 @@ def run():
             )
 
             dist_to_target = np.linalg.norm(env.target - env.boat_pos)
-            if dist_to_target < 200 or target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
-                env.current_wp = None
-                env.next_wp = None
+            if dist_to_target < 400 or target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
                 new_wp = None
             else:
                 new_wp = find_gap(
@@ -99,7 +97,7 @@ def run():
                         if new_wp["score"] > env.current_wp["score"] * threshold:
                             env.current_wp = new_wp
                             
-            if env.current_wp is not None:
+            if env.current_wp is not None and dist_to_target >= 400 and not target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
                 temp_visited = env.visited.copy()
                 temp_visited.add(env.current_wp["pair"])
                 temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
