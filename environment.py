@@ -55,7 +55,7 @@ class BoatEnv:
         self.mass = 12
         self.inertia = 6
         self.drag = 0.2
-        self.rot_drag = 1.3
+        self.rot_drag = 1.7
         self.boat_radius = 25
         
         self.trail = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
