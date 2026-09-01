@@ -38,7 +38,8 @@ def run():
             env.clusters, env.cluster_ids, new_c
         )
 
-        if target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
+        dist_to_target = np.linalg.norm(env.target - env.boat_pos)
+        if dist_to_target < 200 or target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
             env.current_wp = None
             env.next_wp = None
             new_wp = None

@@ -23,7 +23,7 @@ def parameterized_find_gap(clusters, ids, boat_pos, boat_heading, target_pos, vi
     dist_to_target = math.hypot(dx_t, dy_t)
     gps_heading = math.atan2(dy_t, dx_t)
 
-    if dist_to_target < 150 or target_is_clear(boat_pos, target_pos, obstacles):
+    if dist_to_target < 180 or target_is_clear(boat_pos, target_pos, obstacles):
         return None
         
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])
@@ -32,11 +32,12 @@ def parameterized_find_gap(clusters, ids, boat_pos, boat_heading, target_pos, vi
     for i, c in enumerate(clusters):
         v = c - boat_pos
         dist = np.linalg.norm(v)
-        if dist > dist_to_target + 15:
+        # 목적지보다 멀거나 전방 75도 벗어난 측후방 장애물 제외
+        if dist > dist_to_target - 25:
             continue
             
         ang = wrap(math.atan2(v[1], v[0]) - boat_heading)
-        if abs(ang) < np.pi * 0.8:
+        if abs(ang) < np.deg2rad(75):
             items.append((ang, dist, c, ids[i]))
             
     if len(items) < 2:
@@ -69,7 +70,8 @@ def parameterized_find_gap(clusters, ids, boat_pos, boat_heading, target_pos, vi
         rel = mid - boat_pos
         distm = np.linalg.norm(rel) + 1e-6
         
-        if distm > dist_to_target + 15:
+        forward_progress = np.dot(rel / distm, gps_vec)
+        if forward_progress < 0.25 or distm > dist_to_target - 20:
             continue
             
         gx = int(mx // GRID)
