@@ -164,13 +164,6 @@ def run():
             env.validate_wp_obstacle_5x5()
 
             if env.collide() or np.linalg.norm(env.target - env.boat_pos) < 70:
-                is_success = (np.linalg.norm(env.target - env.boat_pos) < 70 and not env.collide())
-                if is_success:
-                    env.success_count += 1
-                else:
-                    env.collision_count += 1
-                env.completed_episodes += 1
-                
                 ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 outdir = r"screenshot"
                 if not os.path.exists(outdir):
