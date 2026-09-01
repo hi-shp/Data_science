@@ -382,8 +382,8 @@ class FastBoatSim:
             self.prev_steer = steer_f
             
             avoid = reactive_avoidance(dists, self.rel_angles)
-            if self.current_wp is not None:
-                avoid = 0.0
+            if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.15:
+                avoid *= 0.25
                 
             avoid_multiplier = avoid_em if is_emergency else avoid_normal
             steer = float(np.clip(steer_f + avoid_multiplier * avoid, -1, 1))

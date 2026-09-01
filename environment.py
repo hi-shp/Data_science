@@ -340,9 +340,9 @@ class BoatEnv:
         
         avoid = reactive_avoidance(dists, self.rel_angles)
         
-        # 웨이포인트가 있을 때는 반대편 개활지 반발력(avoid)에 의한 좌우 진동 간섭을 완전히 차단하여 무조건 웨이포인트만 전념 추종
-        if self.current_wp is not None:
-            avoid = 0.0
+        # 반발력 정상 작동: 웨이포인트 선회 방향과 반대로 충돌할 때만 상쇄 방지를 위해 소프트 감쇠(0.25) 적용
+        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.15:
+            avoid *= 0.25
             
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 
