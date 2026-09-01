@@ -1,10 +1,7 @@
-"""
-cluster_train.py - 이멀전시 히스테리시스 & 갭 우선순위 가중치 포함 24코어 병렬 강화학습
-"""
 import os
-os.environ['SDL_VIDEODRIVER'] = 'dummy'
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 
+import pygame
 import multiprocessing as mp
 import numpy as np
 import math
@@ -249,198 +246,138 @@ class FastBoatSim:
                 self.boat_pos[1] <= 0 or self.boat_pos[1] >= self.sim_h)
         return hit or wall
 
-    def validate_wp_grid(self):
-        if self.current_wp is None: return
-        self.wp_check_timer += self.dt
-        if self.wp_check_timer < 0.05: return
-        self.wp_check_timer = 0
-        wp = self.current_wp["pos"]; pair = self.current_wp["pair"]
-        gx = int(wp[0] // GRID); gy = int(wp[1] // GRID); rad = int(35 // GRID)
-        for yy in range(max(0, gy - rad), min(GRID_H, gy + rad + 1)):
-            for xx in range(max(0, gx - rad), min(GRID_W, gx + rad + 1)):
-                if self.grid[yy, xx] >= 3:
-                    self.visited.add(pair); self.visited.add((pair[1], pair[0]))
-                    self.current_wp = None; return
+    def step_sim(self, params):
+        self.frame += 1
+        self.update_dynamic_obstacles()
 
-    def validate_wp_obstacle_5x5(self):
-        if self.current_wp is None: return
-        wp = self.current_wp["pos"]
-        gx = int(wp[0] // GRID); gy = int(wp[1] // GRID)
-        xs = range(gx - 2, gx + 3); ys = range(gy - 2, gy + 3)
-        ox = self.dynamic_obstacles[:, 0]; oy = self.dynamic_obstacles[:, 1]; rr = self.dynamic_obstacles[:, 2]
-        for yy in ys:
-            for xx in xs:
-                if 0 <= xx < GRID_W and 0 <= yy < GRID_H:
-                    cx = xx * GRID + GRID * 0.5; cy = yy * GRID + GRID * 0.5
-                    dx = ox - cx; dy = oy - cy
-                    hit = np.any(dx*dx + dy*dy <= rr*rr)
-                    if hit:
-                        p = self.current_wp["pair"]
-                        self.visited.add(p); self.visited.add((p[1], p[0]))
-                        self.current_wp = None; return
-
-_worker_sim = None
-
-def worker_init():
-    global _worker_sim
-    _worker_sim = FastBoatSim()
-
-def run_sim_task(args):
-    global _worker_sim
-    seed, params = args
-    sim = _worker_sim
-    sim.reset(seed)
-    
-    steer_gain = params['steer_gain']
-    steer_alpha = params['steer_alpha']
-    mom_coeff = params['mom_coeff']
-    pwm_rng = params['pwm_rng']
-    avoid_normal = params['avoid_normal']
-    avoid_em = params['avoid_em']
-    clear_margin = params['clear_margin']
-    
-    # 이멀전시 히스테리시스 파라미터
-    em_enter = params.get('em_enter', 75.0)
-    em_exit = params.get('em_exit', 115.0)
-    em_hold_frames = int(params.get('em_hold_frames', 12))
-    
-    # 갭 우선순위 가중치
-    align_exp = params.get('align_exp', 5.0)
-    fwd_exp = params.get('fwd_exp', 3.0)
-    clear_exp = params.get('clear_exp', 1.5)
-    width_exp = params.get('width_exp', 0.2)
-    cluster_pen_w = params.get('cluster_pen_w', 0.5)
-    wp_switch_thresh = params.get('wp_switch_thresh', 1.15)
-    
-    wp_arrive = 25.0
-    max_frames = 2600
-
-    for frame in range(max_frames):
-        sim.frame += 1
-        sim.update_dynamic_obstacles()
+        steer_gain = params['steer_gain']
+        steer_alpha = params['steer_alpha']
+        mom_coeff = params['mom_coeff']
+        pwm_rng = params['pwm_rng']
+        avoid_normal = params['avoid_normal']
+        avoid_em = params['avoid_em']
+        clear_margin = params['clear_margin']
+        em_enter = params.get('em_enter', 115.0)
+        em_exit = params.get('em_exit', 160.0)
+        em_hold_frames = int(params.get('em_hold_frames', 18))
+        
+        align_exp = params.get('align_exp', 5.0)
+        fwd_exp = params.get('fwd_exp', 3.0)
+        clear_exp = params.get('clear_exp', 1.5)
+        width_exp = params.get('width_exp', 0.2)
+        cluster_pen_w = params.get('cluster_pen_w', 0.5)
+        wp_switch_thresh = params.get('wp_switch_thresh', 1.15)
 
         dists, hits = lidar_hits_np(
-            sim.boat_pos, sim.boat_heading,
-            sim.rel_angles, sim.dynamic_obstacles,
-            sim.lidar_range
+            self.boat_pos, self.boat_heading,
+            self.rel_angles, self.dynamic_obstacles,
+            self.lidar_range
         )
 
-        update_grid(sim.grid, hits)
-        sim.grid *= 0.945
+        update_grid(self.grid, hits)
+        self.grid *= 0.945
 
-        if frame % 2 == 0:
-            new_c = extract_clusters_from_grid(sim.grid)
-            sim.clusters, sim.cluster_ids = match_clusters(
-                sim.clusters, sim.cluster_ids, new_c
+        if self.frame % 2 == 0:
+            new_c = extract_clusters_from_grid(self.grid)
+            self.clusters, self.cluster_ids = match_clusters(
+                self.clusters, self.cluster_ids, new_c
             )
-            sim.validate_wp_grid()
-            sim.validate_wp_obstacle_5x5()
 
-        if target_is_clear(sim.boat_pos, sim.target, sim.dynamic_obstacles, boat_radius=25 + clear_margin):
-            sim.current_wp = None
-            sim.next_wp = None
+        if target_is_clear(self.boat_pos, self.target, self.dynamic_obstacles, boat_radius=25 + clear_margin):
+            self.current_wp = None
+            self.next_wp = None
             new_wp = None
         else:
             new_wp = parameterized_find_gap(
-                sim.clusters, sim.cluster_ids,
-                sim.boat_pos, sim.boat_heading,
-                sim.target, sim.visited,
-                sim.grid, sim.dynamic_obstacles,
+                self.clusters, self.cluster_ids,
+                self.boat_pos, self.boat_heading,
+                self.target, self.visited,
+                self.grid, self.dynamic_obstacles,
                 align_exp, fwd_exp, clear_exp, width_exp, cluster_pen_w
             )
 
-        if sim.current_wp is not None:
-            should_clear = False
-            vec_to_wp = sim.current_wp["pos"] - sim.boat_pos
+        if self.current_wp is not None:
+            vec_to_wp = self.current_wp["pos"] - self.boat_pos
             dnow = np.linalg.norm(vec_to_wp)
-            if dnow < wp_arrive:
-                should_clear = True
+            should_clear = False
+            if dnow < 25.0: should_clear = True
             wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
-            angle_diff = abs(wrap(wp_angle - sim.boat_heading))
-            if angle_diff > np.pi / 2 and dnow < 60:
+            if abs(wrap(wp_angle - self.boat_heading)) > np.pi / 2 and dnow < 60:
                 should_clear = True
             if should_clear:
-                p = sim.current_wp["pair"]
-                sim.visited.add(p)
-                sim.visited.add((p[1], p[0]))
-                sim.current_wp = None
+                p = self.current_wp["pair"]
+                self.visited.add(p); self.visited.add((p[1], p[0]))
+                self.current_wp = None
 
         if new_wp is not None:
-            if sim.current_wp is None:
-                sim.current_wp = new_wp
+            if self.current_wp is None:
+                self.current_wp = new_wp
             else:
-                dist_to_curr = np.linalg.norm(sim.current_wp["pos"] - sim.boat_pos)
+                dist_to_curr = np.linalg.norm(self.current_wp["pos"] - self.boat_pos)
                 if dist_to_curr > 80:
-                    if new_wp["score"] > sim.current_wp["score"] * wp_switch_thresh:
-                        sim.current_wp = new_wp
+                    if new_wp["score"] > self.current_wp["score"] * wp_switch_thresh:
+                        self.current_wp = new_wp
 
-        if sim.current_wp is not None:
-            temp_visited = sim.visited.copy()
-            temp_visited.add(sim.current_wp["pair"])
-            temp_visited.add((sim.current_wp["pair"][1], sim.current_wp["pair"][0]))
-            vec = sim.current_wp["pos"] - sim.boat_pos
+        if self.current_wp is not None:
+            temp_visited = self.visited.copy()
+            temp_visited.add(self.current_wp["pair"]); temp_visited.add((self.current_wp["pair"][1], self.current_wp["pair"][0]))
+            vec = self.current_wp["pos"] - self.boat_pos
             next_head = math.atan2(vec[1], vec[0])
-            sim.next_wp = parameterized_find_gap(
-                sim.clusters, sim.cluster_ids,
-                sim.current_wp["pos"], next_head,
-                sim.target, temp_visited,
-                sim.grid, sim.dynamic_obstacles,
+            self.next_wp = parameterized_find_gap(
+                self.clusters, self.cluster_ids,
+                self.current_wp["pos"], next_head,
+                self.target, temp_visited,
+                self.grid, self.dynamic_obstacles,
                 align_exp, fwd_exp, clear_exp, width_exp, cluster_pen_w
             )
         else:
-            sim.next_wp = None
+            self.next_wp = None
 
-        sim.path_timer += sim.dt
-        if sim.path_timer >= 0.01:
-            sim.path_timer = 0
-            if sim.current_wp is None:
-                goal = sim.target
-            else:
-                goal = sim.current_wp["pos"]
-            sim.bezier_path = make_bezier_path(sim.boat_pos, sim.boat_heading, goal)
-            if sim.bezier_path is not None:
-                sim.pursuit_target = pure_pursuit(sim.bezier_path, sim.boat_pos, lookahead=52)
-            if sim.current_wp is not None and sim.next_wp is not None:
-                vec = sim.current_wp["pos"] - sim.boat_pos
+        self.path_timer += self.dt
+        if self.path_timer >= 0.01:
+            self.path_timer = 0
+            goal = self.target if self.current_wp is None else self.current_wp["pos"]
+            self.bezier_path = make_bezier_path(self.boat_pos, self.boat_heading, goal)
+            if self.bezier_path is not None:
+                self.pursuit_target = pure_pursuit(self.bezier_path, self.boat_pos, lookahead=52)
+            if self.current_wp is not None and self.next_wp is not None:
+                vec = self.current_wp["pos"] - self.boat_pos
                 next_start_head = math.atan2(vec[1], vec[0])
-                sim.next_bezier_path = make_bezier_path(sim.current_wp["pos"], next_start_head, sim.next_wp["pos"])
-                if sim.next_bezier_path is not None:
-                    sim.next_pursuit_target = pure_pursuit(sim.next_bezier_path, sim.current_wp["pos"], lookahead=52)
+                self.next_bezier_path = make_bezier_path(self.current_wp["pos"], next_start_head, self.next_wp["pos"])
+                if self.next_bezier_path is not None:
+                    self.next_pursuit_target = pure_pursuit(self.next_bezier_path, self.current_wp["pos"], lookahead=52)
             else:
-                sim.next_bezier_path = None
-                sim.next_pursuit_target = None
+                self.next_bezier_path = None
+                self.next_pursuit_target = None
 
-        visual_target = sim.pursuit_target
-        if sim.current_wp is not None and sim.next_pursuit_target is not None and sim.pursuit_target is not None:
-            dist_to_wp = np.linalg.norm(sim.current_wp["pos"] - sim.boat_pos)
-            if dist_to_wp < 75:
-                sim.pursuit_target = sim.next_pursuit_target
+        if self.current_wp is not None and self.next_pursuit_target is not None and self.pursuit_target is not None:
+            if np.linalg.norm(self.current_wp["pos"] - self.boat_pos) < 75:
+                self.pursuit_target = self.next_pursuit_target
 
-        # 이멀전시 히스테리시스 판정
-        center_idx = sim.lidar_beams // 2
-        span = sim.lidar_beams // 12
+        center_idx = self.lidar_beams // 2
+        span = self.lidar_beams // 9
         front_dists = dists[center_idx - span : center_idx + span]
         min_front_dist = np.min(front_dists)
         
         if min_front_dist < em_enter:
-            sim.emergency_mode = True
-            sim.emergency_cooldown = em_hold_frames
-        elif sim.emergency_mode:
-            sim.emergency_cooldown -= 1
-            if min_front_dist > em_exit and sim.emergency_cooldown <= 0:
-                sim.emergency_mode = False
+            self.emergency_mode = True
+            self.emergency_cooldown = em_hold_frames
+        elif self.emergency_mode:
+            self.emergency_cooldown -= 1
+            if min_front_dist > em_exit and self.emergency_cooldown <= 0:
+                self.emergency_mode = False
         
-        is_emergency = sim.emergency_mode
+        is_emergency = self.emergency_mode
         
-        if sim.pursuit_target is not None:
-            px, py = sim.pursuit_target
-            heading_target = math.atan2(py - sim.boat_pos[1], px - sim.boat_pos[0])
-            heading_error = wrap(heading_target - sim.boat_heading)
+        if self.pursuit_target is not None:
+            px, py = self.pursuit_target
+            heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
+            heading_error = wrap(heading_target - self.boat_heading)
             steer_raw = heading_error * steer_gain
-            steer_f = steer_alpha * steer_raw + (1 - steer_alpha) * sim.prev_steer
-            sim.prev_steer = steer_f
+            steer_f = steer_alpha * steer_raw + (1 - steer_alpha) * self.prev_steer
+            self.prev_steer = steer_f
             
-            avoid = reactive_avoidance(dists, sim.rel_angles)
+            avoid = reactive_avoidance(dists, self.rel_angles)
             avoid_multiplier = avoid_em if is_emergency else avoid_normal
             steer = float(np.clip(steer_f + avoid_multiplier * avoid, -1, 1))
         else:
@@ -458,52 +395,60 @@ def run_sim_task(args):
 
         tL = L * 10
         tR = R * 10
-        target_fwd = (tL + tR) / 9.0
-        if is_emergency:
-            target_fwd = (tL + tR) / 22.0  # 완전 감속 대신 선회 추진력을 살려 완벽 회피
-        if not hasattr(sim, 'current_fwd'):
-            sim.current_fwd = 0.0
-        sim.current_fwd = sim.current_fwd * 0.95 + target_fwd * 0.05
+        target_fwd = (tL + tR) / (22.0 if is_emergency else 9.0)
+        self.current_fwd = getattr(self, 'current_fwd', 0.0) * 0.95 + target_fwd * 0.05
         
         mom = (tR - tL) * mom_coeff
-        hv = np.array([math.cos(sim.boat_heading), math.sin(sim.boat_heading)])
-        acc = sim.current_fwd / sim.mass
-        vel_norm = np.linalg.norm(sim.boat_vel)
-        drag = -sim.drag * vel_norm * sim.boat_vel if vel_norm > 0 else np.zeros(2)
+        hv = np.array([math.cos(self.boat_heading), math.sin(self.boat_heading)])
+        acc = self.current_fwd / self.mass
+        vel_norm = np.linalg.norm(self.boat_vel)
+        drag = -self.drag * vel_norm * self.boat_vel if vel_norm > 0 else np.zeros(2)
         
-        sim.boat_vel += (acc * hv + drag) * sim.dt
-        sim.boat_pos += sim.boat_vel * sim.dt
+        self.boat_vel += (acc * hv + drag) * self.dt
+        self.boat_pos += self.boat_vel * self.dt
         
-        ang_acc = (mom - sim.rot_drag * sim.boat_ang_vel) / sim.inertia
-        sim.boat_ang_vel += ang_acc * sim.dt
-        sim.boat_ang_vel *= 0.84
-        sim.boat_heading += sim.boat_ang_vel * sim.dt
+        ang_acc = (mom - self.rot_drag * self.boat_ang_vel) / self.inertia
+        self.boat_ang_vel += ang_acc * self.dt
+        self.boat_ang_vel *= 0.84
+        self.boat_heading += self.boat_ang_vel * self.dt
 
-        dist_to_target = np.linalg.norm(sim.target - sim.boat_pos)
-        if sim.collide():
-            return 'collide', frame
-        if dist_to_target < 70:
-            return 'goal', frame
+        dist_to_target = np.linalg.norm(self.target - self.boat_pos)
+        if self.collide(): return 'collide'
+        if dist_to_target < 70: return 'goal'
+        if self.frame > 2600: return 'timeout'
+        return 'running'
 
-    return 'timeout', max_frames
+_worker_sim = None
+
+def worker_init():
+    global _worker_sim
+    _worker_sim = FastBoatSim()
+
+def run_sim_task(args):
+    global _worker_sim
+    seed, params = args
+    sim = _worker_sim
+    sim.reset(seed)
+    for _ in range(2600):
+        status = sim.step_sim(params)
+        if status != 'running':
+            return status, sim.frame
+    return 'timeout', 2600
 
 def mutate_params(base, scale=0.05):
     p = copy.deepcopy(base)
-    # 조타 및 물리
-    p['steer_gain'] = float(np.clip(p['steer_gain'] + np.random.normal(0, 0.02 * scale * 10), 0.70, 0.92))
+    p['steer_gain'] = float(np.clip(p['steer_gain'] + np.random.normal(0, 0.02 * scale * 10), 0.70, 0.95))
     p['steer_alpha'] = float(np.clip(p['steer_alpha'] + np.random.normal(0, 0.015 * scale * 10), 0.30, 0.45))
     p['mom_coeff'] = float(np.clip(p['mom_coeff'] + np.random.normal(0, 0.0002 * scale * 10), 0.0060, 0.0078))
     p['pwm_rng'] = float(np.clip(p['pwm_rng'] + np.random.normal(0, 5 * scale * 10), 250, 300))
-    p['avoid_normal'] = float(np.clip(p['avoid_normal'] + np.random.normal(0, 0.0015 * scale * 10), 0.016, 0.030))
-    p['avoid_em'] = float(np.clip(p['avoid_em'] + np.random.normal(0, 0.008 * scale * 10), 0.08, 0.16))
+    p['avoid_normal'] = float(np.clip(p['avoid_normal'] + np.random.normal(0, 0.0015 * scale * 10), 0.015, 0.030))
+    p['avoid_em'] = float(np.clip(p['avoid_em'] + np.random.normal(0, 0.008 * scale * 10), 0.07, 0.16))
     p['clear_margin'] = float(np.clip(p['clear_margin'] + np.random.normal(0, 0.4 * scale * 10), 1.5, 4.0))
     
-    # 이멀전시 히스테리시스
-    p['em_enter'] = float(np.clip(p['em_enter'] + np.random.normal(0, 2.0 * scale * 10), 65.0, 90.0))
-    p['em_exit'] = float(np.clip(p['em_exit'] + np.random.normal(0, 3.0 * scale * 10), 100.0, 140.0))
-    p['em_hold_frames'] = int(np.clip(p['em_hold_frames'] + int(np.random.normal(0, 2 * scale * 10)), 8, 25))
+    p['em_enter'] = float(np.clip(p['em_enter'] + np.random.normal(0, 3.0 * scale * 10), 95.0, 135.0))
+    p['em_exit'] = float(np.clip(p['em_exit'] + np.random.normal(0, 4.0 * scale * 10), 135.0, 185.0))
+    p['em_hold_frames'] = int(np.clip(p['em_hold_frames'] + int(np.random.normal(0, 2 * scale * 10)), 12, 25))
     
-    # 갭 가중치
     p['align_exp'] = float(np.clip(p['align_exp'] + np.random.normal(0, 0.3 * scale * 10), 3.0, 7.0))
     p['fwd_exp'] = float(np.clip(p['fwd_exp'] + np.random.normal(0, 0.2 * scale * 10), 2.0, 4.5))
     p['clear_exp'] = float(np.clip(p['clear_exp'] + np.random.normal(0, 0.15 * scale * 10), 1.0, 2.5))
@@ -511,17 +456,54 @@ def mutate_params(base, scale=0.05):
     p['wp_switch_thresh'] = float(np.clip(p['wp_switch_thresh'] + np.random.normal(0, 0.03 * scale * 10), 1.08, 1.35))
     return p
 
+def draw_mini_sim(surf, sim, rect, worker_id):
+    rx, ry, rw, rh = rect
+    sub = pygame.Surface((rw, rh))
+    sub.fill((10, 16, 26))
+    
+    sx = rw / sim.w
+    sy = rh / sim.sim_h
+    
+    # 장애물 그리기
+    for (ox, oy, r) in sim.dynamic_obstacles:
+        pygame.draw.circle(sub, (40, 80, 110), (int(ox * sx), int(oy * sy)), max(2, int(r * sx)))
+        
+    # 목표점
+    pygame.draw.circle(sub, (255, 200, 50), (int(sim.target[0] * sx), int(sim.target[1] * sy)), 5)
+    
+    # 경로
+    if sim.bezier_path is not None and len(sim.bezier_path) > 1:
+        pts = [(int(p[0] * sx), int(p[1] * sy)) for p in sim.bezier_path]
+        pygame.draw.lines(sub, (0, 220, 200), False, pts, 2)
+        
+    # 보트
+    bx, by = int(sim.boat_pos[0] * sx), int(sim.boat_pos[1] * sy)
+    color = (255, 60, 80) if sim.emergency_mode else (80, 220, 120)
+    pygame.draw.circle(sub, color, (bx, by), 4)
+    hx = bx + int(math.cos(sim.boat_heading) * 10)
+    hy = by + int(math.sin(sim.boat_heading) * 10)
+    pygame.draw.line(sub, (255, 255, 255), (bx, by), (hx, hy), 2)
+    
+    # 테두리 및 라벨
+    pygame.draw.rect(sub, (30, 55, 80), (0, 0, rw, rh), 1)
+    surf.blit(sub, (rx, ry))
+
 def main():
-    n_workers = min(12, os.cpu_count() or 4)
-    print("==================================================================", flush=True)
-    print(f"  24코어 이멀전시 히스테리시스 & 갭 가중치 강화학습 (Workers: {n_workers:2d})  ", flush=True)
-    print("==================================================================", flush=True)
-    print("  • 이멀전시 진입/해제 히스테리시스 및 최소 쿨다운(Hold) 도입", flush=True)
-    print("  • 갭(Waypoint) 선정 우선순위 가중치 5종 통합 최적화", flush=True)
-    print("──────────────────────────────────────────────────────────────────", flush=True)
-
+    n_workers = min(24, os.cpu_count() or 4)
+    pygame.init()
+    pygame.font.init()
+    
+    W_SCREEN, H_SCREEN = 1260, 720
+    screen = pygame.display.set_mode((W_SCREEN, H_SCREEN))
+    pygame.display.set_caption(f"KABOAT Parallel Cluster Training ({n_workers} Workers)")
+    clock = pygame.time.Clock()
+    
+    font_lg = pygame.font.SysFont("notosans", 22, bold=True)
+    font_md = pygame.font.SysFont("notosans", 16, bold=True)
+    font_sm = pygame.font.SysFont("notosans", 13)
+    
     pool = mp.Pool(processes=n_workers, initializer=worker_init)
-
+    
     best_params = {
         'steer_gain': 0.7752,
         'steer_alpha': 0.3515,
@@ -541,84 +523,161 @@ def main():
         'wp_switch_thresh': 1.15
     }
 
-    best_rate = 86.0
+    best_rate = 88.0
     generation = 0
+    history_rates = []
+    
+    # 4개의 실시간 시각화용 시뮬레이터 인스턴스
+    vis_sims = [FastBoatSim() for _ in range(4)]
+    for idx, s in enumerate(vis_sims):
+        s.reset(seed=1000 + idx)
 
+    print(f"Cluster RL training started with {n_workers} CPU workers.", flush=True)
+
+    running = True
     try:
-        while True:
+        while running:
             generation += 1
-            seed_offset = generation * 1000 + 100000
-            
-            if generation == 1:
-                candidate = copy.deepcopy(best_params)
-            else:
-                candidate = mutate_params(best_params, scale=0.04 + 0.03 * (generation % 3 == 0))
+            seed_offset = generation * 1000 + 200000
+            candidate = best_params if generation == 1 else mutate_params(best_params, scale=0.04 + 0.03 * (generation % 3 == 0))
+
+            # 4개의 시각화 시뮬레이터 리셋
+            for idx, s in enumerate(vis_sims):
+                s.reset(seed=seed_offset + idx)
+
+            # 비동기 병렬 평가 시작 (24코어 백그라운드)
+            tasks_stage1 = [(seed_offset + i, candidate) for i in range(48)]
+            async_res1 = pool.map_async(run_sim_task, tasks_stage1, chunksize=2)
 
             t0 = time.time()
-            from tqdm import tqdm
-            tasks_stage1 = [(seed_offset + i, candidate) for i in range(40)]
             
-            goals1 = 0
-            collisions1 = 0
-            
-            # 1단계 TQDM 바
-            pbar1 = tqdm(pool.imap_unordered(run_sim_task, tasks_stage1, chunksize=2), total=40, desc=f"Gen {generation:03d} Stage 1", leave=False)
-            for r, f in pbar1:
-                if r == 'goal': goals1 += 1
-                elif r == 'collide': collisions1 += 1
-                pbar1.set_postfix({'goals': goals1, 'col': collisions1})
-                
-            t_elapsed1 = time.time() - t0
-            rate1 = goals1 / 40.0 * 100.0
+            # 백그라운드 24코어가 돌 동안 메인 화면에서 4개 보트 실시간 렌더링
+            while not async_res1.ready() and running:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
+                        break
+                        
+                # 4개 시뮬레이터 1스텝 전진
+                for s in vis_sims:
+                    st = s.step_sim(candidate)
+                    if st != 'running':
+                        s.reset(seed=random.randint(10000, 99999))
 
-            is_elite = (rate1 >= 90.0)
-            tag = "ELITE 후보!" if is_elite else ""
-            print(f"Gen {generation:03d} | [1단계 40회] 도달: {goals1:2d}/40 ({rate1:.1f}%) | 충돌: {collisions1:2d} | {t_elapsed1:.1f}초 {tag}", flush=True)
+                # --- 렌더링 루틴 ---
+                screen.fill((7, 11, 18))
+                
+                # 1. 2x2 멀티 뷰포트 (4개 화면)
+                vw, vh = 410, 320
+                coords = [(15, 60), (435, 60), (15, 385), (435, 385)]
+                for idx, s in enumerate(vis_sims):
+                    draw_mini_sim(screen, s, (coords[idx][0], coords[idx][1], vw, vh), idx + 1)
+                    lbl = font_sm.render(f"Worker Monitor #{idx+1} [Live]", True, (130, 170, 200))
+                    screen.blit(lbl, (coords[idx][0] + 8, coords[idx][1] + 8))
 
-            if is_elite or generation == 1:
-                t0_2 = time.time()
-                from tqdm import tqdm
-                tasks_stage2 = [(seed_offset + 500 + i, candidate) for i in range(100)]
+                # 2. 상단 헤더
+                hdr_txt = font_lg.render(f"PARALLEL CLUSTER TRAINING - 24 CPU WORKERS", True, (0, 230, 190))
+                gen_txt = font_md.render(f"GENERATION: {generation:03d}  |  STATUS: EVALUATING 48 BATCHES", True, (180, 210, 230))
+                screen.blit(hdr_txt, (15, 12))
+                screen.blit(gen_txt, (15, 35))
+
+                # 3. 우측 대시보드 패널
+                px = 860
+                pygame.draw.rect(screen, (14, 22, 35), (px, 15, 385, 690), border_radius=8)
+                pygame.draw.rect(screen, (30, 50, 75), (px, 15, 385, 690), 1, border_radius=8)
+
+                title_hud = font_md.render("REAL-TIME RL METRICS", True, (255, 200, 50))
+                screen.blit(title_hud, (px + 15, 25))
+
+                best_txt = font_lg.render(f"BEST RATE: {best_rate:.1f}%", True, (0, 255, 140))
+                screen.blit(best_txt, (px + 15, 55))
+
+                # 그래프 영역
+                graph_rect = pygame.Rect(px + 15, 95, 355, 110)
+                pygame.draw.rect(screen, (8, 14, 22), graph_rect)
+                pygame.draw.rect(screen, (25, 45, 65), graph_rect, 1)
                 
-                goals2 = 0
-                collisions2 = 0
-                timeouts2 = 0
-                
-                # 2단계 TQDM 바
-                pbar2 = tqdm(pool.imap_unordered(run_sim_task, tasks_stage2, chunksize=4), total=100, desc="Stage 2", leave=False)
-                for r, f in pbar2:
-                    if r == 'goal': goals2 += 1
-                    elif r == 'collide': collisions2 += 1
-                    elif r == 'timeout': timeouts2 += 1
-                    pbar2.set_postfix({'goals': goals2, 'col': collisions2})
+                if len(history_rates) > 1:
+                    pts = []
+                    for i, r in enumerate(history_rates[-30:]):
+                        gx = graph_rect.x + int(i / max(1, len(history_rates[-30:]) - 1) * graph_rect.w)
+                        gy = graph_rect.bottom - int((r / 100.0) * graph_rect.h)
+                        pts.append((gx, gy))
+                    pygame.draw.lines(screen, (0, 220, 255), False, pts, 2)
                     
-                t_elapsed2 = time.time() - t0_2
+                rate_lbl = font_sm.render(f"History (Last 30 Gen) - Current Target: 95.0%", True, (120, 150, 180))
+                screen.blit(rate_lbl, (px + 15, 212))
+
+                # 파라미터 리스트 출력
+                param_title = font_md.render("BEST OPTIMIZED PARAMETERS", True, (200, 220, 240))
+                screen.blit(param_title, (px + 15, 245))
+                
+                y_off = 275
+                items = [
+                    ("Steer Gain", f"{best_params['steer_gain']:.4f}"),
+                    ("Steer Alpha", f"{best_params['steer_alpha']:.4f}"),
+                    ("Moment Coeff", f"{best_params['mom_coeff']:.6f}"),
+                    ("PWM Range", f"{best_params['pwm_rng']:.1f}"),
+                    ("Emergency Enter", f"{best_params['em_enter']:.1f} px"),
+                    ("Emergency Exit", f"{best_params['em_exit']:.1f} px"),
+                    ("Emergency Hold", f"{best_params['em_hold_frames']} frames"),
+                    ("Gap Align Exp", f"{best_params['align_exp']:.2f}"),
+                    ("Gap Fwd Exp", f"{best_params['fwd_exp']:.2f}"),
+                    ("Clear Exp", f"{best_params['clear_exp']:.2f}"),
+                    ("Width Exp", f"{best_params['width_exp']:.2f}"),
+                    ("Cluster Penalty", f"{best_params['cluster_pen_w']:.2f}"),
+                    ("WP Switch Thresh", f"{best_params['wp_switch_thresh']:.2f}"),
+                ]
+                
+                for k, v in items:
+                    t_k = font_sm.render(k, True, (130, 160, 185))
+                    t_v = font_sm.render(v, True, (255, 255, 255))
+                    screen.blit(t_k, (px + 15, y_off))
+                    screen.blit(t_v, (px + 230, y_off))
+                    y_off += 28
+
+                pygame.display.flip()
+                clock.tick(60)
+
+            if not running: break
+
+            results_stage1 = async_res1.get()
+            t_elapsed1 = time.time() - t0
+
+            goals1 = sum(1 for r, f in results_stage1 if r == 'goal')
+            collisions1 = sum(1 for r, f in results_stage1 if r == 'collide')
+            rate1 = goals1 / len(results_stage1) * 100.0
+            history_rates.append(rate1)
+
+            print(f"Gen {generation:03d} | Stage 1 (48) Goals: {goals1:2d} ({rate1:.1f}%) | Collisions: {collisions1:2d} | {t_elapsed1:.1f}s", flush=True)
+
+            if rate1 >= 88.0 or generation == 1:
+                tasks_stage2 = [(seed_offset + 500 + i, candidate) for i in range(100)]
+                results_stage2 = pool.map(run_sim_task, tasks_stage2, chunksize=4)
+
+                goals2 = sum(1 for r, f in results_stage2 if r == 'goal')
+                collisions2 = sum(1 for r, f in results_stage2 if r == 'collide')
                 rate2 = goals2 / 100.0 * 100.0
 
-                print(f"   ↳ [2단계 100회 정밀] 도달: {goals2:3d}/100 ({rate2:.1f}%) | 충돌: {collisions2:2d} | 타임아웃: {timeouts2:2d} | {t_elapsed2:.1f}초", flush=True)
+                print(f"   ↳ Stage 2 Precision (100) Goals: {goals2:3d}/100 ({rate2:.1f}%) | Collisions: {collisions2:2d}", flush=True)
 
                 if rate2 >= best_rate:
                     best_rate = rate2
                     best_params = copy.deepcopy(candidate)
-                    print(f"   ★ [최고 성능 갱신!] 도달률: {best_rate:.1f}% | params: {best_params}", flush=True)
-
-                if goals2 == 100 or rate2 >= 95.0:
-                    print("\n" + "=" * 66, flush=True)
-                    print(f"  축하합니다! 100회 무작위 맵 {rate2:.1f}% 초고도 무충돌 완주 달성! ", flush=True)
-                    print("=" * 66, flush=True)
-                    print(f"  최종 최적 파라미터 세트:", flush=True)
-                    for k, v in best_params.items():
-                        print(f"    • {k:18s}: {v}")
-                    print("──────────────────────────────────────────────────────────────────", flush=True)
-                    
+                    print(f"   ★ Best Rate Updated: {best_rate:.1f}%", flush=True)
                     with open("best_learned_params.json", "w") as f:
                         json.dump(best_params, f, indent=2)
-                    print("[완료] best_learned_params.json 파일 저장 완료.", flush=True)
+
+                if goals2 == 100 or rate2 >= 95.0:
+                    print("\n==================================================================", flush=True)
+                    print(f"  Target Success Rate ({rate2:.1f}%) Achieved! Final Parameters Saved.", flush=True)
+                    print("==================================================================", flush=True)
                     break
 
     finally:
         pool.close()
         pool.join()
+        pygame.quit()
 
 if __name__ == "__main__":
     main()
