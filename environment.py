@@ -245,38 +245,20 @@ class BoatEnv:
             sh = math.sin(h); ch = math.cos(h)
             GAP = 11; L = 84
 
-            # 1. 선체 앞쪽 및 양옆 사선 라인을 따라 뒤로 흩날리는 쇄파 스트림 (Streamlined Hull Boundary Wake)
-            if self.frame % 2 == 0:
-                for f_ratio in [0.42, 0.20]:
-                    lx = self.boat_pos[0] - sh * (GAP + 4) + ch * (L * f_ratio)
-                    ly = self.boat_pos[1] + ch * (GAP + 4) + sh * (L * f_ratio)
-                    rx = self.boat_pos[0] + sh * (GAP + 4) + ch * (L * f_ratio)
-                    ry = self.boat_pos[1] - ch * (GAP + 4) + sh * (L * f_ratio)
-                    
-                    drift_spd = 1.35 + (0.44 - f_ratio) * 0.7
-                    vx_l = -ch * drift_spd - sh * 0.40
-                    vy_l = -sh * drift_spd + ch * 0.40
-                    vx_r = -ch * drift_spd + sh * 0.40
-                    vy_r = -sh * drift_spd - ch * 0.40
-                    
-                    self.wakes.append([lx, ly, 1.2, 130 * intensity, vx_l, vy_l])
-                    self.wakes.append([rx, ry, 1.2, 130 * intensity, vx_r, vy_r])
-
-            # 2. 선미 듀얼 쓰러스터 추진 제트 기포 (Twin Stern Roostertail & Jet Foam - 컴팩트 기포)
+            # 선미 듀얼 쓰러스터 추진 제트 기포 및 후방 횡단 웨이크 (Enlarged Stern Roostertail & Trailing Foam)
             if self.frame % 2 == 0:
                 stern_lx = self.boat_pos[0] - sh * GAP - ch * (L * 0.50)
                 stern_ly = self.boat_pos[1] + ch * GAP - sh * (L * 0.50)
                 stern_rx = self.boat_pos[0] + sh * GAP - ch * (L * 0.50)
                 stern_ry = self.boat_pos[1] - ch * GAP - sh * (L * 0.50)
                 
-                self.wakes.append([stern_lx + random.uniform(-0.8, 0.8), stern_ly + random.uniform(-0.8, 0.8), 1.5, 160 * intensity, -ch * 0.5, -sh * 0.5])
-                self.wakes.append([stern_rx + random.uniform(-0.8, 0.8), stern_ry + random.uniform(-0.8, 0.8), 1.5, 160 * intensity, -ch * 0.5, -sh * 0.5])
+                self.wakes.append([stern_lx + random.uniform(-1.5, 1.5), stern_ly + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.65, -sh * 0.65])
+                self.wakes.append([stern_rx + random.uniform(-1.5, 1.5), stern_ry + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.65, -sh * 0.65])
                 
-            # 3. 선미 후방 횡단 켈빈 파도 (Transverse Kelvin Wave Train - 컴팩트 기포)
-            if self.frame % 4 == 0:
-                cx = self.boat_pos[0] - ch * 38
-                cy = self.boat_pos[1] - sh * 38
-                self.wakes.append([cx + random.uniform(-1.5, 1.5), cy + random.uniform(-1.5, 1.5), 2.2, 100 * intensity, -ch * 0.6, -sh * 0.6])
+            if self.frame % 3 == 0:
+                cx = self.boat_pos[0] - ch * 42
+                cy = self.boat_pos[1] - sh * 42
+                self.wakes.append([cx + random.uniform(-2.5, 2.5), cy + random.uniform(-2.5, 2.5), 4.5, 130 * intensity, -ch * 0.85, -sh * 0.85])
 
         # 파도-장애물 물리 상호작용 (Wave Absorption & Frothy Micro-Bubble Scattering)
         if len(self.wakes) > 0 and len(self.dynamic_obstacles) > 0:
