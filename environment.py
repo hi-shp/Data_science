@@ -227,42 +227,53 @@ class BoatEnv:
         self.boat_ang_vel *= 0.84
         self.boat_heading += self.boat_ang_vel * self.dt
 
-        # 디테일한 파도 생성 로직
-        if vel_norm > 2.5:
+        # 실제 선박 유체역학 파도 생성 (Realistic Hydrodynamic Wave System)
+        if vel_norm > 2.0:
             h = self.boat_heading
-            intensity = min(1.0, vel_norm / 12.0)
+            intensity = min(1.0, vel_norm / 11.0)
             sh = math.sin(h); ch = math.cos(h)
+            GAP = 11; L = 84
             
-            # 카타마란 좌/우 선미에서 풍성한 트윈 프로펠러 물결 웨이크 생성
-            if self.frame % 2 == 0:
-                GAP = 11; L = 84
-                lx = self.boat_pos[0] - sh * GAP - ch * (L * 0.48)
-                ly = self.boat_pos[1] + ch * GAP - sh * (L * 0.48)
-                rx = self.boat_pos[0] + sh * GAP - ch * (L * 0.48)
-                ry = self.boat_pos[1] - ch * GAP - sh * (L * 0.48)
-                
-                self.wakes.append([lx + random.uniform(-2, 2), ly + random.uniform(-2, 2), 2.5, 170 * intensity])
-                self.wakes.append([rx + random.uniform(-2, 2), ry + random.uniform(-2, 2), 2.5, 170 * intensity])
-                
-            # 좌우 확산 V자 켈빈 파도 (Wide Kelvin Wake)
+            # 1. 선수 분기파 (Twin Bow Divergent Waves)
             if self.frame % 3 == 0:
-                cx = self.boat_pos[0] - ch * 35
-                cy = self.boat_pos[1] - sh * 35
-                self.wakes.append([cx + random.uniform(-4, 4), cy + random.uniform(-4, 4), 3.5, 130 * intensity])
+                bow_lx = self.boat_pos[0] - sh * GAP + ch * (L * 0.42)
+                bow_ly = self.boat_pos[1] + ch * GAP + sh * (L * 0.42)
+                bow_rx = self.boat_pos[0] + sh * GAP + ch * (L * 0.42)
+                bow_ry = self.boat_pos[1] - ch * GAP + sh * (L * 0.42)
+                
+                # 선수 분기파는 좌우 바깥쪽으로 퍼짐
+                self.wakes.append([bow_lx, bow_ly, 2.0, 140 * intensity, -sh * 1.2 - ch * 0.3, ch * 1.2 - sh * 0.3])
+                self.wakes.append([bow_rx, bow_ry, 2.0, 140 * intensity, sh * 1.2 - ch * 0.3, -ch * 1.2 - sh * 0.3])
+
+            # 2. 선미 듀얼 쓰러스터 추진 제트 기포 (Twin Stern Roostertail & Jet Foam)
+            if self.frame % 2 == 0:
+                stern_lx = self.boat_pos[0] - sh * GAP - ch * (L * 0.50)
+                stern_ly = self.boat_pos[1] + ch * GAP - sh * (L * 0.50)
+                stern_rx = self.boat_pos[0] + sh * GAP - ch * (L * 0.50)
+                stern_ry = self.boat_pos[1] - ch * GAP - sh * (L * 0.50)
+                
+                self.wakes.append([stern_lx + random.uniform(-1.5, 1.5), stern_ly + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.5, -sh * 0.5])
+                self.wakes.append([stern_rx + random.uniform(-1.5, 1.5), stern_ry + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.5, -sh * 0.5])
+                
+            # 3. 선미 후방 횡단 켈빈 파도 (Transverse Kelvin Wave Train)
+            if self.frame % 4 == 0:
+                cx = self.boat_pos[0] - ch * 38
+                cy = self.boat_pos[1] - sh * 38
+                self.wakes.append([cx + random.uniform(-3, 3), cy + random.uniform(-3, 3), 4.5, 120 * intensity, -ch * 0.8, -sh * 0.8])
 
         # 파도-장애물 충돌 반사파 (Wave-Obstacle Reflection & Back-Scattering)
         if len(self.wakes) > 0 and len(self.dynamic_obstacles) > 0:
             for w in self.wakes:
-                if w[3] > 40 and w[2] > 5:
+                if w[3] > 35 and w[2] > 6:
                     for ox, oy, ob_r in self.dynamic_obstacles:
                         dx = w[0] - ox; dy = w[1] - oy
                         dist = math.hypot(dx, dy)
                         # 파도 전면이 부표 표면에 닿는 순간 반사파 링 생성
-                        if abs(dist - (w[2] + ob_r)) < 4.5:
-                            if random.random() < 0.28:
+                        if abs(dist - (w[2] + ob_r)) < 5.0:
+                            if random.random() < 0.32:
                                 contact_x = ox + (dx / (dist + 1e-5)) * (ob_r + 2)
                                 contact_y = oy + (dy / (dist + 1e-5)) * (ob_r + 2)
-                                self.reflected_wakes.append([contact_x, contact_y, 2.0, w[3] * 0.75])
+                                self.reflected_wakes.append([contact_x, contact_y, 2.0, w[3] * 0.8])
 
     def collide(self):
         ox = self.dynamic_obstacles[:, 0]
