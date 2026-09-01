@@ -189,10 +189,10 @@ class BoatEnv:
             self.dynamic_obstacles[i, 0] = ox + sway_x
             self.dynamic_obstacles[i, 1] = oy + sway_y
             
-            # 부표 중앙을 기준으로 부드러운 백색 원형 구름 파도가 긴 주기로 잔잔하게 퍼져나감
-            if (self.frame + i * 45) % 85 == 0:
+            # 부표 중앙을 기준으로 부드러운 백색 원형 구름 파도가 더 자주 잔잔하게 퍼져나감
+            if (self.frame + i * 19) % 36 == 0:
                 self.reflected_wakes.append([
-                    self.dynamic_obstacles[i, 0], self.dynamic_obstacles[i, 1], r + 1.2, 70
+                    self.dynamic_obstacles[i, 0], self.dynamic_obstacles[i, 1], r + 1.0, 72
                 ])
 
     def pwm_to_thrust(self, p):

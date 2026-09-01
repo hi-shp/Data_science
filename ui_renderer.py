@@ -61,14 +61,14 @@ class EnvRenderer:
                     pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.72)), (int(w[0]), int(w[1])), int(w[2] * 0.52))
         env.wakes = [w for w in env.wakes if w[3] > 0]
         
-        # 장애물 충돌 반사 및 부표 들썩임 시 퍼지는 원형 백색 구름 파도 (부드러운 저속 확산)
+        # 장애물 충돌 반사 및 부표 들썩임 시 퍼지는 원형 백색 구름 파도
         if hasattr(env, 'reflected_wakes'):
             for rw in env.reflected_wakes:
                 if len(rw) == 4:
-                    rw[2] += 0.28
-                    rw[3] -= 1.6
+                    rw[2] += 0.38
+                    rw[3] -= 2.2
                     if rw[3] > 0:
-                        pygame.draw.circle(env.wake_surf, (225, 242, 255, int(rw[3] * 0.45)), (int(rw[0]), int(rw[1])), int(rw[2]), 2)
+                        pygame.draw.circle(env.wake_surf, (225, 242, 255, int(rw[3] * 0.48)), (int(rw[0]), int(rw[1])), int(rw[2]), 2)
                 elif len(rw) >= 6:
                     rw[0] += rw[4]; rw[1] += rw[5]
                     rw[4] *= 0.88; rw[5] *= 0.88
