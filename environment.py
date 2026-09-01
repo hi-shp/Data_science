@@ -312,12 +312,16 @@ class BoatEnv:
         if not hasattr(self, 'emergency_cooldown'):
             self.emergency_cooldown = 0
             
-        if min_front_dist < 115.0:
+        em_enter = self.params.get('em_enter', 115.0)
+        em_exit = self.params.get('em_exit', 160.0)
+        em_hold = self.params.get('em_hold_frames', 18)
+
+        if min_front_dist < em_enter:
             self.emergency_mode = True
-            self.emergency_cooldown = 18
+            self.emergency_cooldown = em_hold
         elif self.emergency_mode:
             self.emergency_cooldown -= 1
-            if min_front_dist > 160.0 and self.emergency_cooldown <= 0:
+            if min_front_dist > em_exit and self.emergency_cooldown <= 0:
                 self.emergency_mode = False
 
         if self.pursuit_target is None: return 0
@@ -325,21 +329,26 @@ class BoatEnv:
         heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
         heading_error = wrap(heading_target - self.boat_heading)
 
-        if self.emergency_mode:
-            steer_gain = 0.95
-            avoid_multiplier = 0.08
-        else:
-            steer_gain = 0.775
-            avoid_multiplier = 0.019
-            
-        steer_raw = heading_error * steer_gain
-        steer_f = 0.4 * steer_raw + 0.6 * self.prev_steer
+        steer_gain = self.params.get('steer_gain', 0.7752)
+        steer_alpha = self.params.get('steer_alpha', 0.3515)
+        avoid_multiplier = self.params.get('avoid_em', 0.11) if self.emergency_mode else self.params.get('avoid_normal', 0.019)
+
+        # 1. 각속도 댐핑(D-term) 적용으로 직진 시 좌우 진동(도리도리) 원천 차단
+        d_term = -0.18 * getattr(self, 'boat_ang_vel', 0.0)
+        steer_raw = heading_error * steer_gain + d_term
+        steer_f = steer_alpha * steer_raw + (1.0 - steer_alpha) * self.prev_steer
         self.prev_steer = steer_f
         
         avoid = reactive_avoidance(dists, self.rel_angles)
         
-        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.25:
-            avoid *= 0.4
+        # 2. 미세 노이즈 데드존 적용
+        if abs(avoid) < 0.05:
+            avoid = 0.0
+        
+        # 3. 웨이포인트 방향과 장애물 회피 방향 충돌 시 상쇄 방지 (웨이포인트 선회 우선)
+        if self.current_wp is not None:
+            if (steer_f * avoid < 0):
+                avoid = 0.0
             
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 
