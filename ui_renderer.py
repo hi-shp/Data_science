@@ -19,14 +19,18 @@ class EnvRenderer:
         # 1. 밝고 맑은 마린 오션 수면 배경 (Brighter Clean Ocean)
         env.screen.fill((40, 118, 178))
         
-        # 아주 은은하고 드문드문한 미세 수면 잔물결 (Subtle Minimalist Ripples)
-        wave_t = env.frame * 0.02
-        for i in range(30, env.sim_h, 75):
-            for j in range(30, env.w, 100):
-                wx = j + math.cos(wave_t + i * 0.03) * 8
-                wy = i + math.sin(wave_t * 0.6 + j * 0.03) * 4
-                w_len = 14 + math.sin(wave_t + j * 0.02) * 5
-                pygame.draw.line(env.screen, (52, 132, 194), (int(wx), int(wy)), (int(wx + w_len), int(wy)), 1)
+        # 아주 은은하고 자연스러운 해양 잔물결 파도 (Gentle Natural Ocean Swell Waves)
+        wave_t = env.frame * 0.016
+        for i in range(25, env.sim_h, 60):
+            for j in range(25, env.w, 80):
+                wx = j + math.cos(wave_t + i * 0.025 + j * 0.01) * 9
+                wy = i + math.sin(wave_t * 0.7 + j * 0.025) * 5
+                w_len = 16 + math.sin(wave_t + j * 0.02) * 6
+                # 물결 본선 (부드러운 오션 하이라이트)
+                pygame.draw.line(env.screen, (55, 134, 196), (int(wx), int(wy)), (int(wx + w_len), int(wy)), 1)
+                # 아주 은은한 미세 물결 크레스트 포인트 (Soft Crest Tip)
+                if (i + j) % 160 == 0:
+                    pygame.draw.circle(env.screen, (210, 235, 255), (int(wx + w_len * 0.5), int(wy - 1)), 1)
 
         bx, by = env.boat_pos
         h = env.boat_heading
