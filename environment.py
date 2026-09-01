@@ -100,7 +100,7 @@ class BoatEnv:
         self.cb3_rect = pygame.Rect(40, 750, 20, 20)
         self.cb4_rect = pygame.Rect(40, 790, 20, 20)
         
-        self.sim_speed = 2
+        self.sim_speed = 1
         self.speed_btns = {
             1: pygame.Rect(40, 835, 52, 28),
             2: pygame.Rect(100, 835, 52, 28),
