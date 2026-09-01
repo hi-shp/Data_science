@@ -100,6 +100,14 @@ class BoatEnv:
         self.cb3_rect = pygame.Rect(40, 750, 20, 20)
         self.cb4_rect = pygame.Rect(40, 790, 20, 20)
         
+        self.sim_speed = 2
+        self.speed_btns = {
+            1: pygame.Rect(40, 835, 52, 28),
+            2: pygame.Rect(100, 835, 52, 28),
+            3: pygame.Rect(160, 835, 52, 28),
+            4: pygame.Rect(220, 835, 52, 28)
+        }
+        
         self.renderer = EnvRenderer(self)
         self.reset()
 
@@ -164,6 +172,11 @@ class BoatEnv:
             self.show_lidar = not self.show_lidar
         elif self.cb4_rect.collidepoint(pos):
             self.show_lidar_range = not self.show_lidar_range
+        else:
+            for spd, rect in self.speed_btns.items():
+                if rect.collidepoint(pos):
+                    self.sim_speed = spd
+                    break
 
     def update_dynamic_obstacles(self):
         self.dynamic_obstacles = self.obstacles.copy()
