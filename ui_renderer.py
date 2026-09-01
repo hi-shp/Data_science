@@ -51,18 +51,18 @@ class EnvRenderer:
         for w in env.wakes:
             # w: [x, y, radius, alpha, vx, vy]
             if len(w) >= 6:
-                w[0] += w[4] * 0.85
-                w[1] += w[5] * 0.85
-                w[4] *= 0.92
-                w[5] *= 0.92
-            w[2] += 0.28  # 부드럽고 자연스러운 거품 확장
-            w[3] -= 2.6   # 자연스러운 수면 분산 소멸
+                w[0] += w[4] * 0.80
+                w[1] += w[5] * 0.80
+                w[4] *= 0.93
+                w[5] *= 0.93
+            w[2] += 1.15  # 웅장하고 풍성한 선미 거품 확장
+            w[3] -= 2.4   # 긴 항적 지속성
             if w[3] > 0:
                 # 외곽 확장 파도 크레스트 (Wave Crest)
-                pygame.draw.circle(env.wake_surf, (220, 240, 255, int(w[3] * 0.40)), (int(w[0]), int(w[1])), int(w[2]))
-                # 내부 백색 기포 제트 코어 (Aerated Jet Foam Core)
-                if w[2] > 1.2:
-                    pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.75)), (int(w[0]), int(w[1])), int(w[2] * 0.55))
+                pygame.draw.circle(env.wake_surf, (220, 240, 255, int(w[3] * 0.42)), (int(w[0]), int(w[1])), int(w[2]))
+                # 내부 백색 기포 난류 (Aerated Foam Core)
+                if w[2] > 1.8:
+                    pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.72)), (int(w[0]), int(w[1])), int(w[2] * 0.52))
         env.wakes = [w for w in env.wakes if w[3] > 0]
         
         # 장애물 충돌 반사 및 부표 들썩임 시 퍼지는 원형 백색 구름 파도
