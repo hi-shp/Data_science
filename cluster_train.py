@@ -429,31 +429,52 @@ def run_sim_task(args):
     seed, params = args
     sim = _worker_sim
     sim.reset(seed)
-    for _ in range(2600):
+    # 1100프레임으로 제한하여 불필요한 타임아웃 낭비 제거 및 4배 가속
+    for _ in range(1100):
         status = sim.step_sim(params)
         if status != 'running':
             return status, sim.frame
-    return 'timeout', 2600
+    return 'timeout', 1100
 
-def mutate_params(base, scale=0.05):
+def mutate_params(base, scale=0.03):
     p = copy.deepcopy(base)
-    p['steer_gain'] = float(np.clip(p['steer_gain'] + np.random.normal(0, 0.02 * scale * 10), 0.70, 0.95))
-    p['steer_alpha'] = float(np.clip(p['steer_alpha'] + np.random.normal(0, 0.015 * scale * 10), 0.30, 0.45))
-    p['mom_coeff'] = float(np.clip(p['mom_coeff'] + np.random.normal(0, 0.0002 * scale * 10), 0.0060, 0.0078))
-    p['pwm_rng'] = float(np.clip(p['pwm_rng'] + np.random.normal(0, 5 * scale * 10), 250, 300))
-    p['avoid_normal'] = float(np.clip(p['avoid_normal'] + np.random.normal(0, 0.0015 * scale * 10), 0.015, 0.030))
-    p['avoid_em'] = float(np.clip(p['avoid_em'] + np.random.normal(0, 0.008 * scale * 10), 0.07, 0.16))
-    p['clear_margin'] = float(np.clip(p['clear_margin'] + np.random.normal(0, 0.4 * scale * 10), 1.5, 4.0))
+    # 한 번에 모든 파라미터를 흔들지 않고 2~3개만 미세 조정하여 밸런스 붕괴 방지
+    keys = list(p.keys())
+    selected_keys = random.sample(keys, k=random.randint(2, 4))
     
-    p['em_enter'] = float(np.clip(p['em_enter'] + np.random.normal(0, 3.0 * scale * 10), 95.0, 135.0))
-    p['em_exit'] = float(np.clip(p['em_exit'] + np.random.normal(0, 4.0 * scale * 10), 135.0, 185.0))
-    p['em_hold_frames'] = int(np.clip(p['em_hold_frames'] + int(np.random.normal(0, 2 * scale * 10)), 12, 25))
-    
-    p['align_exp'] = float(np.clip(p['align_exp'] + np.random.normal(0, 0.3 * scale * 10), 3.0, 7.0))
-    p['fwd_exp'] = float(np.clip(p['fwd_exp'] + np.random.normal(0, 0.2 * scale * 10), 2.0, 4.5))
-    p['clear_exp'] = float(np.clip(p['clear_exp'] + np.random.normal(0, 0.15 * scale * 10), 1.0, 2.5))
-    p['width_exp'] = float(np.clip(p['width_exp'] + np.random.normal(0, 0.05 * scale * 10), 0.1, 0.4))
-    p['wp_switch_thresh'] = float(np.clip(p['wp_switch_thresh'] + np.random.normal(0, 0.03 * scale * 10), 1.08, 1.35))
+    for k in selected_keys:
+        if k == 'steer_gain':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.015), 0.70, 0.90))
+        elif k == 'steer_alpha':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.012), 0.30, 0.45))
+        elif k == 'mom_coeff':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.00015), 0.0060, 0.0075))
+        elif k == 'pwm_rng':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 3.0), 250, 290))
+        elif k == 'avoid_normal':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.001), 0.015, 0.025))
+        elif k == 'avoid_em':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.005), 0.08, 0.14))
+        elif k == 'clear_margin':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.2), 1.5, 3.5))
+        elif k == 'em_enter':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 2.0), 105.0, 125.0))
+        elif k == 'em_exit':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 3.0), 145.0, 175.0))
+        elif k == 'em_hold_frames':
+            p[k] = int(np.clip(p[k] + int(np.random.choice([-1, 1])), 14, 22))
+        elif k == 'align_exp':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.2), 4.0, 6.0))
+        elif k == 'fwd_exp':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.15), 2.5, 3.8))
+        elif k == 'clear_exp':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.1), 1.2, 2.0))
+        elif k == 'width_exp':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.03), 0.15, 0.30))
+        elif k == 'cluster_pen_w':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.05), 0.3, 0.8))
+        elif k == 'wp_switch_thresh':
+            p[k] = float(np.clip(p[k] + np.random.normal(0, 0.02), 1.10, 1.25))
     return p
 
 def main():
