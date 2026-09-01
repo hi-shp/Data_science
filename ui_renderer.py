@@ -44,13 +44,13 @@ class EnvRenderer:
         # 3. 실제 선박 유체역학 항적 웨이크 + 장애물 반사/산란 미세 거품 (Realistic Wakes & Scattering Bubbles)
         env.wake_surf.fill((0, 0, 0, 0))
         
-        # 부표 중앙을 기준으로 부표 표면 밖으로 아주 살짝 피어나는 백색 수면 구름 (Concentric White Cloud Foam Aura)
+        # 부표 중앙을 기준으로 부표 표면 밖으로 아주 살짝 피어나는 백색 수면 구름 (긴 주기의 잔잔한 아우라)
         for ox, oy, r in env.dynamic_obstacles:
-            pulse_f = math.sin(env.frame * 0.05 + ox * 0.06 + oy * 0.06) * 1.0
-            outer_cloud_r = r + 3.0 + pulse_f
-            inner_cloud_r = r + 1.5 + pulse_f * 0.5
-            pygame.draw.circle(env.wake_surf, (220, 240, 255, 60), (int(ox), int(oy)), int(outer_cloud_r))
-            pygame.draw.circle(env.wake_surf, (255, 255, 255, 95), (int(ox), int(oy)), int(inner_cloud_r))
+            pulse_f = math.sin(env.frame * 0.015 + ox * 0.03 + oy * 0.03) * 0.75
+            outer_cloud_r = r + 2.8 + pulse_f
+            inner_cloud_r = r + 1.4 + pulse_f * 0.5
+            pygame.draw.circle(env.wake_surf, (220, 240, 255, 55), (int(ox), int(oy)), int(outer_cloud_r))
+            pygame.draw.circle(env.wake_surf, (255, 255, 255, 85), (int(ox), int(oy)), int(inner_cloud_r))
 
         for w in env.wakes:
             # w: [x, y, radius, alpha, vx, vy]
@@ -69,14 +69,14 @@ class EnvRenderer:
                     pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.72)), (int(w[0]), int(w[1])), int(w[2] * 0.52))
         env.wakes = [w for w in env.wakes if w[3] > 0]
         
-        # 장애물 충돌 반사 및 부표 들썩임 시 퍼지는 원형 백색 구름 파도
+        # 장애물 충돌 반사 및 부표 들썩임 시 퍼지는 원형 백색 구름 파도 (부드러운 저속 확산)
         if hasattr(env, 'reflected_wakes'):
             for rw in env.reflected_wakes:
                 if len(rw) == 4:
-                    rw[2] += 0.45
-                    rw[3] -= 3.0
+                    rw[2] += 0.28
+                    rw[3] -= 1.6
                     if rw[3] > 0:
-                        pygame.draw.circle(env.wake_surf, (225, 242, 255, int(rw[3] * 0.5)), (int(rw[0]), int(rw[1])), int(rw[2]), 2)
+                        pygame.draw.circle(env.wake_surf, (225, 242, 255, int(rw[3] * 0.45)), (int(rw[0]), int(rw[1])), int(rw[2]), 2)
                 elif len(rw) >= 6:
                     rw[0] += rw[4]; rw[1] += rw[5]
                     rw[4] *= 0.88; rw[5] *= 0.88
