@@ -60,18 +60,18 @@ class EnvRenderer:
         for w in env.wakes:
             # w: [x, y, radius, alpha, vx, vy]
             if len(w) >= 6:
-                w[0] += w[4] * 0.75
-                w[1] += w[5] * 0.75
-                w[4] *= 0.92
-                w[5] *= 0.92
-            w[2] += 0.85
-            w[3] -= 2.6
+                w[0] += w[4] * 0.70
+                w[1] += w[5] * 0.70
+                w[4] *= 0.90
+                w[5] *= 0.90
+            w[2] += 0.65  # 한층 더 작고 부드러운 거품 확장
+            w[3] -= 2.9   # 자연스러운 점진적 소멸
             if w[3] > 0:
                 # 외곽 확장 파도 크레스트 (Wave Crest)
-                pygame.draw.circle(env.wake_surf, (220, 240, 255, int(w[3] * 0.40)), (int(w[0]), int(w[1])), int(w[2]))
+                pygame.draw.circle(env.wake_surf, (220, 240, 255, int(w[3] * 0.38)), (int(w[0]), int(w[1])), int(w[2]))
                 # 내부 백색 기포 난류 (Aerated Foam Core)
-                if w[2] > 1.5:
-                    pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.70)), (int(w[0]), int(w[1])), int(w[2] * 0.48))
+                if w[2] > 1.2:
+                    pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.65)), (int(w[0]), int(w[1])), int(w[2] * 0.45))
         env.wakes = [w for w in env.wakes if w[3] > 0]
         
         # 장애물 충돌 시 발생하는 자글자글한 미세 거품 파편들 (Scattered Micro-Bubbles)

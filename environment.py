@@ -183,10 +183,22 @@ class BoatEnv:
         self.dynamic_obstacles = self.obstacles.copy()
         for i in range(len(self.obstacles)):
             ox, oy, r = self.obstacles[i]
-            sway_x = math.sin(self.frame * 0.03 + oy * 0.1) * (r * 0.2)
-            sway_y = math.cos(self.frame * 0.04 + ox * 0.1) * (r * 0.2)
+            phase = self.frame * 0.04 + ox * 0.05 + oy * 0.05
+            sway_x = math.sin(phase) * (r * 0.2)
+            sway_y = math.cos(phase * 1.2) * (r * 0.2)
             self.dynamic_obstacles[i, 0] = ox + sway_x
             self.dynamic_obstacles[i, 1] = oy + sway_y
+            
+            # 부표가 위아래로 들썩일 때 배처럼 부드러운 백색 구름 거품들이 원형으로 퍼져나감
+            if (self.frame + i * 13) % 22 == 0:
+                for k in range(6):
+                    ang = k * (math.pi / 3) + random.uniform(-0.15, 0.15)
+                    fx = self.dynamic_obstacles[i, 0] + math.cos(ang) * (r + 1.5)
+                    fy = self.dynamic_obstacles[i, 1] + math.sin(ang) * (r + 1.5)
+                    self.reflected_wakes.append([
+                        fx, fy, 1.2, 85,
+                        math.cos(ang) * 0.55, math.sin(ang) * 0.55
+                    ])
 
     def pwm_to_thrust(self, p):
         return p * 10
@@ -208,10 +220,14 @@ class BoatEnv:
         
         acc = self.current_fwd / self.mass
         vel_norm = np.linalg.norm(self.boat_vel)
-        if vel_norm > 0:
-            drag = -self.drag * vel_norm * self.boat_vel
-        else:
-            drag = np.zeros(2)
+        
+        # 유체 항력
+        drag = -self.drag * self.boat_vel * vel_norm
+        
+        # 횡방향 슬립 댐핑
+        lat_v = np.array([-math.sin(self.boat_heading), math.cos(self.boat_heading)])
+        lat_speed = np.dot(self.boat_vel, lat_v)
+        drag += -lat_v * lat_speed * 18.0
             
         prev = self.boat_pos.copy()
         self.boat_vel += (acc * hv + drag) * self.dt
@@ -234,21 +250,22 @@ class BoatEnv:
             sh = math.sin(h); ch = math.cos(h)
             GAP = 11; L = 84
 
-            # 1. 선수 조파저항 쇄파 구름 (Bow Divergent Wave Foam Clouds - 화살촉 궤적으로 사선 방출)
+            # 1. 선체 앞쪽 및 양옆 사선 라인을 따라 뒤로 흩날리는 쇄파 스트림 (Streamlined Hull Boundary Wake)
             if self.frame % 2 == 0:
-                bow_lx = self.boat_pos[0] - sh * GAP + ch * (L * 0.44)
-                bow_ly = self.boat_pos[1] + ch * GAP + sh * (L * 0.44)
-                bow_rx = self.boat_pos[0] + sh * GAP + ch * (L * 0.44)
-                bow_ry = self.boat_pos[1] - ch * GAP + sh * (L * 0.44)
-                
-                # 켈빈 쇄파 각도(뒤쪽 + 바깥쪽)로 전개되는 속도 벡터 -> 자연스러운 화살촉 구름 라인 형성
-                vx_l = -ch * 0.65 - sh * 1.25
-                vy_l = -sh * 0.65 + ch * 1.25
-                vx_r = -ch * 0.65 + sh * 1.25
-                vy_r = -sh * 0.65 - ch * 1.25
-                
-                self.wakes.append([bow_lx, bow_ly, 1.5, 150 * intensity, vx_l, vy_l])
-                self.wakes.append([bow_rx, bow_ry, 1.5, 150 * intensity, vx_r, vy_r])
+                for f_ratio in [0.42, 0.20]:
+                    lx = self.boat_pos[0] - sh * (GAP + 4) + ch * (L * f_ratio)
+                    ly = self.boat_pos[1] + ch * (GAP + 4) + sh * (L * f_ratio)
+                    rx = self.boat_pos[0] + sh * (GAP + 4) + ch * (L * f_ratio)
+                    ry = self.boat_pos[1] - ch * (GAP + 4) + sh * (L * f_ratio)
+                    
+                    drift_spd = 1.35 + (0.44 - f_ratio) * 0.7
+                    vx_l = -ch * drift_spd - sh * 0.40
+                    vy_l = -sh * drift_spd + ch * 0.40
+                    vx_r = -ch * drift_spd + sh * 0.40
+                    vy_r = -sh * drift_spd - ch * 0.40
+                    
+                    self.wakes.append([lx, ly, 1.2, 130 * intensity, vx_l, vy_l])
+                    self.wakes.append([rx, ry, 1.2, 130 * intensity, vx_r, vy_r])
 
             # 2. 선미 듀얼 쓰러스터 추진 제트 기포 (Twin Stern Roostertail & Jet Foam - 컴팩트 기포)
             if self.frame % 2 == 0:
@@ -257,14 +274,14 @@ class BoatEnv:
                 stern_rx = self.boat_pos[0] + sh * GAP - ch * (L * 0.50)
                 stern_ry = self.boat_pos[1] - ch * GAP - sh * (L * 0.50)
                 
-                self.wakes.append([stern_lx + random.uniform(-1.0, 1.0), stern_ly + random.uniform(-1.0, 1.0), 1.8, 170 * intensity, -ch * 0.5, -sh * 0.5])
-                self.wakes.append([stern_rx + random.uniform(-1.0, 1.0), stern_ry + random.uniform(-1.0, 1.0), 1.8, 170 * intensity, -ch * 0.5, -sh * 0.5])
+                self.wakes.append([stern_lx + random.uniform(-0.8, 0.8), stern_ly + random.uniform(-0.8, 0.8), 1.5, 160 * intensity, -ch * 0.5, -sh * 0.5])
+                self.wakes.append([stern_rx + random.uniform(-0.8, 0.8), stern_ry + random.uniform(-0.8, 0.8), 1.5, 160 * intensity, -ch * 0.5, -sh * 0.5])
                 
             # 3. 선미 후방 횡단 켈빈 파도 (Transverse Kelvin Wave Train - 컴팩트 기포)
             if self.frame % 4 == 0:
                 cx = self.boat_pos[0] - ch * 38
                 cy = self.boat_pos[1] - sh * 38
-                self.wakes.append([cx + random.uniform(-2, 2), cy + random.uniform(-2, 2), 2.8, 110 * intensity, -ch * 0.7, -sh * 0.7])
+                self.wakes.append([cx + random.uniform(-1.5, 1.5), cy + random.uniform(-1.5, 1.5), 2.2, 100 * intensity, -ch * 0.6, -sh * 0.6])
 
         # 파도-장애물 물리 상호작용 (Wave Absorption & Frothy Micro-Bubble Scattering)
         if len(self.wakes) > 0 and len(self.dynamic_obstacles) > 0:
