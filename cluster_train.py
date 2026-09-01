@@ -367,29 +367,39 @@ class FastBoatSim:
             if min_front_dist > em_exit and self.emergency_cooldown <= 0:
                 self.emergency_mode = False
         
-        is_emergency = self.emergency_mode
-        
-        if self.pursuit_target is not None:
+        avoid = reactive_avoidance(dists, self.rel_angles)
+
+        if is_emergency:
+            left_space = np.mean(dists[center_idx - span : center_idx])
+            right_space = np.mean(dists[center_idx : center_idx + span])
+            heading_error = 0.0
+            if self.pursuit_target is not None:
+                px, py = self.pursuit_target
+                heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
+                heading_error = wrap(heading_target - self.boat_heading)
+                
+            if heading_error > 0.05 or (abs(heading_error) <= 0.05 and right_space >= left_space):
+                base_turn = 0.85
+            else:
+                base_turn = -0.85
+            steer = float(np.clip(base_turn + avoid_em * avoid, -1.0, 1.0))
+            self.prev_steer = steer
+        elif self.pursuit_target is not None:
             px, py = self.pursuit_target
             heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
             heading_error = wrap(heading_target - self.boat_heading)
             
-            # 각속도 댐핑(D-term)
             d_term = -0.18 * self.boat_ang_vel
             steer_raw = heading_error * steer_gain + d_term
             steer_f = steer_alpha * steer_raw + (1 - steer_alpha) * self.prev_steer
             self.prev_steer = steer_f
             
-            avoid = reactive_avoidance(dists, self.rel_angles)
             if abs(avoid) < 0.05:
                 avoid = 0.0
-                
-            # 웨이포인트 방향과 회피 방향 상쇄 방지
             if self.current_wp is not None and (steer_f * avoid < 0):
                 avoid = 0.0
 
-            avoid_multiplier = avoid_em if is_emergency else avoid_normal
-            steer = float(np.clip(steer_f + avoid_multiplier * avoid, -1, 1))
+            steer = float(np.clip(steer_f + avoid_normal * avoid, -1, 1))
         else:
             steer = 0
 
