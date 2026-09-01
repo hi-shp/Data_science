@@ -201,14 +201,12 @@ class BoatEnv:
     def step(self, L, R):
         tL = self.pwm_to_thrust(L)
         tR = self.pwm_to_thrust(R)
-        # 220도 범위 내 최소 장애물 거리에 비례하여 연속적으로 속도 조절
-        em_dist = getattr(self, 'min_wide_dist', 999)
-        if em_dist < 200:
-            # 거리 0px -> /20(최대감속), 거리 200px -> /9(정상속도)
-            ratio = 9.0 + (200.0 - em_dist) / 200.0 * 11.0
-            target_fwd = (tL + tR) / ratio
-        else:
-            target_fwd = (tL + tR) / 9.0
+        # 220도 범위 내 최소 장애물 거리에 비례하여 연속적으로 속도 조절 (가까울수록 감속)
+        em_dist = float(getattr(self, 'min_wide_dist', 999.0))
+        clear_ratio = np.clip((em_dist - 25.0) / 225.0, 0.0, 1.0)
+        # 거리 25px(초근접) 시 25% 서행 ~ 250px(원거리) 시 100% 정상 항해 연속 보간
+        speed_factor = 0.25 + 0.75 * (clear_ratio ** 1.2)
+        target_fwd = ((tL + tR) / 9.0) * speed_factor
             
         if not hasattr(self, 'current_fwd'):
             self.current_fwd = 0.0
@@ -328,7 +326,7 @@ class BoatEnv:
         dead = 0.02
         if abs(steer) < dead: steer = 0
         mid = 1500; rng = self.params['pwm_rng']
-        m = np.log1p(3 * abs(steer)) / np.log(4)
+        m = (abs(steer) ** 1.15)
         d = m * rng
         if steer >= 0: L = mid - d; R = mid + d
         else: L = mid + d; R = mid - d
@@ -389,15 +387,13 @@ class BoatEnv:
         heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
         heading_error = wrap(heading_target - self.boat_heading)
 
-        if self.emergency_mode:
-            steer_gain = 0.95
-            avoid_multiplier = self.params['avoid_em']
-        else:
-            steer_gain = self.params['steer_gain']
-            avoid_multiplier = self.params['avoid_normal']
+        # 거리에 따라 연속적으로 조향 및 회피력 스케일링
+        clear_ratio = np.clip((min_front_dist - 30.0) / 200.0, 0.0, 1.0)
+        steer_gain = self.params['steer_gain'] + (1.0 - clear_ratio) * 0.12
+        avoid_multiplier = self.params['avoid_normal'] + (1.0 - clear_ratio) * (self.params['avoid_em'] * 0.25)
             
-        # 각속도 댐핑으로 관성 오버슈트 억제
-        d_term = -0.15 * getattr(self, 'boat_ang_vel', 0.0)
+        # 각속도 댐핑을 강화하여 관성 오버슈트 및 휙휙 도는 회전 억제
+        d_term = -0.32 * getattr(self, 'boat_ang_vel', 0.0)
         steer_raw = heading_error * steer_gain + d_term
         alpha = self.params['steer_alpha']
         steer_f = alpha * steer_raw + (1.0 - alpha) * self.prev_steer
