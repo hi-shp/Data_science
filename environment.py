@@ -101,7 +101,11 @@ class BoatEnv:
         self.cb3_rect = pygame.Rect(40, 750, 20, 20)
         self.cb4_rect = pygame.Rect(40, 790, 20, 20)
         
-        self.sim_speed = 1
+        self.sim_speed = 2  # 2배속 기본 설정
+        self.total_episodes = 1000
+        self.completed_episodes = 0
+        self.success_count = 0
+        self.collision_count = 0
         self.speed_btns = {
             1: pygame.Rect(40, 835, 52, 28),
             2: pygame.Rect(100, 835, 52, 28),

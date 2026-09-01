@@ -10,6 +10,7 @@ class EnvRenderer:
         self.real_cam_surf = pygame.Surface((320, 220), pygame.SRCALPHA)
         self.safety_surf = pygame.Surface((120, 120), pygame.SRCALPHA)
         self.hud_surf = pygame.Surface((210, 110), pygame.SRCALPHA)
+        self.eval_surf = pygame.Surface((400, 85), pygame.SRCALPHA)
         self.font = pygame.font.SysFont(None, 24)
         self.bold_font = pygame.font.SysFont(None, 26, bold=True)
         self.small_font = pygame.font.SysFont(None, 18)
@@ -176,6 +177,9 @@ class EnvRenderer:
 
         # 8. 실시간 텔레메트리 HUD
         self._draw_telemetry()
+
+        # 9. 실시간 1,000회 평가 대시보드 (성공/충돌 확률 실시간 HUD)
+        self._draw_evaluation_stats()
 
         pygame.display.flip()
 
@@ -673,6 +677,53 @@ class EnvRenderer:
         d2t = float(np.linalg.norm(env.target - env.boat_pos))
         d2t_m = d2t / 50.0
         d2t_txt = self.small_font.render(f"Target: {d2t_m:.1f} m", True, (50, 230, 120))
-        hud_surf.blit(d2t_txt, (10, 92))
-        
         env.screen.blit(hud_surf, (hud_x, hud_y))
+
+    def _draw_evaluation_stats(self):
+        """상단 중앙 실시간 1,000회 평가 대시보드 (성공/충돌 확률 실시간 HUD)"""
+        env = self.env
+        w_box, h_box = 400, 82
+        pos_x = (env.w - w_box) // 2
+        pos_y = 12
+        
+        self.eval_surf.fill((10, 22, 45, 220))
+        pygame.draw.rect(self.eval_surf, (0, 200, 255), (0, 0, w_box, h_box), 2)
+        
+        total = getattr(env, 'total_episodes', 1000)
+        completed = getattr(env, 'completed_episodes', 0)
+        curr_ep = min(total, completed + 1)
+        succ = getattr(env, 'success_count', 0)
+        coll = getattr(env, 'collision_count', 0)
+        
+        sr = (succ / completed * 100.0) if completed > 0 else 0.0
+        cr = (coll / completed * 100.0) if completed > 0 else 0.0
+        
+        # 타이틀
+        title_txt = self.bold_font.render(f"1000-RUN EVALUATION ({env.sim_speed}X SPEED)", True, (255, 230, 90))
+        ep_txt = self.small_font.render(f"Episode: {curr_ep}/{total}", True, (200, 230, 255))
+        self.eval_surf.blit(title_txt, (12, 8))
+        self.eval_surf.blit(ep_txt, (w_box - ep_txt.get_width() - 12, 10))
+        
+        # 실시간 성공/실패 텍스트
+        succ_txt = self.bold_font.render(f"SUCCESS: {succ} ({sr:.1f}%)", True, (40, 240, 120))
+        coll_txt = self.bold_font.render(f"COLLISION: {coll} ({cr:.1f}%)", True, (255, 85, 70))
+        self.eval_surf.blit(succ_txt, (12, 32))
+        self.eval_surf.blit(coll_txt, (205, 32))
+        
+        # 하단 프로그레스 바
+        bar_x = 12
+        bar_y = 58
+        bar_w = w_box - 24
+        bar_h = 14
+        pygame.draw.rect(self.eval_surf, (25, 40, 60), (bar_x, bar_y, bar_w, bar_h))
+        pygame.draw.rect(self.eval_surf, (70, 110, 150), (bar_x, bar_y, bar_w, bar_h), 1)
+        
+        if completed > 0:
+            succ_w = int((succ / total) * bar_w)
+            coll_w = int((coll / total) * bar_w)
+            if succ_w > 0:
+                pygame.draw.rect(self.eval_surf, (40, 220, 100), (bar_x, bar_y, succ_w, bar_h))
+            if coll_w > 0:
+                pygame.draw.rect(self.eval_surf, (240, 70, 60), (bar_x + succ_w, bar_y, coll_w, bar_h))
+                
+        env.screen.blit(self.eval_surf, (pos_x, pos_y))
