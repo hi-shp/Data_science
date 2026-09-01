@@ -234,21 +234,21 @@ class BoatEnv:
             sh = math.sin(h); ch = math.cos(h)
             GAP = 11; L = 84
 
-            # 1. 선미 듀얼 쓰러스터 추진 제트 기포 (Twin Stern Roostertail & Jet Foam)
+            # 1. 선미 듀얼 쓰러스터 추진 제트 기포 (Twin Stern Roostertail & Jet Foam - 컴팩트 기포)
             if self.frame % 2 == 0:
                 stern_lx = self.boat_pos[0] - sh * GAP - ch * (L * 0.50)
                 stern_ly = self.boat_pos[1] + ch * GAP - sh * (L * 0.50)
                 stern_rx = self.boat_pos[0] + sh * GAP - ch * (L * 0.50)
                 stern_ry = self.boat_pos[1] - ch * GAP - sh * (L * 0.50)
                 
-                self.wakes.append([stern_lx + random.uniform(-1.5, 1.5), stern_ly + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.5, -sh * 0.5])
-                self.wakes.append([stern_rx + random.uniform(-1.5, 1.5), stern_ry + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.5, -sh * 0.5])
+                self.wakes.append([stern_lx + random.uniform(-1.0, 1.0), stern_ly + random.uniform(-1.0, 1.0), 1.8, 170 * intensity, -ch * 0.5, -sh * 0.5])
+                self.wakes.append([stern_rx + random.uniform(-1.0, 1.0), stern_ry + random.uniform(-1.0, 1.0), 1.8, 170 * intensity, -ch * 0.5, -sh * 0.5])
                 
-            # 2. 선미 후방 횡단 켈빈 파도 (Transverse Kelvin Wave Train)
+            # 2. 선미 후방 횡단 켈빈 파도 (Transverse Kelvin Wave Train - 컴팩트 기포)
             if self.frame % 4 == 0:
                 cx = self.boat_pos[0] - ch * 38
                 cy = self.boat_pos[1] - sh * 38
-                self.wakes.append([cx + random.uniform(-3, 3), cy + random.uniform(-3, 3), 4.5, 120 * intensity, -ch * 0.8, -sh * 0.8])
+                self.wakes.append([cx + random.uniform(-2, 2), cy + random.uniform(-2, 2), 2.8, 110 * intensity, -ch * 0.7, -sh * 0.7])
 
         # 파도-장애물 물리 상호작용 (Wave Absorption & Frothy Micro-Bubble Scattering)
         if len(self.wakes) > 0 and len(self.dynamic_obstacles) > 0:

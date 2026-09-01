@@ -74,27 +74,34 @@ class EnvRenderer:
             pygame.draw.circle(env.wake_surf, (255, 255, 255, int(140 * spray_i)), b_l_mid, 2)
             pygame.draw.circle(env.wake_surf, (255, 255, 255, int(140 * spray_i)), b_r_mid, 2)
         
-        # 부표 밑에 자연스럽게 맺히는 부드러운 백색 수면 물거품 아우라 (Soft White Buoy Waterline Foam)
+        # 부표 밑에 배처럼 몽글몽글 피어나는 백색 수면 물거품 구름 클러스터 (Organic Waterline Foam Cloud Puffs)
         for ox, oy, r in env.dynamic_obstacles:
-            pulse_f = math.sin(env.frame * 0.06 + ox * 0.05) * 1.5
-            pygame.draw.circle(env.wake_surf, (225, 240, 255, 55), (int(ox), int(oy)), int(r + 3.5 + pulse_f))
-            pygame.draw.circle(env.wake_surf, (255, 255, 255, 90), (int(ox), int(oy)), int(r + 1.2 + pulse_f * 0.5))
+            for k in range(6):
+                ang = k * (math.pi / 3) + math.sin(env.frame * 0.05 + ox * 0.08 + k) * 0.35
+                p_dist = r * 0.70 + math.sin(env.frame * 0.07 + k * 1.3 + oy * 0.05) * 1.8
+                px = int(ox + math.cos(ang) * p_dist)
+                py = int(oy + math.sin(ang) * p_dist)
+                p_rad = int(3.2 + math.sin(env.frame * 0.06 + k) * 1.0)
+                
+                # 배와 동일한 질감의 백색 수면 구름/물거품 클러스터
+                pygame.draw.circle(env.wake_surf, (220, 238, 255, 55), (px, py), p_rad + 2)
+                pygame.draw.circle(env.wake_surf, (255, 255, 255, 90), (px, py), p_rad)
 
         for w in env.wakes:
             # w: [x, y, radius, alpha, vx, vy]
             if len(w) >= 6:
-                w[0] += w[4] * 0.8
-                w[1] += w[5] * 0.8
-                w[4] *= 0.94
-                w[5] *= 0.94
-            w[2] += 1.25
-            w[3] -= 2.3
+                w[0] += w[4] * 0.75
+                w[1] += w[5] * 0.75
+                w[4] *= 0.92
+                w[5] *= 0.92
+            w[2] += 0.85
+            w[3] -= 2.6
             if w[3] > 0:
                 # 외곽 확장 파도 크레스트 (Wave Crest)
-                pygame.draw.circle(env.wake_surf, (220, 240, 255, int(w[3] * 0.45)), (int(w[0]), int(w[1])), int(w[2]))
+                pygame.draw.circle(env.wake_surf, (220, 240, 255, int(w[3] * 0.40)), (int(w[0]), int(w[1])), int(w[2]))
                 # 내부 백색 기포 난류 (Aerated Foam Core)
-                if w[2] > 2:
-                    pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.75)), (int(w[0]), int(w[1])), int(w[2] * 0.52))
+                if w[2] > 1.5:
+                    pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.70)), (int(w[0]), int(w[1])), int(w[2] * 0.48))
         env.wakes = [w for w in env.wakes if w[3] > 0]
         
         # 장애물 충돌 시 발생하는 자글자글한 미세 거품 파편들 (Scattered Micro-Bubbles)
