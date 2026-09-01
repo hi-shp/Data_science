@@ -547,7 +547,8 @@ def main():
             tag = "[ELITE]" if rate1 >= 90.0 else ""
             print(f"Gen {generation:03d} | [{bar}] {rate1:5.1f}% | Goal: {goals1:2d}/96 | Col: {collisions1:2d} | Time: {t_elapsed1:.2f}s {tag}", flush=True)
 
-            if rate1 >= 88.0 or generation == 1:
+            # 이전 최고 기록 대비 동등 이상(best_rate - 2%)일 경우 2단계 정밀 검증 진행
+            if rate1 >= max(best_rate - 2.0, 50.0) or generation == 1:
                 t0_2 = time.time()
                 # 24코어 맞춤 120회 (24 x 5) 2단계 정밀 검증
                 tasks_stage2 = [(seed_offset + 500 + i, candidate) for i in range(120)]
