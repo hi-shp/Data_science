@@ -312,16 +312,12 @@ class BoatEnv:
         if not hasattr(self, 'emergency_cooldown'):
             self.emergency_cooldown = 0
             
-        em_enter = self.params.get('em_enter', 115.0)
-        em_exit = self.params.get('em_exit', 160.0)
-        em_hold = self.params.get('em_hold_frames', 18)
-
-        if min_front_dist < em_enter:
+        if min_front_dist < 115.0:
             self.emergency_mode = True
-            self.emergency_cooldown = em_hold
+            self.emergency_cooldown = 18
         elif self.emergency_mode:
             self.emergency_cooldown -= 1
-            if min_front_dist > em_exit and self.emergency_cooldown <= 0:
+            if min_front_dist > 160.0 and self.emergency_cooldown <= 0:
                 self.emergency_mode = False
 
         if self.pursuit_target is None: return 0
@@ -329,46 +325,23 @@ class BoatEnv:
         heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
         heading_error = wrap(heading_target - self.boat_heading)
 
-        avoid = reactive_avoidance(dists, self.rel_angles)
-
-        # [1] 이멀전시(비상) 모드: 직진 절대 금지, 즉각적이고 강력한 회피 선회 수행
         if self.emergency_mode:
-            avoid_multiplier = self.params.get('avoid_em', 0.11)
-            # 좌우 여유 공간 비교
-            left_space = np.mean(dists[center_idx - span : center_idx])
-            right_space = np.mean(dists[center_idx : center_idx + span])
-            
-            # 웨이포인트 방향이 있거나 더 넓은 쪽으로 강제 회피 선회 방향 결정
-            if heading_error > 0.05 or (abs(heading_error) <= 0.05 and right_space >= left_space):
-                base_turn = 0.85
-            else:
-                base_turn = -0.85
-                
-            em_steer = base_turn + avoid_multiplier * avoid
-            self.prev_steer = em_steer
-            return np.clip(em_steer, -1.0, 1.0)
-
-        # [2] 정상 주행 모드: 웨이포인트 정밀 추종 및 각속도 댐핑(도리도리 진동 억제)
+            steer_gain = 0.95
+            avoid_multiplier = 0.08
         else:
-            steer_gain = self.params.get('steer_gain', 0.7752)
-            steer_alpha = self.params.get('steer_alpha', 0.3515)
-            avoid_multiplier = self.params.get('avoid_normal', 0.019)
-
-            # 각속도 댐핑(D-term)으로 정상 직진 시 좌우 진동(도리도리) 억제
-            d_term = -0.18 * getattr(self, 'boat_ang_vel', 0.0)
-            steer_raw = heading_error * steer_gain + d_term
-            steer_f = steer_alpha * steer_raw + (1.0 - steer_alpha) * self.prev_steer
-            self.prev_steer = steer_f
+            steer_gain = 0.775
+            avoid_multiplier = 0.019
             
-            # 미세 노이즈 데드존
-            if abs(avoid) < 0.05:
-                avoid = 0.0
+        steer_raw = heading_error * steer_gain
+        steer_f = 0.4 * steer_raw + 0.6 * self.prev_steer
+        self.prev_steer = steer_f
+        
+        avoid = reactive_avoidance(dists, self.rel_angles)
+        
+        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.25:
+            avoid *= 0.4
             
-            # 정상 주행 시 웨이포인트 선회 우선
-            if self.current_wp is not None and (steer_f * avoid < 0):
-                avoid = 0.0
-                
-            return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
+        return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 
     def render(self, hits):
         self.renderer.render(hits)
