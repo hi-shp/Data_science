@@ -16,8 +16,8 @@ class EnvRenderer:
 
     def render(self, hits):
         env = self.env
-        # 1. 깔끔하고 차분한 마린 블루 수면 배경 (Clean & Calm Ocean)
-        env.screen.fill((28, 95, 152))
+        # 1. 밝고 맑은 마린 오션 수면 배경 (Brighter Clean Ocean)
+        env.screen.fill((40, 118, 178))
         
         # 아주 은은하고 드문드문한 미세 수면 잔물결 (Subtle Minimalist Ripples)
         wave_t = env.frame * 0.02
@@ -26,20 +26,20 @@ class EnvRenderer:
                 wx = j + math.cos(wave_t + i * 0.03) * 8
                 wy = i + math.sin(wave_t * 0.6 + j * 0.03) * 4
                 w_len = 14 + math.sin(wave_t + j * 0.02) * 5
-                pygame.draw.line(env.screen, (38, 108, 168), (int(wx), int(wy)), (int(wx + w_len), int(wy)), 1)
+                pygame.draw.line(env.screen, (52, 132, 194), (int(wx), int(wy)), (int(wx + w_len), int(wy)), 1)
 
         bx, by = env.boat_pos
         h = env.boat_heading
         ch, sh = math.cos(h), math.sin(h)
         
-        # 2. 360도 라이다 범위
+        # 2. 360도 라이다 범위 (저채도 소프트 에메랄드 / 세이지 그린)
         if env.show_lidar_range:
-            pygame.draw.circle(env.screen, (0, 180, 100), (int(bx), int(by)), int(env.lidar_range), 1)
+            pygame.draw.circle(env.screen, (80, 175, 140), (int(bx), int(by)), int(env.lidar_range), 1)
             for ang in env.rel_angles:
                 ray_ang = h + ang
                 rx = bx + math.cos(ray_ang) * env.lidar_range
                 ry = by + math.sin(ray_ang) * env.lidar_range
-                pygame.draw.line(env.screen, (0, 100, 60), (int(bx), int(by)), (int(rx), int(ry)), 1)
+                pygame.draw.line(env.screen, (55, 115, 90), (int(bx), int(by)), (int(rx), int(ry)), 1)
 
         # 3. 실제 선박 유체역학 항적 웨이크 + 장애물 반사/산란 미세 거품 (Realistic Wakes & Scattering Bubbles)
         env.wake_surf.fill((0, 0, 0, 0))
@@ -106,7 +106,7 @@ class EnvRenderer:
         if env.show_lidar:
             for p in hits:
                 if p is not None:
-                    pygame.draw.circle(env.screen, (255, 255, 0), (int(p[0]), int(p[1])), 2)
+                    pygame.draw.circle(env.screen, (225, 220, 130), (int(p[0]), int(p[1])), 2)
 
         # Safety Envelope (8acbd56 버전의 소프트 반투명 안전 원, 120x120 로컬 버퍼)
         self.safety_surf.fill((0, 0, 0, 0))
@@ -321,11 +321,11 @@ class EnvRenderer:
         env.screen.blit(self.font.render("Show 2nd Path Set", True, (255, 255, 255)), (70, 712))
 
         pygame.draw.rect(env.screen, (255, 255, 255), env.cb3_rect, 2)
-        if env.show_lidar: pygame.draw.rect(env.screen, (255, 255, 0), env.cb3_rect.inflate(-6, -6))
+        if env.show_lidar: pygame.draw.rect(env.screen, (225, 220, 130), env.cb3_rect.inflate(-6, -6))
         env.screen.blit(self.font.render("Show LiDAR Hits", True, (255, 255, 255)), (70, 752))
 
         pygame.draw.rect(env.screen, (255, 255, 255), env.cb4_rect, 2)
-        if env.show_lidar_range: pygame.draw.rect(env.screen, (0, 180, 100), env.cb4_rect.inflate(-6, -6))
+        if env.show_lidar_range: pygame.draw.rect(env.screen, (80, 175, 140), env.cb4_rect.inflate(-6, -6))
         env.screen.blit(self.font.render("Show LiDAR Range", True, (255, 255, 255)), (70, 792))
 
         # 시뮬레이션 배속 제어 버튼 (1x, 2x, 3x, 4x)
@@ -376,15 +376,15 @@ class EnvRenderer:
             lbl = self.small_font.render(f"{dist // 50}m", True, (0, 120, 170))
             self.pov_surf.blit(lbl, (pcx + 4, pcy - r_pixel - 10))
 
-        # 180도 스캔 레이 라인
+        # 180도 스캔 레이 라인 (저채도 세이지 그린)
         if env.show_lidar_range:
             for ang in env.rel_angles:
                 if -math.pi/2 <= ang <= math.pi/2:
                     rx = pcx + math.sin(ang) * (env.lidar_range * scale_r)
                     ry = pcy - math.cos(ang) * (env.lidar_range * scale_r)
-                    pygame.draw.line(self.pov_surf, (0, 110, 60), (pcx, pcy), (int(rx), int(ry)), 1)
+                    pygame.draw.line(self.pov_surf, (55, 120, 95), (pcx, pcy), (int(rx), int(ry)), 1)
 
-        # 라이다 히트 포인트 렌더링
+        # 라이다 히트 포인트 렌더링 (저채도 소프트 옐로우)
         if env.show_lidar:
             for hp in hits:
                 if hp is not None:
@@ -392,7 +392,7 @@ class EnvRenderer:
                     hlf = hdx * f_vec[0] + hdy * f_vec[1]
                     hlr = hdx * r_vec[0] + hdy * r_vec[1]
                     if hlf >= -10:
-                        pygame.draw.circle(self.pov_surf, (255, 255, 0), (int(pcx + hlr * scale_r), int(pcy - hlf * scale_r)), 2)
+                        pygame.draw.circle(self.pov_surf, (225, 220, 130), (int(pcx + hlr * scale_r), int(pcy - hlf * scale_r)), 2)
 
         # --- 목적지 인디케이터 & 테두리 트래킹 컴퍼스 ---
         dx_t = env.target[0] - bx; dy_t = env.target[1] - by
