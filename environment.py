@@ -282,42 +282,37 @@ class BoatEnv:
         
         if not hasattr(self, 'emergency_cooldown'):
             self.emergency_cooldown = 0
-        if not hasattr(self, 'emergency_dir'):
-            self.emergency_dir = 0.0
             
         if min_front_dist < 115.0:
-            if not self.emergency_mode:
-                left_space = np.sum(dists[center_idx - span*2 : center_idx])
-                right_space = np.sum(dists[center_idx : center_idx + span*2])
-                self.emergency_dir = 1.0 if right_space >= left_space else -1.0
-                
             self.emergency_mode = True
             self.emergency_cooldown = 18
         elif self.emergency_mode:
             self.emergency_cooldown -= 1
             if min_front_dist > 160.0 and self.emergency_cooldown <= 0:
                 self.emergency_mode = False
-                self.emergency_dir = 0.0
 
         if self.pursuit_target is None: return 0
         px, py = self.pursuit_target
         heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
         heading_error = wrap(heading_target - self.boat_heading)
 
-        steer_gain = 0.775
+        if self.emergency_mode:
+            steer_gain = 0.95
+            avoid_multiplier = 0.08
+        else:
+            steer_gain = 0.775
+            avoid_multiplier = 0.019
+            
         steer_raw = heading_error * steer_gain
-        steer_f = 0.35 * steer_raw + 0.65 * self.prev_steer
+        steer_f = 0.4 * steer_raw + 0.6 * self.prev_steer
         self.prev_steer = steer_f
         
         avoid = reactive_avoidance(dists, self.rel_angles)
         
-        if self.emergency_mode:
-            # 고정된 한 방향으로 아주 약하고 부드러운 편향만 추가 (진동 방지 및 부드러운 우회)
-            steer = steer_f * 0.75 + self.emergency_dir * 0.22 + 0.02 * avoid
-        else:
-            steer = steer_f + 0.019 * avoid
+        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.25:
+            avoid *= 0.4
             
-        return np.clip(steer, -1, 1)
+        return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 
     def render(self, hits):
         self.renderer.render(hits)

@@ -76,7 +76,15 @@ def run():
             else:
                 dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
                 if dist_to_curr > 80:
+                    vec_curr = env.current_wp["pos"] - env.boat_pos
+                    vec_new = new_wp["pos"] - env.boat_pos
+                    
+                    ang_curr = math.atan2(vec_curr[1], vec_curr[0])
+                    ang_new = math.atan2(vec_new[1], vec_new[0])
+                    angle_diff = abs(wrap(ang_new - ang_curr))
+                    
                     threshold = 1.1
+
                     if new_wp["score"] > env.current_wp["score"] * threshold:
                         env.current_wp = new_wp
                         
