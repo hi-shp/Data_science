@@ -131,11 +131,11 @@ class EnvRenderer:
             # 부표 수중 앰비언트 그림자 (Realistic Underwater Shadow)
             pygame.draw.circle(env.screen, (10, 42, 75, 140), (int(ox + 4), int(oy + 4)), int(r + 1))
             
-            # 선명한 2D 부표 바디
-            pygame.draw.circle(env.screen, (200, 50, 35), (int(ox), int(oy)), int(r))
-            pygame.draw.circle(env.screen, (240, 80, 55), (int(ox - 1), int(oy - 1)), int(r * 0.78))
-            pygame.draw.circle(env.screen, (255, 200, 190), (int(ox - 1), int(oy - 1)), int(r * 0.42))
-            pygame.draw.circle(env.screen, (255, 120, 70), (int(ox), int(oy)), int(r * 0.18))
+            # 선명한 2D 부표 바디 (중심부 쨍한 순백색 하이라이트)
+            pygame.draw.circle(env.screen, (210, 45, 30), (int(ox), int(oy)), int(r))
+            pygame.draw.circle(env.screen, (245, 75, 50), (int(ox - 1), int(oy - 1)), int(r * 0.76))
+            pygame.draw.circle(env.screen, (255, 255, 255), (int(ox - 1), int(oy - 1)), int(r * 0.40))
+            pygame.draw.circle(env.screen, (255, 255, 255), (int(ox), int(oy)), int(r * 0.20))
             
         env.occ_surf.fill((0, 0, 0, 0))
         occ = np.where(env.grid >= 3)
