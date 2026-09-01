@@ -26,13 +26,13 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     p0 = boat_pos.copy()
     p3 = goal.copy()
 
-    # 각도 편차 계산
+    # 각도 편차에 따른 전방 제어점 거리 축소 (관성으로 인한 외측 쏠림 방지 및 타이트한 직진 추종)
     v_to_goal = p3 - p0
     goal_angle = math.atan2(v_to_goal[1], v_to_goal[0])
     ang_diff = abs(wrap(goal_angle - boat_heading))
     
-    # 전방 제어점 거리를 기존(65)보다 넉넉하게 확장(최대 110px)하여 부드럽고 풍성한 선회 곡률 형성
-    forward_dist = min(110.0, d * 0.45)
+    # 꺾이는 각도가 클수록 전방 돌출을 줄이고 곡선 시작점을 당겨 즉각적인 회전 유도 (예전의 직관적인 곡률)
+    forward_dist = min(65, d * 0.35) * max(0.25, math.cos(ang_diff * 0.5))
     
     forward = np.array([math.cos(boat_heading), math.sin(boat_heading)])
     p1 = boat_pos + forward * forward_dist
@@ -41,7 +41,7 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     norm_v_goal = np.linalg.norm(v_goal)
     v_goal_n = np.zeros(2) if norm_v_goal < 1e-6 else v_goal / norm_v_goal
         
-    p2 = p3 - v_goal_n * min(100.0, d * 0.40)
+    p2 = p3 - v_goal_n * min(65, d * 0.35)
 
     # 장애물 회피를 위한 베지어 제어점(p1, p2) 외측 굴곡/우회 처리 (Obstacle-avoiding Bezier curve deflection)
     if obstacles is not None and len(obstacles) > 0:
