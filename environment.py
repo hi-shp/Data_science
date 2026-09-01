@@ -53,7 +53,7 @@ class BoatEnv:
         self.rel_angles = np.linspace(-np.pi, np.pi, self.lidar_beams, endpoint=False)
         
         self.mass = 12
-        self.inertia = 6
+        self.inertia = 5
         self.drag = 0.2
         self.rot_drag = 0.1
         self.boat_radius = 25
