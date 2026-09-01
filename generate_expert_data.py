@@ -528,6 +528,7 @@ def main():
         
     num_episodes = 2000
     n_workers = min(20, os.cpu_count() or 4)
+    from tqdm import tqdm
     print(f"Generating expert data using {n_workers} workers...")
     
     pool = mp.Pool(processes=n_workers, initializer=worker_init)
@@ -540,15 +541,18 @@ def main():
     success_count = 0
     total_frames = 0
     
+    pbar = tqdm(total=num_episodes, desc="Collecting Episodes", unit="ep")
+    
     for success, S, A in results:
         if success:
             success_count += 1
             all_states.append(S)
             all_actions.append(A)
             total_frames += len(S)
-            if success_count % 50 == 0:
-                print(f"Collected {success_count} successful episodes... ({total_frames} frames)")
+            pbar.set_postfix({'success': success_count, 'frames': total_frames})
+        pbar.update(1)
                 
+    pbar.close()
     pool.close()
     pool.join()
     

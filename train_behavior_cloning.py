@@ -5,6 +5,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset, random_split
+from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # ==========================================
 # 1. 신경망 아키텍처 정의 (MLP)
@@ -85,14 +87,30 @@ def main():
     epochs = 20
     best_val_loss = float('inf')
     
+    # --- 시각화(Matplotlib) 초기화 ---
+    plt.ion()
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.set_title("Behavior Cloning Training Loss")
+    ax.set_xlabel("Epochs")
+    ax.set_ylabel("MSE Loss")
+    ax.grid(True)
+    line_train, = ax.plot([], [], label='Train Loss', color='blue', marker='o')
+    line_val, = ax.plot([], [], label='Validation Loss', color='orange', marker='o')
+    ax.legend()
+    
+    hist_epochs = []
+    hist_train = []
+    hist_val = []
+    
     print("\n[Train] 🚀 모델 학습 시작...")
     
     for epoch in range(1, epochs + 1):
         t0 = time.time()
         model.train()
         train_loss = 0.0
-        
-        for batch_X, batch_Y in train_loader:
+        # TQDM Progress Bar
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch:02d}/{epochs:02d} [Train]", leave=False)
+        for batch_X, batch_Y in pbar:
             batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
             
             optimizer.zero_grad()
@@ -104,15 +122,18 @@ def main():
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             
-            train_loss += loss.item() * batch_X.size(0)
+            batch_loss = loss.item()
+            train_loss += batch_loss * batch_X.size(0)
+            pbar.set_postfix({'loss': f"{batch_loss:.6f}"})
             
         train_loss /= len(train_dataset)
         
         # Validation
         model.eval()
         val_loss = 0.0
+        val_pbar = tqdm(val_loader, desc=f"Epoch {epoch:02d}/{epochs:02d} [Val]", leave=False)
         with torch.no_grad():
-            for batch_X, batch_Y in val_loader:
+            for batch_X, batch_Y in val_pbar:
                 batch_X, batch_Y = batch_X.to(device), batch_Y.to(device)
                 outputs = model(batch_X)
                 loss = criterion(outputs, batch_Y)
@@ -124,6 +145,20 @@ def main():
         elapsed = time.time() - t0
         print(f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {train_loss:.6f} | Val Loss: {val_loss:.6f} | Time: {elapsed:.1f}s")
         
+        # --- 시각화 그래프 업데이트 ---
+        hist_epochs.append(epoch)
+        hist_train.append(train_loss)
+        hist_val.append(val_loss)
+        
+        line_train.set_data(hist_epochs, hist_train)
+        line_val.set_data(hist_epochs, hist_val)
+        
+        ax.relim()
+        ax.autoscale_view()
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+        plt.pause(0.01)
+        
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), "deep_agent_best.pth")
@@ -131,6 +166,10 @@ def main():
 
     print("\n[완료] 🎉 딥러닝 행동 복제 학습이 모두 종료되었습니다.")
     print("저장된 모델 가중치: 'deep_agent_best.pth'")
+    
+    plt.ioff()
+    plt.savefig('training_loss.png')
+    plt.show()
 
 if __name__ == "__main__":
     main()

@@ -555,12 +555,20 @@ def main():
                 candidate = mutate_params(best_params, scale=0.04 + 0.03 * (generation % 3 == 0))
 
             t0 = time.time()
+            from tqdm import tqdm
             tasks_stage1 = [(seed_offset + i, candidate) for i in range(40)]
-            results_stage1 = pool.map(run_sim_task, tasks_stage1, chunksize=2)
+            
+            goals1 = 0
+            collisions1 = 0
+            
+            # 1단계 TQDM 바
+            pbar1 = tqdm(pool.imap_unordered(run_sim_task, tasks_stage1, chunksize=2), total=40, desc=f"Gen {generation:03d} Stage 1", leave=False)
+            for r, f in pbar1:
+                if r == 'goal': goals1 += 1
+                elif r == 'collide': collisions1 += 1
+                pbar1.set_postfix({'goals': goals1, 'col': collisions1})
+                
             t_elapsed1 = time.time() - t0
-
-            goals1 = sum(1 for r, f in results_stage1 if r == 'goal')
-            collisions1 = sum(1 for r, f in results_stage1 if r == 'collide')
             rate1 = goals1 / 40.0 * 100.0
 
             is_elite = (rate1 >= 90.0)
@@ -569,13 +577,22 @@ def main():
 
             if is_elite or generation == 1:
                 t0_2 = time.time()
+                from tqdm import tqdm
                 tasks_stage2 = [(seed_offset + 500 + i, candidate) for i in range(100)]
-                results_stage2 = pool.map(run_sim_task, tasks_stage2, chunksize=4)
+                
+                goals2 = 0
+                collisions2 = 0
+                timeouts2 = 0
+                
+                # 2단계 TQDM 바
+                pbar2 = tqdm(pool.imap_unordered(run_sim_task, tasks_stage2, chunksize=4), total=100, desc="Stage 2", leave=False)
+                for r, f in pbar2:
+                    if r == 'goal': goals2 += 1
+                    elif r == 'collide': collisions2 += 1
+                    elif r == 'timeout': timeouts2 += 1
+                    pbar2.set_postfix({'goals': goals2, 'col': collisions2})
+                    
                 t_elapsed2 = time.time() - t0_2
-
-                goals2 = sum(1 for r, f in results_stage2 if r == 'goal')
-                collisions2 = sum(1 for r, f in results_stage2 if r == 'collide')
-                timeouts2 = sum(1 for r, f in results_stage2 if r == 'timeout')
                 rate2 = goals2 / 100.0 * 100.0
 
                 print(f"   ↳ [2단계 100회 정밀] 도달: {goals2:3d}/100 ({rate2:.1f}%) | 충돌: {collisions2:2d} | 타임아웃: {timeouts2:2d} | {t_elapsed2:.1f}초", flush=True)
