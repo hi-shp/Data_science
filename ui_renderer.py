@@ -43,14 +43,6 @@ class EnvRenderer:
 
         # 3. 실제 선박 유체역학 항적 웨이크 + 장애물 반사/산란 미세 거품 (Realistic Wakes & Scattering Bubbles)
         env.wake_surf.fill((0, 0, 0, 0))
-        
-        # 부표 중앙을 기준으로 부표 표면 밖으로 아주 살짝 피어나는 백색 수면 구름 (긴 주기의 잔잔한 아우라)
-        for ox, oy, r in env.dynamic_obstacles:
-            pulse_f = math.sin(env.frame * 0.015 + ox * 0.03 + oy * 0.03) * 0.75
-            outer_cloud_r = r + 2.8 + pulse_f
-            inner_cloud_r = r + 1.4 + pulse_f * 0.5
-            pygame.draw.circle(env.wake_surf, (220, 240, 255, 55), (int(ox), int(oy)), int(outer_cloud_r))
-            pygame.draw.circle(env.wake_surf, (255, 255, 255, 85), (int(ox), int(oy)), int(inner_cloud_r))
 
         for w in env.wakes:
             # w: [x, y, radius, alpha, vx, vy]
