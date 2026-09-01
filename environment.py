@@ -227,42 +227,27 @@ class BoatEnv:
         self.boat_heading += self.boat_ang_vel * self.dt
 
         # 디테일한 파도 생성 로직
-        if vel_norm > 3:
+        if vel_norm > 2.5:
             h = self.boat_heading
-            intensity = min(1.0, vel_norm / 15.0) # 속도에 따른 파도 강도
+            intensity = min(1.0, vel_norm / 12.0)
+            sh = math.sin(h); ch = math.cos(h)
             
-            # 1. 중앙 프로펠러 난류 (자주 발생, 짧게 유지)
+            # 카타마란 좌/우 선미에서 풍성한 트윈 프로펠러 물결 웨이크 생성
             if self.frame % 2 == 0:
-                px = self.boat_pos[0] - math.cos(h) * 25
-                py = self.boat_pos[1] - math.sin(h) * 25
-                # x, y, 반경, 알파, 타입(0=중앙), 현재수명, 최대수명, 각도오프셋
-                self.wakes.append([px + random.uniform(-3, 3), py + random.uniform(-3, 3), 
-                                   1.0 + intensity, 180 * intensity, 0, 0, 40, 0])
-
-            # 2. 좌우 V자 주 파도 (Kelvin Wake)
-            if self.frame % 4 == 0:
-                spread_angle = 0.55 # 파도가 퍼지는 기본 각도
+                GAP = 11; L = 84
+                lx = self.boat_pos[0] - sh * GAP - ch * (L * 0.48)
+                ly = self.boat_pos[1] + ch * GAP - sh * (L * 0.48)
+                rx = self.boat_pos[0] + sh * GAP - ch * (L * 0.48)
+                ry = self.boat_pos[1] - ch * GAP - sh * (L * 0.48)
                 
-                # 좌측 주 파도
-                lx = self.boat_pos[0] - math.cos(h + 0.3) * 15
-                ly = self.boat_pos[1] - math.sin(h + 0.3) * 15
-                self.wakes.append([lx, ly, 1.5, 140 * intensity, 1, 0, 100, spread_angle])
+                self.wakes.append([lx + random.uniform(-2, 2), ly + random.uniform(-2, 2), 2.5, 170 * intensity])
+                self.wakes.append([rx + random.uniform(-2, 2), ry + random.uniform(-2, 2), 2.5, 170 * intensity])
                 
-                # 우측 주 파도
-                rx = self.boat_pos[0] - math.cos(h - 0.3) * 15
-                ry = self.boat_pos[1] - math.sin(h - 0.3) * 15
-                self.wakes.append([rx, ry, 1.5, 140 * intensity, -1, 0, 100, -spread_angle])
-
-            # 3. 바깥쪽 잔물결 (속도가 높을 때만 추가 생성)
-            if vel_norm > 8 and self.frame % 6 == 0:
-                outer_angle = 0.8
-                lx_o = self.boat_pos[0] - math.cos(h + 0.5) * 10
-                ly_o = self.boat_pos[1] - math.sin(h + 0.5) * 10
-                self.wakes.append([lx_o, ly_o, 1.0, 90 * intensity, 2, 0, 80, outer_angle])
-                
-                rx_o = self.boat_pos[0] - math.cos(h - 0.5) * 10
-                ry_o = self.boat_pos[1] - math.sin(h - 0.5) * 10
-                self.wakes.append([rx_o, ry_o, 1.0, 90 * intensity, -2, 0, 80, -outer_angle])
+            # 좌우 확산 V자 켈빈 파도 (Wide Kelvin Wake)
+            if self.frame % 3 == 0:
+                cx = self.boat_pos[0] - ch * 35
+                cy = self.boat_pos[1] - sh * 35
+                self.wakes.append([cx + random.uniform(-4, 4), cy + random.uniform(-4, 4), 3.5, 130 * intensity])
 
     def collide(self):
         ox = self.dynamic_obstacles[:, 0]
@@ -318,19 +303,19 @@ class BoatEnv:
     def update_steering(self, dists):
         self.steer_timer += self.dt
         center_idx = self.lidar_beams // 2
-        span = self.lidar_beams // 9
+        span = self.lidar_beams // 8
         front_dists = dists[center_idx - span : center_idx + span]
         min_front_dist = np.min(front_dists)
         
         if not hasattr(self, 'emergency_cooldown'):
             self.emergency_cooldown = 0
             
-        if min_front_dist < 115.0:
+        if min_front_dist < 135.0:
             self.emergency_mode = True
-            self.emergency_cooldown = 18
+            self.emergency_cooldown = 22
         elif self.emergency_mode:
             self.emergency_cooldown -= 1
-            if min_front_dist > 160.0 and self.emergency_cooldown <= 0:
+            if min_front_dist > 165.0 and self.emergency_cooldown <= 0:
                 self.emergency_mode = False
 
         if self.pursuit_target is None: return 0
@@ -339,11 +324,11 @@ class BoatEnv:
         heading_error = wrap(heading_target - self.boat_heading)
 
         if self.emergency_mode:
-            steer_gain = 0.95
-            avoid_multiplier = 0.09
+            steer_gain = 0.98
+            avoid_multiplier = 0.10
         else:
             steer_gain = 0.786
-            avoid_multiplier = 0.02
+            avoid_multiplier = 0.022
             
         # 각속도 댐핑으로 관성 오버슈트 억제
         d_term = -0.15 * getattr(self, 'boat_ang_vel', 0.0)
@@ -353,8 +338,8 @@ class BoatEnv:
         
         avoid = reactive_avoidance(dists, self.rel_angles)
         
-        # 반발력 정상 작동: 웨이포인트 선회 방향과 반대로 충돌할 때만 상쇄 방지를 위해 소프트 감쇠(0.25) 적용
-        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.15:
+        # 반발력 정상 작동: 비상 상황이 아니고 웨이포인트 선회 방향과 반대로 충돌할 때만 상쇄 방지를 위해 소프트 감쇠(0.25) 적용
+        if not self.emergency_mode and self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.15:
             avoid *= 0.25
             
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)

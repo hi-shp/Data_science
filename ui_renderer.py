@@ -44,14 +44,14 @@ class EnvRenderer:
         # 3. 항적 및 거품 웨이크 (Propeller Foam & Twin Wakes)
         env.wake_surf.fill((0, 0, 0, 0))
         for w in env.wakes:
-            w[2] += 0.8
-            w[3] -= 3.2
+            w[2] += 1.35
+            w[3] -= 2.2
             if w[3] > 0:
-                # 외곽 물거품
-                pygame.draw.circle(env.wake_surf, (220, 240, 255, int(w[3] * 0.5)), (int(w[0]), int(w[1])), int(w[2]))
-                # 중심 백색 기포
-                if w[2] > 3:
-                    pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3])), (int(w[0]), int(w[1])), int(w[2] * 0.45))
+                # 외곽 물결 거품 링
+                pygame.draw.circle(env.wake_surf, (225, 242, 255, int(w[3] * 0.45)), (int(w[0]), int(w[1])), int(w[2]))
+                # 내부 백색 기포
+                if w[2] > 2:
+                    pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.7)), (int(w[0]), int(w[1])), int(w[2] * 0.5))
         env.wakes = [w for w in env.wakes if w[3] > 0]
         
         env.screen.blit(env.wake_surf, (0, 0))
