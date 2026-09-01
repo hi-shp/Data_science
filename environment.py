@@ -327,19 +327,22 @@ class BoatEnv:
 
         if self.emergency_mode:
             steer_gain = 0.95
-            avoid_multiplier = 0.08
+            avoid_multiplier = 0.09
         else:
-            steer_gain = 0.775
-            avoid_multiplier = 0.019
+            steer_gain = 0.786
+            avoid_multiplier = 0.02
             
-        steer_raw = heading_error * steer_gain
-        steer_f = 0.4 * steer_raw + 0.6 * self.prev_steer
+        # 각속도 댐핑으로 관성 오버슈트 억제
+        d_term = -0.15 * getattr(self, 'boat_ang_vel', 0.0)
+        steer_raw = heading_error * steer_gain + d_term
+        steer_f = 0.38 * steer_raw + 0.62 * self.prev_steer
         self.prev_steer = steer_f
         
         avoid = reactive_avoidance(dists, self.rel_angles)
         
-        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.25:
-            avoid *= 0.4
+        # 웨이포인트가 있을 때는 반대편 개활지 반발력(avoid)에 의한 좌우 진동 간섭을 완전히 차단하여 무조건 웨이포인트만 전념 추종
+        if self.current_wp is not None:
+            avoid = 0.0
             
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 

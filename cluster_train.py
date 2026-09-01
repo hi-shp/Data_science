@@ -375,11 +375,16 @@ class FastBoatSim:
             px, py = self.pursuit_target
             heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
             heading_error = wrap(heading_target - self.boat_heading)
-            steer_raw = heading_error * steer_gain
+            
+            d_term = -0.15 * self.boat_ang_vel
+            steer_raw = heading_error * steer_gain + d_term
             steer_f = steer_alpha * steer_raw + (1 - steer_alpha) * self.prev_steer
             self.prev_steer = steer_f
             
             avoid = reactive_avoidance(dists, self.rel_angles)
+            if self.current_wp is not None:
+                avoid = 0.0
+                
             avoid_multiplier = avoid_em if is_emergency else avoid_normal
             steer = float(np.clip(steer_f + avoid_multiplier * avoid, -1, 1))
         else:
