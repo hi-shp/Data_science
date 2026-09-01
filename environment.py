@@ -154,7 +154,7 @@ class BoatEnv:
         target_fwd = (tL + tR) / 9.0
         
         if self.emergency_mode:
-            target_fwd = 0.0
+            target_fwd = (tL + tR) / 20.0
             
         if not hasattr(self, 'current_fwd'):
             self.current_fwd = 0.0
@@ -275,14 +275,23 @@ class BoatEnv:
 
     def update_steering(self, dists):
         self.steer_timer += self.dt
-        if self.steer_timer < 0.02: return None
-        self.steer_timer = 0
         center_idx = self.lidar_beams // 2
         span = self.lidar_beams // 12
         front_dists = dists[center_idx - span : center_idx + span]
         min_front_dist = np.min(front_dists)
-        if min_front_dist < 70: self.emergency_mode = True; self.current_wp = None
-        else: self.emergency_mode = False
+        
+        if not hasattr(self, 'emergency_cooldown'):
+            self.emergency_cooldown = 0
+            
+        if min_front_dist < 78.0:
+            self.emergency_mode = True
+            self.emergency_cooldown = 14
+            self.current_wp = None
+        elif self.emergency_mode:
+            self.emergency_cooldown -= 1
+            if min_front_dist > 118.0 and self.emergency_cooldown <= 0:
+                self.emergency_mode = False
+
         if self.pursuit_target is None: return 0
         px, py = self.pursuit_target
         heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
@@ -293,7 +302,7 @@ class BoatEnv:
         self.prev_steer = steer_f
         
         avoid = reactive_avoidance(dists, self.rel_angles)
-        avoid_multiplier = 0.082 if self.emergency_mode else 0.019
+        avoid_multiplier = 0.11 if self.emergency_mode else 0.019
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 
     def render(self, hits):
