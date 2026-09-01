@@ -43,9 +43,15 @@ def run():
             )
 
             dist_to_target = np.linalg.norm(env.target - env.boat_pos)
-            if dist_to_target < 400 or target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
+            clear_to_target = target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles)
+
+            # 목적지까지 장애물이 없으면 거리와 무관하게 즉시 목적지 직행 (기존/신규 웨이포인트 모두 해제)
+            if clear_to_target:
                 new_wp = None
+                env.current_wp = None
+                env.next_wp = None
             else:
+                # 경로 상에 장애물이 있으면 장애물 사이 갭(웨이포인트)을 찾아 안전하게 우회
                 new_wp = find_gap(
                     env.clusters, env.cluster_ids,
                     env.boat_pos, env.boat_heading,
@@ -97,7 +103,7 @@ def run():
                         if new_wp["score"] > env.current_wp["score"] * threshold:
                             env.current_wp = new_wp
                             
-            if env.current_wp is not None and dist_to_target >= 400 and not target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
+            if env.current_wp is not None and not clear_to_target:
                 temp_visited = env.visited.copy()
                 temp_visited.add(env.current_wp["pair"])
                 temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
@@ -124,14 +130,14 @@ def run():
                 else:
                     goal = env.current_wp["pos"]
                     
-                env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal)
+                env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, env.dynamic_obstacles, env.boat_radius)
                 if env.bezier_path is not None:
                     env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=75)
                     
                 if env.current_wp is not None and env.next_wp is not None:
                     vec = env.current_wp["pos"] - env.boat_pos
                     next_start_head = math.atan2(vec[1], vec[0])
-                    env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_start_head, env.next_wp["pos"])
+                    env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_start_head, env.next_wp["pos"], env.dynamic_obstacles, env.boat_radius)
                     if env.next_bezier_path is not None:
                         env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=75)
                 else:

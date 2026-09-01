@@ -52,7 +52,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     dist_to_target = math.hypot(dx_t, dy_t)
     gps_heading = math.atan2(dy_t, dx_t)
 
-    if dist_to_target < 180 or target_is_clear(boat_pos, target_pos, obstacles):
+    if target_is_clear(boat_pos, target_pos, obstacles):
         return None
         
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])

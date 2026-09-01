@@ -52,10 +52,10 @@ class BoatEnv:
         self.lidar_range = 350
         self.rel_angles = np.linspace(-np.pi, np.pi, self.lidar_beams, endpoint=False)
         
-        self.mass = 20
+        self.mass = 12
         self.inertia = 6
-        self.drag = 0.38
-        self.rot_drag = 0.55
+        self.drag = 0.2
+        self.rot_drag = 1.3
         self.boat_radius = 25
         
         self.trail = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
@@ -201,16 +201,20 @@ class BoatEnv:
     def step(self, L, R):
         tL = self.pwm_to_thrust(L)
         tR = self.pwm_to_thrust(R)
-        target_fwd = (tL + tR) / 9.0
-        
-        if self.emergency_mode:
-            target_fwd = (tL + tR) / 20.0
+        # 220도 범위 내 최소 장애물 거리에 비례하여 연속적으로 속도 조절
+        em_dist = getattr(self, 'min_wide_dist', 999)
+        if em_dist < 200:
+            # 거리 0px -> /20(최대감속), 거리 200px -> /9(정상속도)
+            ratio = 9.0 + (200.0 - em_dist) / 200.0 * 11.0
+            target_fwd = (tL + tR) / ratio
+        else:
+            target_fwd = (tL + tR) / 9.0
             
         if not hasattr(self, 'current_fwd'):
             self.current_fwd = 0.0
             
         self.current_fwd = self.current_fwd * 0.95 + target_fwd * 0.05
-        mom = (tR - tL) * 0.00665
+        mom = (tR - tL) * self.params['mom_coeff']
         hv = np.array([math.cos(self.boat_heading), math.sin(self.boat_heading)])
         
         acc = self.current_fwd / self.mass
@@ -267,6 +271,23 @@ class BoatEnv:
                 cy = self.boat_pos[1] - sh * 42
                 self.wakes.append([cx + random.uniform(-2.5, 2.5), cy + random.uniform(-2.5, 2.5), 4.5, 130 * intensity, -ch * 0.85, -sh * 0.85])
 
+            # 좌/우 회전 시 외측 선체 유체 저항에 의한 흰색 거품 (Outer Hull Resistance Foam)
+            if abs(self.boat_ang_vel) > 0.06:
+                turn_p = min(1.0, abs(self.boat_ang_vel) / 0.42) * intensity
+                s = 1.0 if self.boat_ang_vel < 0 else -1.0
+                
+                rand_l = random.uniform(-L * 0.25, L * 0.15)
+                bx_foam = self.boat_pos[0] + s * (-sh) * (GAP + random.uniform(1.5, 4.0)) + ch * rand_l
+                by_foam = self.boat_pos[1] + s * ch * (GAP + random.uniform(1.5, 4.0)) + sh * rand_l
+                
+                drift_vx = s * (-sh) * random.uniform(0.3, 0.7) - ch * 0.35
+                drift_vy = s * ch * random.uniform(0.3, 0.7) - sh * 0.35
+                init_r = random.uniform(2.0, 3.5)
+                alpha = random.uniform(140, 200) * turn_p
+                
+                # 7번째 원소=1: 순백색 거품 태그 (뷰쪽 파란색 링 없이 흰색만)
+                self.wakes.append([bx_foam, by_foam, init_r, alpha, drift_vx, drift_vy, 1])
+
         # 파도-장애물 물리 상호작용 (Wave Absorption & Frothy Micro-Bubble Scattering)
         if len(self.wakes) > 0 and len(self.dynamic_obstacles) > 0:
             for w in self.wakes:
@@ -306,7 +327,7 @@ class BoatEnv:
     def get_pwm(self, steer):
         dead = 0.02
         if abs(steer) < dead: steer = 0
-        mid = 1500; rng = 240  # 210 -> 270 (최대 회전 출력 한계를 대폭 확장)
+        mid = 1500; rng = self.params['pwm_rng']
         m = np.log1p(3 * abs(steer)) / np.log(4)
         d = m * rng
         if steer >= 0: L = mid - d; R = mid + d
@@ -346,19 +367,21 @@ class BoatEnv:
     def update_steering(self, dists):
         self.steer_timer += self.dt
         center_idx = self.lidar_beams // 2
-        span = self.lidar_beams // 9
+        # 정면 + 양옆 20도 = 총 220도 범위 감시
+        span = int(self.lidar_beams * 220 / 360 / 2)
         front_dists = dists[center_idx - span : center_idx + span]
         min_front_dist = np.min(front_dists)
+        self.min_wide_dist = min_front_dist
         
         if not hasattr(self, 'emergency_cooldown'):
             self.emergency_cooldown = 0
             
-        if min_front_dist < 115.0:
+        if min_front_dist < self.params['em_enter']:
             self.emergency_mode = True
-            self.emergency_cooldown = 18
+            self.emergency_cooldown = self.params['em_hold_frames']
         elif self.emergency_mode:
             self.emergency_cooldown -= 1
-            if min_front_dist > 160.0 and self.emergency_cooldown <= 0:
+            if min_front_dist > self.params['em_exit'] and self.emergency_cooldown <= 0:
                 self.emergency_mode = False
 
         if self.pursuit_target is None: return 0
@@ -368,15 +391,16 @@ class BoatEnv:
 
         if self.emergency_mode:
             steer_gain = 0.95
-            avoid_multiplier = 0.09
+            avoid_multiplier = self.params['avoid_em']
         else:
-            steer_gain = 0.786
-            avoid_multiplier = 0.02
+            steer_gain = self.params['steer_gain']
+            avoid_multiplier = self.params['avoid_normal']
             
         # 각속도 댐핑으로 관성 오버슈트 억제
         d_term = -0.15 * getattr(self, 'boat_ang_vel', 0.0)
         steer_raw = heading_error * steer_gain + d_term
-        steer_f = 0.38 * steer_raw + 0.62 * self.prev_steer
+        alpha = self.params['steer_alpha']
+        steer_f = alpha * steer_raw + (1.0 - alpha) * self.prev_steer
         self.prev_steer = steer_f
         
         avoid = reactive_avoidance(dists, self.rel_angles)
