@@ -16,17 +16,21 @@ class EnvRenderer:
 
     def render(self, hits):
         env = self.env
-        # 1. 깔끔하고 눈이 편안한 마린 블루 수면 배경 (Clean Ocean Water)
-        env.screen.fill((26, 85, 142))
+        # 1. 밝고 맑은 코스탈 마린 블루 수면 배경 (Bright Coastal Marine Blue)
+        env.screen.fill((34, 112, 175))
         
-        # 은은하고 자연스러운 미세 수면 잔물결 (Gentle Minimalist Waves)
-        wave_t = env.frame * 0.03
-        for i in range(25, env.sim_h, 55):
-            for j in range(25, env.w, 75):
-                wx = j + math.cos(wave_t + i * 0.05) * 10
-                wy = i + math.sin(wave_t * 0.7 + j * 0.05) * 5
-                w_len = 16 + math.sin(wave_t + j * 0.04) * 6
-                pygame.draw.line(env.screen, (38, 102, 164), (int(wx), int(wy)), (int(wx + w_len), int(wy)), 1)
+        # 역동적인 다층 파도 물결 & 수면 반사 하이라이트 (Dynamic Multi-layered Ocean Waves)
+        wave_t = env.frame * 0.035
+        for i in range(18, env.sim_h, 42):
+            for j in range(18, env.w, 62):
+                wx = j + math.cos(wave_t + i * 0.06) * 12
+                wy = i + math.sin(wave_t * 0.8 + j * 0.06) * 6
+                w_len = 18 + math.sin(wave_t + j * 0.05) * 8
+                
+                # 기본 파도 물결선
+                pygame.draw.line(env.screen, (52, 138, 204), (int(wx), int(wy)), (int(wx + w_len), int(wy)), 2)
+                # 파도 상단 햇살 반사광 (Wave Crest Shimmer)
+                pygame.draw.line(env.screen, (115, 195, 245), (int(wx + 3), int(wy - 1)), (int(wx + w_len * 0.55), int(wy - 1)), 1)
 
         bx, by = env.boat_pos
         h = env.boat_heading
@@ -266,16 +270,37 @@ class EnvRenderer:
             p_b2 = (int(prop_c[0] + 3.5*t_nx), int(prop_c[1] + 3.5*t_ny))
             pygame.draw.line(env.screen, (225, 235, 245), p_b1, p_b2, 2)
 
+        # 선체 통합 원형 자율주행 상태 LED 링 (Integrated Autonomous Status LED Ring)
+        em = getattr(env, 'emergency_mode', False)
+        dist_to_target = np.linalg.norm(env.target - env.boat_pos)
+        
+        if em:
+            # 비상 회피 모드: 선명한 레드 경보 스트로브
+            strobe = (math.sin(env.frame * 0.4) > 0)
+            led_color = (255, 45, 40) if strobe else (120, 20, 20)
+        elif dist_to_target < 200:
+            # 목적지 최종 접근 모드: 밝은 골든 앰버 펄스
+            pulse_a = (math.sin(env.frame * 0.15) + 1) * 0.5
+            led_color = (int(210 + 45*pulse_a), int(160 + 55*pulse_a), 20)
+        else:
+            # 정상 자율 주행 모드: 부드러운 에메랄드/시안 숨쉬기 펄스
+            pulse_g = (math.sin(env.frame * 0.08) + 1) * 0.5
+            led_color = (0, int(200 + 55*pulse_g), int(170 + 70*pulse_g))
+            
+        # 캐빈 루프 상단 상태 LED 링 렌더링
+        led_base = TR((bx, by), -L*0.05, 0)
+        pygame.draw.circle(env.screen, (35, 42, 50), led_base, 8)
+        pygame.draw.circle(env.screen, led_color, led_base, 6, 2)
+        
         # 중앙 회전식 라이다 센서 돔 (Rotating LiDAR Sensor Pod)
-        # 중앙 회전식 라이다 센서 돔 (Rotating LiDAR Sensor Pod)
-        Lidar_pos = TR((bx, by), -L*0.05, 0)
-        pygame.draw.circle(env.screen, (42, 48, 56), Lidar_pos, 6)
-        pygame.draw.circle(env.screen, (255, 215, 30), Lidar_pos, 3)
+        pygame.draw.circle(env.screen, (48, 55, 65), led_base, 4)
+        pygame.draw.circle(env.screen, (255, 215, 30), led_base, 2)
+        
         # 라이다 360도 스캔 레이저 펄스 회전선
         scan_ang = env.frame * 0.35
-        sp_x = int(Lidar_pos[0] + math.cos(scan_ang) * 6)
-        sp_y = int(Lidar_pos[1] + math.sin(scan_ang) * 6)
-        pygame.draw.line(env.screen, (0, 255, 200), Lidar_pos, (sp_x, sp_y), 2)
+        sp_x = int(led_base[0] + math.cos(scan_ang) * 7)
+        sp_y = int(led_base[1] + math.sin(scan_ang) * 7)
+        pygame.draw.line(env.screen, (0, 255, 200), led_base, (sp_x, sp_y), 2)
         pygame.draw.circle(env.screen, (0, 255, 200), (sp_x, sp_y), 2)
 
     def _draw_dashboard(self, hits):
