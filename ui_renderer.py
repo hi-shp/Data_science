@@ -93,13 +93,12 @@ class EnvRenderer:
                 if p is not None:
                     pygame.draw.circle(env.screen, (255, 255, 0), (int(p[0]), int(p[1])), 2)
 
-        # Safety Envelope (안전 반경 오버레이)
+        # Safety Envelope (8acbd56 버전의 소프트 반투명 안전 원, 120x120 로컬 버퍼)
         self.safety_surf.fill((0, 0, 0, 0))
         safety_r = int(env.boat_radius + 18)
         em = getattr(env, 'emergency_mode', False)
-        safety_color = (255, 50, 50, 45) if em else (0, 220, 140, 22)
+        safety_color = (255, 60, 60, 40) if em else (0, 200, 120, 25)
         pygame.draw.circle(self.safety_surf, safety_color, (60, 60), safety_r)
-        pygame.draw.circle(self.safety_surf, (255, 60, 60, 120) if em else (0, 240, 160, 60), (60, 60), safety_r, 1)
         env.screen.blit(self.safety_surf, (int(bx - 60), int(by - 60)))
                 
         # 목표점: 해양 항로 비콘 (Nautical Beacon Target)
@@ -150,7 +149,7 @@ class EnvRenderer:
                 pygame.draw.circle(env.screen, (255, 255, 255), (int(px_t), int(py_t)), 10, 2)
                 pygame.draw.circle(env.screen, (255, 50, 150), (int(px_t), int(py_t)), 5)
 
-        # 6. 선박 형상 정밀 렌더링 (카타마란 + 항해등 + 듀얼 모터 + 라이다 회전)
+        # 6. 선박 형상 정밀 렌더링
         self._draw_boat_hull(bx, by, ch, sh)
 
         # 7. 하단 대시보드 UI
@@ -249,28 +248,33 @@ class EnvRenderer:
         pygame.draw.circle(env.screen, (30, 35, 40), ant_pos, 2)
         pygame.draw.line(env.screen, (200, 210, 220), ant_pos, (ant_pos[0]-1, ant_pos[1]-6), 2)
 
-        # 선체와 평행하게 고정된 정밀 듀얼 아웃보드 쓰러스터 (Fixed Parallel Thrusters)
+        # 선체 일체형 소형 T500 덕트 쓰러스터 (Integrated Compact T500 Thrusters)
         t_ch, t_sh = ch, sh
+        t_nx, t_ny = -sh, ch
+        d_len = 11; d_rad = 4.8
         
         for m_center in [left_center, right_center]:
-            # 마운트 브래킷
-            mount_p = TR(m_center, -L*0.48, 0)
-            pivot_p = TR(m_center, -L*0.54, 0)
-            pygame.draw.line(env.screen, (30, 35, 42), mount_p, pivot_p, 4)
+            p_center = TR(m_center, -L*0.50, 0)
             
-            # 쓰러스터 모터 본체 (Engine Cowling: 선체와 완전 평행 고정)
-            cowl_f = (int(pivot_p[0] + 5*t_ch), int(pivot_p[1] + 5*t_sh))
-            cowl_b = (int(pivot_p[0] - 8*t_ch), int(pivot_p[1] - 8*t_sh))
-            pygame.draw.line(env.screen, (40, 48, 56), cowl_f, cowl_b, 6)
-            pygame.draw.line(env.screen, (80, 92, 104), cowl_f, cowl_b, 2)
+            # 덕트 노즐 모서리
+            d_fl = (int(p_center[0] + (d_len*0.5)*t_ch - d_rad*t_nx), int(p_center[1] + (d_len*0.5)*t_sh - d_rad*t_ny))
+            d_fr = (int(p_center[0] + (d_len*0.5)*t_ch + d_rad*t_nx), int(p_center[1] + (d_len*0.5)*t_sh + d_rad*t_ny))
+            d_rr = (int(p_center[0] - (d_len*0.5)*t_ch + d_rad*t_nx), int(p_center[1] - (d_len*0.5)*t_sh + d_rad*t_ny))
+            d_rl = (int(p_center[0] - (d_len*0.5)*t_ch - d_rad*t_nx), int(p_center[1] - (d_len*0.5)*t_sh - d_rad*t_ny))
             
-            # 프로펠러 허브 & 트윈 블레이드 (Propeller Hub & Twin Blades)
-            prop_p = (int(pivot_p[0] - 10*t_ch), int(pivot_p[1] - 10*t_sh))
-            pygame.draw.circle(env.screen, (24, 28, 34), prop_p, 3)
-            # 프로펠러 블레이드
-            p_blade1 = (int(prop_p[0] - 4*t_sh), int(prop_p[1] + 4*t_ch))
-            p_blade2 = (int(prop_p[0] + 4*t_sh), int(prop_p[1] - 4*t_ch))
-            pygame.draw.line(env.screen, (220, 228, 238), p_blade1, p_blade2, 2)
+            # 일체형 덕트 쉘
+            pygame.draw.polygon(env.screen, (32, 38, 46), [d_fl, d_fr, d_rr, d_rl])
+            pygame.draw.polygon(env.screen, (68, 78, 92), [d_fl, d_fr, d_rr, d_rl], 1)
+            
+            # 중앙 모터 코어 & 프로펠러
+            m_f = (int(p_center[0] + 3*t_ch), int(p_center[1] + 3*t_sh))
+            m_r = (int(p_center[0] - 4*t_ch), int(p_center[1] - 4*t_sh))
+            pygame.draw.line(env.screen, (18, 22, 28), m_f, m_r, 3)
+            
+            prop_c = (int(p_center[0] - 1*t_ch), int(p_center[1] - 1*t_sh))
+            p_b1 = (int(prop_c[0] - 3.5*t_nx), int(prop_c[1] - 3.5*t_ny))
+            p_b2 = (int(prop_c[0] + 3.5*t_nx), int(prop_c[1] + 3.5*t_ny))
+            pygame.draw.line(env.screen, (225, 235, 245), p_b1, p_b2, 2)
 
         # 중앙 회전식 라이다 센서 돔 (Rotating LiDAR Sensor Pod)
         Lidar_pos = TR((bx, by), -L*0.05, 0)
