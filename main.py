@@ -50,12 +50,44 @@ def run():
                 env.grid, env.dynamic_obstacles
             )
 
+        # 정면 장애물 발생 시 중간 가상 우회 웨이포인트(Virtual Waypoint) 삽입
+        center_idx = env.lidar_beams // 2
+        span = env.lidar_beams // 10
+        front_dists = dists[center_idx - span : center_idx + span]
+        min_f_idx = int(np.argmin(front_dists))
+        min_f_dist = front_dists[min_f_idx]
+        
+        if min_f_dist < 110.0 and env.current_wp is not None and not env.current_wp.get("is_virtual", False):
+            obs_rel_ang = env.rel_angles[center_idx - span + min_f_idx]
+            obs_glob_ang = env.boat_heading + obs_rel_ang
+            obs_p = env.boat_pos + np.array([math.cos(obs_glob_ang), math.sin(obs_glob_ang)]) * min_f_dist
+            
+            perp_ang = obs_glob_ang + np.pi / 2.0
+            normal = np.array([math.cos(perp_ang), math.sin(perp_ang)])
+            
+            d_left = obs_p - normal * 65.0
+            d_right = obs_p + normal * 65.0
+            
+            l_space = np.sum(dists[center_idx - span*2 : center_idx])
+            r_space = np.sum(dists[center_idx : center_idx + span*2])
+            
+            chosen_detour = d_left if l_space >= r_space else d_right
+            
+            env.next_wp = env.current_wp
+            env.current_wp = {
+                "pos": chosen_detour,
+                "pair": (-1, -1),
+                "score": 999.0,
+                "is_virtual": True
+            }
+
         if env.current_wp is not None:
             should_clear = False
             vec_to_wp = env.current_wp["pos"] - env.boat_pos
             dnow = np.linalg.norm(vec_to_wp)
             
-            if dnow < 25:
+            arrive_dist = 35.0 if env.current_wp.get("is_virtual", False) else 25.0
+            if dnow < arrive_dist:
                 should_clear = True
                 
             wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
@@ -66,29 +98,23 @@ def run():
                 
             if should_clear:
                 p = env.current_wp["pair"]
-                env.visited.add(p)
-                env.visited.add((p[1], p[0]))
-                env.current_wp = None
+                if p != (-1, -1):
+                    env.visited.add(p)
+                    env.visited.add((p[1], p[0]))
+                env.current_wp = env.next_wp
+                env.next_wp = None
 
-        if new_wp is not None:
+        if new_wp is not None and (env.current_wp is None or not env.current_wp.get("is_virtual", False)):
             if env.current_wp is None:
                 env.current_wp = new_wp
             else:
                 dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
                 if dist_to_curr > 80:
-                    vec_curr = env.current_wp["pos"] - env.boat_pos
-                    vec_new = new_wp["pos"] - env.boat_pos
-                    
-                    ang_curr = math.atan2(vec_curr[1], vec_curr[0])
-                    ang_new = math.atan2(vec_new[1], vec_new[0])
-                    angle_diff = abs(wrap(ang_new - ang_curr))
-                    
                     threshold = 1.1
-
                     if new_wp["score"] > env.current_wp["score"] * threshold:
                         env.current_wp = new_wp
                         
-        if env.current_wp is not None:
+        if env.current_wp is not None and not env.current_wp.get("is_virtual", False):
             temp_visited = env.visited.copy()
             temp_visited.add(env.current_wp["pair"])
             temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
@@ -102,7 +128,7 @@ def run():
                 env.target, temp_visited,
                 env.grid, env.dynamic_obstacles
             )
-        else:
+        elif env.current_wp is None:
             env.next_wp = None
 
         env.path_timer += env.dt
