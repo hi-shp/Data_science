@@ -160,7 +160,7 @@ class BoatEnv:
             self.current_fwd = 0.0
             
         self.current_fwd = self.current_fwd * 0.95 + target_fwd * 0.05
-        mom = (tR - tL) * 0.006
+        mom = (tR - tL) * 0.00665
         hv = np.array([math.cos(self.boat_heading), math.sin(self.boat_heading)])
         
         acc = self.current_fwd / self.mass
@@ -234,14 +234,14 @@ class BoatEnv:
         return hit or wall
 
     def get_pwm(self, steer):
-        dead = 0.03
+        dead = 0.02
         if abs(steer) < dead: steer = 0
-        mid = 1500; rng = 210
-        m = np.log1p(4 * abs(steer)) / np.log(5)
+        mid = 1500; rng = 270  # 210 -> 270 (최대 회전 출력 한계를 대폭 확장)
+        m = np.log1p(3 * abs(steer)) / np.log(4)
         d = m * rng
         if steer >= 0: L = mid - d; R = mid + d
         else: L = mid + d; R = mid - d
-        return int(np.clip(L, 1300, 1700)), int(np.clip(R, 1300, 1700))
+        return int(np.clip(L, 1230, 1770)), int(np.clip(R, 1230, 1770))
 
     def validate_wp_grid(self):
         if self.current_wp is None: return
@@ -287,11 +287,13 @@ class BoatEnv:
         px, py = self.pursuit_target
         heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
         heading_error = wrap(heading_target - self.boat_heading)
-        steer_raw = heading_error * 0.6
-        steer_f = 0.3 * steer_raw + 0.7 * self.prev_steer
+        
+        steer_raw = heading_error * 0.775
+        steer_f = 0.35 * steer_raw + 0.65 * self.prev_steer
         self.prev_steer = steer_f
+        
         avoid = reactive_avoidance(dists, self.rel_angles)
-        avoid_multiplier = 0.1 if self.emergency_mode else 0.02
+        avoid_multiplier = 0.082 if self.emergency_mode else 0.019
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 
     def render(self, hits):

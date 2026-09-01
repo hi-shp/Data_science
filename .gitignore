@@ -1,2 +1,4 @@
 *.webm
 screenshot/
+__pycache__/
+*.pyc

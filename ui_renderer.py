@@ -8,7 +8,10 @@ class EnvRenderer:
         self.pov_surf = pygame.Surface((320, 220), pygame.SRCALPHA)
         self.cam_surf = pygame.Surface((320, 220), pygame.SRCALPHA)
         self.real_cam_surf = pygame.Surface((320, 220), pygame.SRCALPHA)
+        self.safety_surf = pygame.Surface((120, 120), pygame.SRCALPHA)
+        self.hud_surf = pygame.Surface((210, 110), pygame.SRCALPHA)
         self.font = pygame.font.SysFont(None, 24)
+        self.bold_font = pygame.font.SysFont(None, 26, bold=True)
         self.small_font = pygame.font.SysFont(None, 18)
 
     def render(self, hits):
@@ -47,12 +50,13 @@ class EnvRenderer:
         env.screen.blit(env.wake_surf, (0, 0))
         env.screen.blit(env.trail, (0, 0))
         
-        # 4. 장애물
+        # 4. 장애물 (그라데이션 + 디테일 그림자)
         for ox, oy, r in env.dynamic_obstacles:
-            pygame.draw.circle(env.screen, (15, 75, 130), (int(ox + 4), int(oy + 4)), int(r))
-            pygame.draw.circle(env.screen, (220, 60, 40), (int(ox), int(oy)), int(r))
-            pygame.draw.circle(env.screen, (255, 240, 240), (int(ox), int(oy)), int(r * 0.6))
-            pygame.draw.circle(self.env.screen, (255, 100, 50), (int(ox), int(oy)), int(r * 0.3))
+            pygame.draw.circle(env.screen, (12, 55, 100), (int(ox + 5), int(oy + 5)), int(r + 2))
+            pygame.draw.circle(env.screen, (200, 50, 35), (int(ox), int(oy)), int(r))
+            pygame.draw.circle(env.screen, (240, 80, 55), (int(ox - 1), int(oy - 1)), int(r * 0.78))
+            pygame.draw.circle(env.screen, (255, 200, 190), (int(ox - 1), int(oy - 1)), int(r * 0.42))
+            pygame.draw.circle(env.screen, (255, 120, 70), (int(ox), int(oy)), int(r * 0.18))
             
         env.occ_surf.fill((0, 0, 0, 0))
         occ = np.where(env.grid >= 3)
@@ -66,9 +70,20 @@ class EnvRenderer:
             for p in hits:
                 if p is not None:
                     pygame.draw.circle(env.screen, (255, 255, 0), (int(p[0]), int(p[1])), 2)
+
+        # Safety Envelope (반투명 안전 원, 120x120 로컬 버퍼)
+        self.safety_surf.fill((0, 0, 0, 0))
+        safety_r = int(env.boat_radius + 18)
+        em = getattr(env, 'emergency_mode', False)
+        safety_color = (255, 60, 60, 40) if em else (0, 200, 120, 25)
+        pygame.draw.circle(self.safety_surf, safety_color, (60, 60), safety_r)
+        env.screen.blit(self.safety_surf, (int(bx - 60), int(by - 60)))
                 
-        pygame.draw.circle(env.screen, (20, 200, 50), (int(env.target[0]), int(env.target[1])), 10)
-        pygame.draw.circle(env.screen, (255, 255, 255), (int(env.target[0]), int(env.target[1])), 6)
+        # 목표점: 펄스 비콘 애니메이션
+        pulse = math.sin(env.frame * 0.08) * 3.5
+        pygame.draw.circle(env.screen, (20, 200, 50, 60), (int(env.target[0]), int(env.target[1])), int(14 + pulse))
+        pygame.draw.circle(env.screen, (30, 230, 70), (int(env.target[0]), int(env.target[1])), 10)
+        pygame.draw.circle(env.screen, (255, 255, 255), (int(env.target[0]), int(env.target[1])), 5)
         
         env.screen.blit(env.path_surf, (0, 0))
         
@@ -112,6 +127,9 @@ class EnvRenderer:
 
         # 7. 하단 대시보드 UI
         self._draw_dashboard(hits)
+
+        # 8. 실시간 텔레메트리 HUD
+        self._draw_telemetry()
 
         pygame.display.flip()
 
@@ -228,12 +246,12 @@ class EnvRenderer:
             ty_off = -12 if ry < pcy else 2
             self.pov_surf.blit(txt_ang, (int(rx) + tx_off, int(ry) + ty_off))
 
-        # 동심원 스케일 서클
+        # 동심원 스케일 서클 (50px = 1m 기준: 2m, 4m, 6m)
         for dist in [100, 200, 300]:
             r_pixel = int(dist * scale_r)
             rect = pygame.Rect(pcx - r_pixel, pcy - r_pixel, r_pixel * 2, r_pixel * 2)
             pygame.draw.arc(self.pov_surf, (0, 90, 140), rect, 0, math.pi, 1)
-            lbl = self.small_font.render(f"{dist // 5}m", True, (0, 120, 170))
+            lbl = self.small_font.render(f"{dist // 50}m", True, (0, 120, 170))
             self.pov_surf.blit(lbl, (pcx + 4, pcy - r_pixel - 10))
 
         # 180도 스캔 레이 라인
@@ -263,7 +281,7 @@ class EnvRenderer:
         ty_p = pcy - lf_t * scale_r
         
         margin = 0
-        dist_total_m = math.hypot(dx_t, dy_t) / 10.0
+        dist_total_m = math.hypot(dx_t, dy_t) / 50.0
         
         if margin <= tx_p <= pov_w - margin and margin <= ty_p <= pov_h - margin:
             pygame.draw.circle(self.pov_surf, (20, 250, 80), (int(tx_p), int(ty_p)), 7)
@@ -289,7 +307,7 @@ class EnvRenderer:
                 pygame.draw.circle(self.pov_surf, (20, 250, 80), (edge_x, edge_y), 6)
                 pygame.draw.circle(self.pov_surf, (255, 255, 255), (edge_x, edge_y), 2)
                 
-                dist_txt = self.small_font.render(f"{int(dist_total_m/5)}m", True, (20, 250, 80))
+                dist_txt = self.small_font.render(f"{dist_total_m:.0f}m", True, (20, 250, 80))
                 lbl_x = max(10, min(edge_x - 12, pov_w - 40))
                 lbl_y = max(10, min(edge_y - 12, pov_h - 18))
                 self.pov_surf.blit(dist_txt, (lbl_x, lbl_y))
@@ -479,3 +497,56 @@ class EnvRenderer:
         pygame.draw.rect(self.real_cam_surf, (130, 180, 220), (0, 0, real_w, real_h), 2)
         self.real_cam_surf.blit(self.font.render("LiDAR 1st View", True, (255, 255, 255)), (10, 10))
         env.screen.blit(self.real_cam_surf, (1050, env.sim_h + 35))
+
+    def _draw_telemetry(self):
+        """우상단 실시간 텔레메트리 HUD"""
+        env = self.env
+        hud_w, hud_h = 210, 110
+        hud_x = env.w - hud_w - 15
+        hud_y = 12
+        
+        hud_surf = self.hud_surf
+        hud_surf.fill((10, 20, 40, 190))
+        pygame.draw.rect(hud_surf, (0, 160, 230), (0, 0, hud_w, hud_h), 2)
+        
+        # 모드 표시
+        em = getattr(env, 'emergency_mode', False)
+        has_wp = env.current_wp is not None
+        if em:
+            mode_txt = self.bold_font.render("\u26a0 EMERGENCY", True, (255, 80, 60))
+        elif has_wp:
+            mode_txt = self.bold_font.render("\u25c8 GAP PASS", True, (0, 255, 220))
+        else:
+            mode_txt = self.bold_font.render("\u25b6 CRUISING", True, (50, 230, 120))
+        hud_surf.blit(mode_txt, (10, 6))
+        
+        # 속도
+        speed = float(np.linalg.norm(env.boat_vel))
+        speed_knots = speed * 0.9
+        spd_txt = self.small_font.render(f"Speed: {speed_knots:.1f} kt", True, (220, 235, 255))
+        hud_surf.blit(spd_txt, (10, 32))
+        
+        # 속도 바
+        bar_w = 125
+        pygame.draw.rect(hud_surf, (30, 50, 70), (10, 48, bar_w, 7))
+        fill_w = int(min(speed / 15.0, 1.0) * bar_w)
+        bar_color = (255, 80, 60) if em else (0, 200, 100)
+        pygame.draw.rect(hud_surf, bar_color, (10, 48, fill_w, 7))
+        
+        # 조타각
+        steer_val = getattr(env, 'prev_steer', 0)
+        steer_txt = self.small_font.render(f"Steer: {steer_val:+.2f}", True, (220, 235, 255))
+        hud_surf.blit(steer_txt, (10, 60))
+        
+        # Heading
+        hdg_deg = math.degrees(env.boat_heading) % 360
+        hdg_txt = self.small_font.render(f"Heading: {hdg_deg:.0f}\u00b0", True, (220, 235, 255))
+        hud_surf.blit(hdg_txt, (10, 76))
+        
+        # 목표 거리 (50px = 1m 기준 미터 단위 변환)
+        d2t = float(np.linalg.norm(env.target - env.boat_pos))
+        d2t_m = d2t / 50.0
+        d2t_txt = self.small_font.render(f"Target: {d2t_m:.1f} m", True, (50, 230, 120))
+        hud_surf.blit(d2t_txt, (10, 92))
+        
+        env.screen.blit(hud_surf, (hud_x, hud_y))
