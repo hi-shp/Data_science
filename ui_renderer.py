@@ -41,8 +41,15 @@ class EnvRenderer:
                 ry = by + math.sin(ray_ang) * env.lidar_range
                 pygame.draw.line(env.screen, (0, 100, 60), (int(bx), int(by)), (int(rx), int(ry)), 1)
 
-        # 3. 실제 선박 유체역학 항적 웨이크 + 장애물 충돌 반사파 (Realistic Ship Hydrodynamic Wakes)
+        # 3. 실제 선박 유체역학 항적 웨이크 + 장애물 충돌 미세 찰랑임 (Realistic Ship Wakes & Soft Buoy Splash)
         env.wake_surf.fill((0, 0, 0, 0))
+        
+        # 부표 밑에 자연스럽게 맺히는 부드러운 백색 수면 물거품 아우라 (Soft White Buoy Waterline Foam)
+        for ox, oy, r in env.dynamic_obstacles:
+            pulse_f = math.sin(env.frame * 0.06 + ox * 0.05) * 1.5
+            pygame.draw.circle(env.wake_surf, (225, 240, 255, 55), (int(ox), int(oy)), int(r + 3.5 + pulse_f))
+            pygame.draw.circle(env.wake_surf, (255, 255, 255, 90), (int(ox), int(oy)), int(r + 1.2 + pulse_f * 0.5))
+
         for w in env.wakes:
             # w: [x, y, radius, alpha, vx, vy]
             if len(w) >= 6:
@@ -60,30 +67,24 @@ class EnvRenderer:
                     pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.75)), (int(w[0]), int(w[1])), int(w[2] * 0.52))
         env.wakes = [w for w in env.wakes if w[3] > 0]
         
-        # 장애물 충돌 후 튕겨 나가는 실시간 물리 반사파 (Reflected Waves)
+        # 장애물 충돌 시 발생하는 작고 부드러운 미세 물보라 (Small Gentle Splash)
         if hasattr(env, 'reflected_wakes'):
             for rw in env.reflected_wakes:
-                rw[2] += 1.15
-                rw[3] -= 3.0
-                if rw[3] > 0:
-                    pygame.draw.circle(env.wake_surf, (215, 245, 255, int(rw[3] * 0.7)), (int(rw[0]), int(rw[1])), int(rw[2]), 2)
-            env.reflected_wakes = [rw for rw in env.reflected_wakes if rw[3] > 0]
+                rw[2] += 0.35
+                rw[3] -= 5.5
+                if rw[3] > 0 and rw[2] < 7.0:
+                    pygame.draw.circle(env.wake_surf, (240, 250, 255, int(rw[3] * 0.6)), (int(rw[0]), int(rw[1])), int(rw[2]))
+            env.reflected_wakes = [rw for rw in env.reflected_wakes if rw[3] > 0 and rw[2] < 7.0]
         
         env.screen.blit(env.wake_surf, (0, 0))
         env.screen.blit(env.trail, (0, 0))
         
-        # 4. 해상 장애물 (부표 밑 자연스러운 수면 파문 + 완전 평면 2D 부표)
+        # 4. 해상 장애물 (오리지널 선명한 2D 부표)
         for ox, oy, r in env.dynamic_obstacles:
-            # 부표 밑에 생기는 잔잔하고 자연스러운 수면 파문 (Buoy Waterline Lapping Ripples)
-            r_lap1 = r + 3 + math.sin(env.frame * 0.08 + ox * 0.06) * 2.5
-            r_lap2 = r + 7 + math.sin(env.frame * 0.05 + oy * 0.06) * 4.0
-            pygame.draw.circle(env.screen, (42, 130, 192), (int(ox), int(oy)), int(r_lap2), 1)
-            pygame.draw.circle(env.screen, (55, 150, 215), (int(ox), int(oy)), int(r_lap1), 1)
-            
-            # 완전 평면 2D 고대비 부표 (Clean Flat 2D Buoy, No Fake Shadows)
-            pygame.draw.circle(env.screen, (225, 45, 30), (int(ox), int(oy)), int(r))
-            pygame.draw.circle(env.screen, (255, 80, 55), (int(ox), int(oy)), int(r * 0.68))
-            pygame.draw.circle(env.screen, (255, 235, 220), (int(ox), int(oy)), int(r * 0.28))
+            pygame.draw.circle(env.screen, (200, 50, 35), (int(ox), int(oy)), int(r))
+            pygame.draw.circle(env.screen, (240, 80, 55), (int(ox - 1), int(oy - 1)), int(r * 0.78))
+            pygame.draw.circle(env.screen, (255, 200, 190), (int(ox - 1), int(oy - 1)), int(r * 0.42))
+            pygame.draw.circle(env.screen, (255, 120, 70), (int(ox), int(oy)), int(r * 0.18))
             
         env.occ_surf.fill((0, 0, 0, 0))
         occ = np.where(env.grid >= 3)
