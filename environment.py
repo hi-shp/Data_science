@@ -85,7 +85,8 @@ class BoatEnv:
         self.next_bezier_path = None
         self.pursuit_target = None
         self.next_pursuit_target = None
-        self.wakes = [] # [x, y, radius, alpha, type, life, max_life, angle_offset]
+        self.wakes = [] # [x, y, radius, alpha]
+        self.reflected_wakes = [] # [x, y, radius, alpha] (장애물 충돌 반사파)
         
         self.obstacles = np.array([])
         self.dynamic_obstacles = np.array([])
@@ -249,6 +250,20 @@ class BoatEnv:
                 cy = self.boat_pos[1] - sh * 35
                 self.wakes.append([cx + random.uniform(-4, 4), cy + random.uniform(-4, 4), 3.5, 130 * intensity])
 
+        # 파도-장애물 충돌 반사파 (Wave-Obstacle Reflection & Back-Scattering)
+        if len(self.wakes) > 0 and len(self.dynamic_obstacles) > 0:
+            for w in self.wakes:
+                if w[3] > 40 and w[2] > 5:
+                    for ox, oy, ob_r in self.dynamic_obstacles:
+                        dx = w[0] - ox; dy = w[1] - oy
+                        dist = math.hypot(dx, dy)
+                        # 파도 전면이 부표 표면에 닿는 순간 반사파 링 생성
+                        if abs(dist - (w[2] + ob_r)) < 4.5:
+                            if random.random() < 0.28:
+                                contact_x = ox + (dx / (dist + 1e-5)) * (ob_r + 2)
+                                contact_y = oy + (dy / (dist + 1e-5)) * (ob_r + 2)
+                                self.reflected_wakes.append([contact_x, contact_y, 2.0, w[3] * 0.75])
+
     def collide(self):
         ox = self.dynamic_obstacles[:, 0]
         oy = self.dynamic_obstacles[:, 1]
@@ -303,19 +318,19 @@ class BoatEnv:
     def update_steering(self, dists):
         self.steer_timer += self.dt
         center_idx = self.lidar_beams // 2
-        span = self.lidar_beams // 8
+        span = self.lidar_beams // 9
         front_dists = dists[center_idx - span : center_idx + span]
         min_front_dist = np.min(front_dists)
         
         if not hasattr(self, 'emergency_cooldown'):
             self.emergency_cooldown = 0
             
-        if min_front_dist < 135.0:
+        if min_front_dist < 115.0:
             self.emergency_mode = True
-            self.emergency_cooldown = 22
+            self.emergency_cooldown = 18
         elif self.emergency_mode:
             self.emergency_cooldown -= 1
-            if min_front_dist > 165.0 and self.emergency_cooldown <= 0:
+            if min_front_dist > 160.0 and self.emergency_cooldown <= 0:
                 self.emergency_mode = False
 
         if self.pursuit_target is None: return 0
@@ -324,11 +339,11 @@ class BoatEnv:
         heading_error = wrap(heading_target - self.boat_heading)
 
         if self.emergency_mode:
-            steer_gain = 0.98
-            avoid_multiplier = 0.10
+            steer_gain = 0.95
+            avoid_multiplier = 0.09
         else:
             steer_gain = 0.786
-            avoid_multiplier = 0.022
+            avoid_multiplier = 0.02
             
         # 각속도 댐핑으로 관성 오버슈트 억제
         d_term = -0.15 * getattr(self, 'boat_ang_vel', 0.0)
@@ -338,8 +353,8 @@ class BoatEnv:
         
         avoid = reactive_avoidance(dists, self.rel_angles)
         
-        # 반발력 정상 작동: 비상 상황이 아니고 웨이포인트 선회 방향과 반대로 충돌할 때만 상쇄 방지를 위해 소프트 감쇠(0.25) 적용
-        if not self.emergency_mode and self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.15:
+        # 반발력 정상 작동: 웨이포인트 선회 방향과 반대로 충돌할 때만 상쇄 방지를 위해 소프트 감쇠(0.25) 적용
+        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.15:
             avoid *= 0.25
             
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)

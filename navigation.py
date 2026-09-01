@@ -203,11 +203,6 @@ def reactive_avoidance(dists, angles):
     for d, ang in zip(dists, angles):
         if d < SAFE:
             w = math.exp(-(d / sigma)**2)
-            front = max(1.4 - abs(ang) / (math.pi/2), 0.3)
-            # 정면 장애물(ang ~ 0)일 때 sin(ang)=0으로 회피 토크가 소실되는 사각지대 방지
-            if abs(ang) < 0.25 and d < 180:
-                sin_term = math.sin(ang) if abs(ang) > 0.04 else (0.35 if ang >= 0 else -0.35)
-                a -= w * front * 1.6 * sin_term
-            else:
-                a -= w * front * math.sin(ang)
+            front = max(1.2 - abs(ang) / (math.pi/2), 0.3)
+            a -= w * front * math.sin(ang)
     return a
