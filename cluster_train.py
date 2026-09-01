@@ -399,13 +399,13 @@ def run_sim_task(args):
                 goal = sim.current_wp["pos"]
             sim.bezier_path = make_bezier_path(sim.boat_pos, sim.boat_heading, goal)
             if sim.bezier_path is not None:
-                sim.pursuit_target = pure_pursuit(sim.bezier_path, sim.boat_pos, lookahead=70)
+                sim.pursuit_target = pure_pursuit(sim.bezier_path, sim.boat_pos, lookahead=52)
             if sim.current_wp is not None and sim.next_wp is not None:
                 vec = sim.current_wp["pos"] - sim.boat_pos
                 next_start_head = math.atan2(vec[1], vec[0])
                 sim.next_bezier_path = make_bezier_path(sim.current_wp["pos"], next_start_head, sim.next_wp["pos"])
                 if sim.next_bezier_path is not None:
-                    sim.next_pursuit_target = pure_pursuit(sim.next_bezier_path, sim.current_wp["pos"], lookahead=70)
+                    sim.next_pursuit_target = pure_pursuit(sim.next_bezier_path, sim.current_wp["pos"], lookahead=52)
             else:
                 sim.next_bezier_path = None
                 sim.next_pursuit_target = None
