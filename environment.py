@@ -201,17 +201,17 @@ class BoatEnv:
     def step(self, L, R):
         tL = self.pwm_to_thrust(L)
         tR = self.pwm_to_thrust(R)
-        # 220도 범위 내 최소 장애물 거리에 비례하여 연속적으로 속도 조절 (가까울수록 감속)
+        # 220도 범위 내 최소 장애물 거리에 비례하여 연속적으로 속도 조절 (근접 시에만 110px 이하에서 적절히 감속)
         em_dist = float(getattr(self, 'min_wide_dist', 999.0))
-        clear_ratio = np.clip((em_dist - 25.0) / 225.0, 0.0, 1.0)
-        # 거리 25px(초근접) 시 25% 서행 ~ 250px(원거리) 시 100% 정상 항해 연속 보간
-        speed_factor = 0.25 + 0.75 * (clear_ratio ** 1.2)
-        target_fwd = ((tL + tR) / 9.0) * speed_factor
+        clear_ratio = np.clip((em_dist - 30.0) / 80.0, 0.0, 1.0)
+        # 110px 이상에서는 100% 최대 속도, 30px 이하 초근접 시에도 65% 속도를 유지하여 빠르고 시원하게 항해
+        speed_factor = 0.65 + 0.35 * clear_ratio
+        target_fwd = ((tL + tR) / 6.5) * speed_factor
             
         if not hasattr(self, 'current_fwd'):
             self.current_fwd = 0.0
             
-        self.current_fwd = self.current_fwd * 0.95 + target_fwd * 0.05
+        self.current_fwd = self.current_fwd * 0.90 + target_fwd * 0.10
         mom = (tR - tL) * self.params['mom_coeff']
         hv = np.array([math.cos(self.boat_heading), math.sin(self.boat_heading)])
         
