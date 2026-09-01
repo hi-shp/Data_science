@@ -215,7 +215,7 @@ class EnvRenderer:
 
         pygame.draw.rect(env.screen, (255, 255, 255), env.cb3_rect, 2)
         if env.show_lidar: pygame.draw.rect(env.screen, (255, 255, 0), env.cb3_rect.inflate(-6, -6))
-        env.screen.blit(self.font.render("Show LiDAR Hits", True, (255, 255, 0)), (70, 752))
+        env.screen.blit(self.font.render("Show LiDAR Hits", True, (255, 255, 255)), (70, 752))
 
         pygame.draw.rect(env.screen, (255, 255, 255), env.cb4_rect, 2)
         if env.show_lidar_range: pygame.draw.rect(env.screen, (0, 180, 100), env.cb4_rect.inflate(-6, -6))
@@ -316,7 +316,7 @@ class EnvRenderer:
         pygame.draw.circle(self.pov_surf, (20, 60, 180), (pcx, pcy), int(env.boat_radius * scale_r))
         pygame.draw.line(self.pov_surf, (255, 255, 255), (pcx, pcy), (pcx, pcy - 16), 2)
         
-        txt_surf = self.font.render("LiDAR View", True, (0, 180, 255))
+        txt_surf = self.font.render("LiDAR View", True, (255, 255, 255))
         self.pov_surf.blit(txt_surf, (10, pov_h - txt_surf.get_height() - 5))
         env.screen.blit(self.pov_surf, (350, env.sim_h + 35))
 
@@ -396,7 +396,7 @@ class EnvRenderer:
                     pygame.draw.circle(self.cam_surf, (20, 250, 80), (mx, 65), 7)
                     pygame.draw.circle(self.cam_surf, (255, 255, 255), (mx, 65), 3)
 
-        self.cam_surf.blit(self.font.render("LiDAR Gauge View", True, (0, 180, 255)), (10, 8))
+        self.cam_surf.blit(self.font.render("LiDAR Gauge View", True, (255, 255, 255)), (10, 8))
         env.screen.blit(self.cam_surf, (700, env.sim_h + 35))
 
         # --- 3. LiDAR Depth 1st-Person View (하단 렌더링: 해수면 배경 처리) ---
