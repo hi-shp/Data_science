@@ -520,6 +520,13 @@ def main():
             json.dump(best_params, f, indent=2)
         print(f"  Created {json_path} with baseline parameters.", flush=True)
 
+    # 누적 기록용 CSV 파일 헤더 초기화
+    history_csv = "training_history.csv"
+    if not os.path.exists(history_csv):
+        with open(history_csv, "w") as f:
+            headers = ["generation", "timestamp", "stage1_rate", "stage1_goals", "stage1_cols", "stage1_time", "stage2_rate", "stage2_goals", "stage2_cols", "stage2_time"] + list(default_params.keys())
+            f.write(",".join(headers) + "\n")
+
     best_rate = 0.0
     generation = 0
 
@@ -546,6 +553,11 @@ def main():
             
             tag = "[ELITE]" if rate1 >= 90.0 else ""
             print(f"Gen {generation:03d} | [{bar}] {rate1:5.1f}% | Goal: {goals1:2d}/96 | Col: {collisions1:2d} | Time: {t_elapsed1:.2f}s {tag}", flush=True)
+
+            rate2 = None
+            goals2 = None
+            collisions2 = None
+            t_elapsed2 = None
 
             # 이전 최고 기록 대비 동등 이상(best_rate - 2%)일 경우 2단계 정밀 검증 진행
             if rate1 >= max(best_rate - 2.0, 50.0) or generation == 1:
@@ -578,6 +590,22 @@ def main():
                     for k, v in best_params.items():
                         print(f"    - {k:18s}: {v}")
                     break
+
+            # CSV 파일에 현재 세대 파라미터 및 결과 누적 저장
+            row_data = [
+                str(generation),
+                time.strftime("%Y-%m-%d %H:%M:%S"),
+                f"{rate1:.2f}",
+                str(goals1),
+                str(collisions1),
+                f"{t_elapsed1:.2f}",
+                f"{rate2:.2f}" if rate2 is not None else "",
+                str(goals2) if goals2 is not None else "",
+                str(collisions2) if collisions2 is not None else "",
+                f"{t_elapsed2:.2f}" if t_elapsed2 is not None else ""
+            ] + [str(candidate[k]) for k in default_params.keys()]
+            with open(history_csv, "a") as f:
+                f.write(",".join(row_data) + "\n")
 
     finally:
         pool.close()
