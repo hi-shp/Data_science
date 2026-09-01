@@ -16,25 +16,17 @@ class EnvRenderer:
 
     def render(self, hits):
         env = self.env
-        # 1. 심해 그라데이션 해수면 배경
-        env.screen.fill((16, 68, 115))
+        # 1. 깔끔하고 차분한 마린 블루 수면 배경 (Clean & Calm Ocean)
+        env.screen.fill((28, 95, 152))
         
-        # 해양 차트 미세 그리드 격자 (Sonar Depth Grid)
-        for gx in range(0, env.w, 100):
-            pygame.draw.line(env.screen, (22, 82, 132), (gx, 0), (gx, env.sim_h), 1)
-        for gy in range(0, env.sim_h, 100):
-            pygame.draw.line(env.screen, (22, 82, 132), (0, gy), (env.w, gy), 1)
-
-        # 역동적인 다층 수면 파도 물결 (Dynamic Ocean Waves & Caustics)
-        wave_t = env.frame * 0.04
-        for i in range(15, env.sim_h, 45):
-            for j in range(15, env.w, 65):
-                wx = j + math.cos(wave_t + i * 0.08) * 14
-                wy = i + math.sin(wave_t * 0.8 + j * 0.08) * 7
-                w_len = 22 + math.sin(wave_t + j * 0.05) * 8
-                # 파도 하이라이트
-                pygame.draw.line(env.screen, (32, 112, 172), (int(wx), int(wy)), (int(wx + w_len), int(wy)), 2)
-                pygame.draw.line(env.screen, (70, 160, 225), (int(wx + 4), int(wy - 1)), (int(wx + w_len * 0.6), int(wy - 1)), 1)
+        # 아주 은은하고 드문드문한 미세 수면 잔물결 (Subtle Minimalist Ripples)
+        wave_t = env.frame * 0.02
+        for i in range(30, env.sim_h, 75):
+            for j in range(30, env.w, 100):
+                wx = j + math.cos(wave_t + i * 0.03) * 8
+                wy = i + math.sin(wave_t * 0.6 + j * 0.03) * 4
+                w_len = 14 + math.sin(wave_t + j * 0.02) * 5
+                pygame.draw.line(env.screen, (38, 108, 168), (int(wx), int(wy)), (int(wx + w_len), int(wy)), 1)
 
         bx, by = env.boat_pos
         h = env.boat_heading
