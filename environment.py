@@ -209,8 +209,8 @@ class BoatEnv:
         if not hasattr(self, 'current_fwd'):
             self.current_fwd = 0.0
             
-        self.current_fwd = self.current_fwd * 0.95 + target_fwd * 0.05
-        mom = (tR - tL) * 0.00665
+        # 부드럽고 묵직한 선회 조타 (너무 휙 돌지 않도록 조타 토크 및 감쇠 조절)
+        mom = (tR - tL) * 0.0039
         hv = np.array([math.cos(self.boat_heading), math.sin(self.boat_heading)])
         
         acc = self.current_fwd / self.mass
@@ -235,8 +235,15 @@ class BoatEnv:
                              
         ang_acc = (mom - self.rot_drag * self.boat_ang_vel) / self.inertia
         self.boat_ang_vel += ang_acc * self.dt
-        self.boat_ang_vel *= 0.84
-        self.boat_heading += self.boat_ang_vel * self.dt
+        self.boat_ang_vel *= 0.80
+        
+        d_head = self.boat_ang_vel * self.dt
+        self.boat_heading += d_head
+        
+        # 회전 시 회전축이 후방(-L_pivot)에 위치하여 선회 시 선수가 돌고 선미가 킥되는 물리적 거동
+        L_pivot = 6.0
+        lat_vec = np.array([-math.sin(self.boat_heading), math.cos(self.boat_heading)])
+        self.boat_pos += lat_vec * (self.boat_ang_vel * L_pivot * self.dt)
 
         # 실제 선박 유체역학 파도 생성 (Realistic Hydrodynamic Wave System)
         if vel_norm > 2.0:
@@ -246,22 +253,18 @@ class BoatEnv:
             GAP = 11; L = 84
 
             # 선미 듀얼 쓰러스터 추진 제트 기포 및 후방 횡단 웨이크 (Enlarged Stern Roostertail & Trailing Foam)
-            PO = 11
-            cx_hull = self.boat_pos[0] + ch * PO
-            cy_hull = self.boat_pos[1] + sh * PO
-            
             if self.frame % 2 == 0:
-                stern_lx = cx_hull - sh * GAP - ch * (L * 0.50)
-                stern_ly = cy_hull + ch * GAP - sh * (L * 0.50)
-                stern_rx = cx_hull + sh * GAP - ch * (L * 0.50)
-                stern_ry = cy_hull - ch * GAP - sh * (L * 0.50)
+                stern_lx = self.boat_pos[0] - sh * GAP - ch * (L * 0.50)
+                stern_ly = self.boat_pos[1] + ch * GAP - sh * (L * 0.50)
+                stern_rx = self.boat_pos[0] + sh * GAP - ch * (L * 0.50)
+                stern_ry = self.boat_pos[1] - ch * GAP - sh * (L * 0.50)
                 
                 self.wakes.append([stern_lx + random.uniform(-1.5, 1.5), stern_ly + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.65, -sh * 0.65])
                 self.wakes.append([stern_rx + random.uniform(-1.5, 1.5), stern_ry + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.65, -sh * 0.65])
                 
             if self.frame % 3 == 0:
-                cx = cx_hull - ch * 42
-                cy = cy_hull - sh * 42
+                cx = self.boat_pos[0] - ch * 42
+                cy = self.boat_pos[1] - sh * 42
                 self.wakes.append([cx + random.uniform(-2.5, 2.5), cy + random.uniform(-2.5, 2.5), 4.5, 130 * intensity, -ch * 0.85, -sh * 0.85])
 
         # 파도-장애물 물리 상호작용 (Wave Absorption & Frothy Micro-Bubble Scattering)

@@ -178,15 +178,8 @@ class EnvRenderer:
     def _draw_boat_hull(self, bx, by, ch, sh):
         env = self.env
         GAP = 11; L = 84; W = 16
-        
-        # 선미 쓰러스터 추진 선박의 후방 선회축(Hydrodynamic Aft Pivot Point) 반영
-        # (회전축이 뒤쪽에 위치하여 선회 시 선수가 넓고 시원하게 돌며 선미가 킥아웃되는 실제 선박 거동)
-        PO = 11
-        cx, cy = bx + ch * PO, by + sh * PO
-        center_pos = (cx, cy)
-        
-        left_center = (cx - sh*GAP, cy + ch*GAP)
-        right_center = (cx + sh*GAP, cy - ch*GAP)
+        left_center = (bx - sh*GAP, by + ch*GAP)
+        right_center = (bx + sh*GAP, by - ch*GAP)
         
         hull_local = [
             (L*0.50, 0), (L*0.12, W),
@@ -224,49 +217,49 @@ class EnvRenderer:
 
         # 중앙 연결 브릿지 데크 (투톤 대비 - Tone 2: Crisp Platinum Deck)
         deck_corners = [
-            TR(center_pos, L*0.25, -GAP*0.85),
-            TR(center_pos, L*0.25, GAP*0.85),
-            TR(center_pos, -L*0.35, GAP*0.85),
-            TR(center_pos, -L*0.35, -GAP*0.85)
+            TR((bx, by), L*0.25, -GAP*0.85),
+            TR((bx, by), L*0.25, GAP*0.85),
+            TR((bx, by), -L*0.35, GAP*0.85),
+            TR((bx, by), -L*0.35, -GAP*0.85)
         ]
         pygame.draw.polygon(env.screen, (210, 218, 228), deck_corners)
         pygame.draw.polygon(env.screen, (90, 100, 112), deck_corners, 1)
 
         # 데크 중앙 미끄럼 방지 패드 라인
         deck_pad = [
-            TR(center_pos, L*0.20, -GAP*0.65),
-            TR(center_pos, L*0.20, GAP*0.65),
-            TR(center_pos, -L*0.30, GAP*0.65),
-            TR(center_pos, -L*0.30, -GAP*0.65)
+            TR((bx, by), L*0.20, -GAP*0.65),
+            TR((bx, by), L*0.20, GAP*0.65),
+            TR((bx, by), -L*0.30, GAP*0.65),
+            TR((bx, by), -L*0.30, -GAP*0.65)
         ]
         pygame.draw.polygon(env.screen, (165, 175, 188), deck_pad)
 
         # 캐빈 조종실 팟 (Stealth Tactical Cabin)
         cabin_corners = [
-            TR(center_pos, L*0.16, -GAP*0.55),
-            TR(center_pos, L*0.16, GAP*0.55),
-            TR(center_pos, -L*0.16, GAP*0.55),
-            TR(center_pos, -L*0.16, -GAP*0.55)
+            TR((bx, by), L*0.16, -GAP*0.55),
+            TR((bx, by), L*0.16, GAP*0.55),
+            TR((bx, by), -L*0.16, GAP*0.55),
+            TR((bx, by), -L*0.16, -GAP*0.55)
         ]
         pygame.draw.polygon(env.screen, (75, 84, 96), cabin_corners)
         pygame.draw.polygon(env.screen, (35, 42, 50), cabin_corners, 1)
 
         # 틴팅 전면 윈드실드 창문 (Tinted Marine Cockpit Glass)
         windshield = [
-            TR(center_pos, L*0.13, -GAP*0.42),
-            TR(center_pos, L*0.13, GAP*0.42),
-            TR(center_pos, L*0.04, GAP*0.42),
-            TR(center_pos, L*0.04, -GAP*0.42)
+            TR((bx, by), L*0.13, -GAP*0.42),
+            TR((bx, by), L*0.13, GAP*0.42),
+            TR((bx, by), L*0.04, GAP*0.42),
+            TR((bx, by), L*0.04, -GAP*0.42)
         ]
         pygame.draw.polygon(env.screen, (28, 105, 160), windshield)
-        pygame.draw.line(env.screen, (180, 230, 255), TR(center_pos, L*0.12, -GAP*0.3), TR(center_pos, L*0.06, GAP*0.3), 1)
+        pygame.draw.line(env.screen, (180, 230, 255), TR((bx, by), L*0.12, -GAP*0.3), TR((bx, by), L*0.06, GAP*0.3), 1)
 
         # 후방 GPS 수신기 마스트 돔 & 통신 휩 안테나 (GPS Dome & Whip Antenna)
-        gps_pos = TR(center_pos, -L*0.22, GAP*0.35)
+        gps_pos = TR((bx, by), -L*0.22, GAP*0.35)
         pygame.draw.circle(env.screen, (245, 248, 255), gps_pos, 4)
         pygame.draw.circle(env.screen, (60, 70, 80), gps_pos, 4, 1)
         # 휩 안테나
-        ant_pos = TR(center_pos, -L*0.24, -GAP*0.35)
+        ant_pos = TR((bx, by), -L*0.24, -GAP*0.35)
         pygame.draw.circle(env.screen, (30, 35, 40), ant_pos, 2)
         pygame.draw.line(env.screen, (200, 210, 220), ant_pos, (ant_pos[0]-1, ant_pos[1]-6), 2)
 
@@ -299,7 +292,7 @@ class EnvRenderer:
             pygame.draw.line(env.screen, (225, 235, 245), p_b1, p_b2, 2)
 
         # 중앙 회전식 라이다 센서 돔 (Rotating LiDAR Sensor Pod)
-        Lidar_pos = TR(center_pos, -L*0.05, 0)
+        Lidar_pos = TR((bx, by), -L*0.05, 0)
         pygame.draw.circle(env.screen, (32, 36, 42), Lidar_pos, 6)
         pygame.draw.circle(env.screen, (255, 215, 30), Lidar_pos, 3)
         # 라이다 360도 스캔 레이저 펄스 회전선
