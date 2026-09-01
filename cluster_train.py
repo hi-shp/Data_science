@@ -512,7 +512,7 @@ def mutate_params(base, scale=0.05):
     return p
 
 def main():
-    n_workers = min(24, os.cpu_count() or 4)
+    n_workers = min(12, os.cpu_count() or 4)
     print("╔══════════════════════════════════════════════════════════════════╗", flush=True)
     print(f"║  🚀 24코어 이멀전시 히스테리시스 & 갭 가중치 강화학습 (Workers: {n_workers:2d}) 🚀  ║", flush=True)
     print("╚══════════════════════════════════════════════════════════════════╝", flush=True)
