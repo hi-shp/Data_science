@@ -245,27 +245,36 @@ class BoatEnv:
         lat_vec = np.array([-math.sin(self.boat_heading), math.cos(self.boat_heading)])
         self.boat_pos += lat_vec * (self.boat_ang_vel * L_pivot * self.dt)
 
-        # 실제 선박 유체역학 파도 생성 (Realistic Hydrodynamic Wave System)
-        if vel_norm > 2.0:
+        # 실제 선박 유체역학 파도 생성 (Realistic Conical Fan Thruster Jet & Hydrodynamic Wave System)
+        if vel_norm > 1.2:
             h = self.boat_heading
-            intensity = min(1.0, vel_norm / 11.0)
+            intensity = min(1.0, vel_norm / 10.0)
             sh = math.sin(h); ch = math.cos(h)
             GAP = 11; L = 84
 
-            # 선미 듀얼 쓰러스터 추진 제트 기포 및 후방 횡단 웨이크 (Enlarged Stern Roostertail & Trailing Foam)
+            # 선미 듀얼 쓰러스터 부채꼴 추진 제트 기포 분사 (Conical Fan Thruster Bubble Jet Stream)
+            stern_lx = self.boat_pos[0] - sh * GAP - ch * (L * 0.50)
+            stern_ly = self.boat_pos[1] + ch * GAP - sh * (L * 0.50)
+            stern_rx = self.boat_pos[0] + sh * GAP - ch * (L * 0.50)
+            stern_ry = self.boat_pos[1] - ch * GAP - sh * (L * 0.50)
+
+            for sx, sy in [(stern_lx, stern_ly), (stern_rx, stern_ry)]:
+                # 부채꼴 분사 각도 (Cone spread angle)
+                spray_ang = h + math.pi + random.uniform(-0.35, 0.35)
+                spray_spd = (vel_norm * 0.55 + random.uniform(0.8, 2.0)) * intensity
+                vx = math.cos(spray_ang) * spray_spd
+                vy = math.sin(spray_ang) * spray_spd
+                init_r = random.uniform(1.2, 2.2)
+                alpha = random.uniform(140, 190) * intensity
+                self.wakes.append([sx + random.uniform(-1, 1), sy + random.uniform(-1, 1), init_r, alpha, vx, vy])
+
+            # 후방 중심부 완만한 유체 기포 난류 (Central Trailing Swell)
             if self.frame % 2 == 0:
-                stern_lx = self.boat_pos[0] - sh * GAP - ch * (L * 0.50)
-                stern_ly = self.boat_pos[1] + ch * GAP - sh * (L * 0.50)
-                stern_rx = self.boat_pos[0] + sh * GAP - ch * (L * 0.50)
-                stern_ry = self.boat_pos[1] - ch * GAP - sh * (L * 0.50)
-                
-                self.wakes.append([stern_lx + random.uniform(-1.5, 1.5), stern_ly + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.65, -sh * 0.65])
-                self.wakes.append([stern_rx + random.uniform(-1.5, 1.5), stern_ry + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.65, -sh * 0.65])
-                
-            if self.frame % 3 == 0:
                 cx = self.boat_pos[0] - ch * 42
                 cy = self.boat_pos[1] - sh * 42
-                self.wakes.append([cx + random.uniform(-2.5, 2.5), cy + random.uniform(-2.5, 2.5), 4.5, 130 * intensity, -ch * 0.85, -sh * 0.85])
+                c_ang = h + math.pi + random.uniform(-0.25, 0.25)
+                c_spd = (vel_norm * 0.40 + random.uniform(0.5, 1.4)) * intensity
+                self.wakes.append([cx + random.uniform(-2, 2), cy + random.uniform(-2, 2), 2.4, 110 * intensity, math.cos(c_ang) * c_spd, math.sin(c_ang) * c_spd])
 
         # 파도-장애물 물리 상호작용 (Wave Absorption & Frothy Micro-Bubble Scattering)
         if len(self.wakes) > 0 and len(self.dynamic_obstacles) > 0:
