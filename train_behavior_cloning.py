@@ -41,9 +41,9 @@ class DeepBoatAgent(nn.Module):
 # 2. 메인 학습 스크립트
 # ==========================================
 def main():
-    print("╔══════════════════════════════════════════════════════════════════╗")
-    print("║      🧠 딥러닝 행동 복제 (Behavior Cloning) 학습 스크립트        ║")
-    print("╚══════════════════════════════════════════════════════════════════╝")
+    print("==================================================================")
+    print("      딥러닝 행동 복제 (Behavior Cloning) 학습 스크립트        ")
+    print("==================================================================")
     
     # 디바이스 설정 (GPU 지원)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -102,7 +102,7 @@ def main():
     hist_train = []
     hist_val = []
     
-    print("\n[Train] 🚀 모델 학습 시작...")
+    print("\n[Train] 모델 학습 시작...")
     
     for epoch in range(1, epochs + 1):
         t0 = time.time()
@@ -162,9 +162,9 @@ def main():
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), "deep_agent_best.pth")
-            print(f"  → 💾 새로운 최고 성능 모델 저장! (Val Loss: {val_loss:.6f})")
+            print(f"  -> 새로운 최고 성능 모델 저장! (Val Loss: {val_loss:.6f})")
 
-    print("\n[완료] 🎉 딥러닝 행동 복제 학습이 모두 종료되었습니다.")
+    print("\n[완료] 딥러닝 행동 복제 학습이 모두 종료되었습니다.")
     print("저장된 모델 가중치: 'deep_agent_best.pth'")
     
     plt.ioff()

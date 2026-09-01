@@ -8,9 +8,9 @@ from perception import lidar_hits_np, update_grid, extract_clusters_from_grid, m
 from deep_navigation import get_deep_action
 
 def run():
-    print("╔══════════════════════════════════════════════════════════════════╗")
-    print("║          🧠 Deep Learning Autonomous Navigation 🚀               ║")
-    print("╚══════════════════════════════════════════════════════════════════╝")
+    print("==================================================================")
+    print("            Deep Learning Autonomous Navigation                   ")
+    print("==================================================================")
     env = BoatEnv()
 
     while True:
@@ -42,7 +42,7 @@ def run():
         )
 
         # ----------------------------------------------------
-        # 🔥 인공신경망 추론 (복잡한 로직 전체를 1줄로 대체)
+        # 인공신경망 추론 (복잡한 로직 전체를 1줄로 대체)
         # ----------------------------------------------------
         L, R = get_deep_action(
             boat_pos=env.boat_pos,

@@ -513,9 +513,9 @@ def mutate_params(base, scale=0.05):
 
 def main():
     n_workers = min(12, os.cpu_count() or 4)
-    print("╔══════════════════════════════════════════════════════════════════╗", flush=True)
-    print(f"║  🚀 24코어 이멀전시 히스테리시스 & 갭 가중치 강화학습 (Workers: {n_workers:2d}) 🚀  ║", flush=True)
-    print("╚══════════════════════════════════════════════════════════════════╝", flush=True)
+    print("==================================================================", flush=True)
+    print(f"  24코어 이멀전시 히스테리시스 & 갭 가중치 강화학습 (Workers: {n_workers:2d})  ", flush=True)
+    print("==================================================================", flush=True)
     print("  • 이멀전시 진입/해제 히스테리시스 및 최소 쿨다운(Hold) 도입", flush=True)
     print("  • 갭(Waypoint) 선정 우선순위 가중치 5종 통합 최적화", flush=True)
     print("──────────────────────────────────────────────────────────────────", flush=True)
@@ -572,7 +572,7 @@ def main():
             rate1 = goals1 / 40.0 * 100.0
 
             is_elite = (rate1 >= 90.0)
-            tag = "⚡ ELITE 후보!" if is_elite else ""
+            tag = "ELITE 후보!" if is_elite else ""
             print(f"Gen {generation:03d} | [1단계 40회] 도달: {goals1:2d}/40 ({rate1:.1f}%) | 충돌: {collisions1:2d} | {t_elapsed1:.1f}초 {tag}", flush=True)
 
             if is_elite or generation == 1:
@@ -603,9 +603,9 @@ def main():
                     print(f"   ★ [최고 성능 갱신!] 도달률: {best_rate:.1f}% | params: {best_params}", flush=True)
 
                 if goals2 == 100 or rate2 >= 95.0:
-                    print("\n" + "★" * 66, flush=True)
-                    print(f"  🏆 축하합니다! 100회 무작위 맵 {rate2:.1f}% 초고도 무충돌 완주 달성! 🏆", flush=True)
-                    print("★" * 66, flush=True)
+                    print("\n" + "=" * 66, flush=True)
+                    print(f"  축하합니다! 100회 무작위 맵 {rate2:.1f}% 초고도 무충돌 완주 달성! ", flush=True)
+                    print("=" * 66, flush=True)
                     print(f"  최종 최적 파라미터 세트:", flush=True)
                     for k, v in best_params.items():
                         print(f"    • {k:18s}: {v}")

@@ -286,7 +286,6 @@ class BoatEnv:
         if min_front_dist < 78.0:
             self.emergency_mode = True
             self.emergency_cooldown = 14
-            self.current_wp = None
         elif self.emergency_mode:
             self.emergency_cooldown -= 1
             if min_front_dist > 118.0 and self.emergency_cooldown <= 0:
@@ -296,13 +295,23 @@ class BoatEnv:
         px, py = self.pursuit_target
         heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
         heading_error = wrap(heading_target - self.boat_heading)
-        
-        steer_raw = heading_error * 0.775
-        steer_f = 0.35 * steer_raw + 0.65 * self.prev_steer
+
+        if self.emergency_mode:
+            steer_gain = 0.95
+            avoid_multiplier = 0.08
+        else:
+            steer_gain = 0.775
+            avoid_multiplier = 0.019
+            
+        steer_raw = heading_error * steer_gain
+        steer_f = 0.4 * steer_raw + 0.6 * self.prev_steer
         self.prev_steer = steer_f
         
         avoid = reactive_avoidance(dists, self.rel_angles)
-        avoid_multiplier = 0.11 if self.emergency_mode else 0.019
+        
+        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.25:
+            avoid *= 0.4
+            
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 
     def render(self, hits):
