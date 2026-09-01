@@ -418,33 +418,21 @@ def run_sim_task(args):
 
         # 이멀전시 히스테리시스 판정
         center_idx = sim.lidar_beams // 2
-        span = sim.lidar_beams // 9
+        span = sim.lidar_beams // 12
         front_dists = dists[center_idx - span : center_idx + span]
         min_front_dist = np.min(front_dists)
         
-        if not hasattr(sim, 'emergency_dir'):
-            sim.emergency_dir = 0.0
-            
         if min_front_dist < em_enter:
-            if not sim.emergency_mode:
-                left_space = np.sum(dists[center_idx - span*2 : center_idx])
-                right_space = np.sum(dists[center_idx : center_idx + span*2])
-                sim.emergency_dir = 1.0 if right_space >= left_space else -1.0
-                
             sim.emergency_mode = True
             sim.emergency_cooldown = em_hold_frames
         elif sim.emergency_mode:
             sim.emergency_cooldown -= 1
             if min_front_dist > em_exit and sim.emergency_cooldown <= 0:
                 sim.emergency_mode = False
-                sim.emergency_dir = 0.0
         
         is_emergency = sim.emergency_mode
         
-        if is_emergency:
-            steer = float(sim.emergency_dir * 0.85)
-            sim.prev_steer = steer
-        elif sim.pursuit_target is not None:
+        if sim.pursuit_target is not None:
             px, py = sim.pursuit_target
             heading_target = math.atan2(py - sim.boat_pos[1], px - sim.boat_pos[0])
             heading_error = wrap(heading_target - sim.boat_heading)
@@ -453,7 +441,8 @@ def run_sim_task(args):
             sim.prev_steer = steer_f
             
             avoid = reactive_avoidance(dists, sim.rel_angles)
-            steer = float(np.clip(steer_f + avoid_normal * avoid, -1, 1))
+            avoid_multiplier = avoid_em if is_emergency else avoid_normal
+            steer = float(np.clip(steer_f + avoid_multiplier * avoid, -1, 1))
         else:
             steer = 0
 

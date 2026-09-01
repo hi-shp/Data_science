@@ -282,23 +282,14 @@ class BoatEnv:
         
         if not hasattr(self, 'emergency_cooldown'):
             self.emergency_cooldown = 0
-        if not hasattr(self, 'emergency_dir'):
-            self.emergency_dir = 0.0
             
         if min_front_dist < 115.0:
-            if not self.emergency_mode:
-                # 진입 시 좌/우 공간을 비교하여 회피 방향을 단 1회 결정 및 고정(Latching)
-                left_space = np.sum(dists[center_idx - span*2 : center_idx])
-                right_space = np.sum(dists[center_idx : center_idx + span*2])
-                self.emergency_dir = 1.0 if right_space >= left_space else -1.0
-                
             self.emergency_mode = True
             self.emergency_cooldown = 18
         elif self.emergency_mode:
             self.emergency_cooldown -= 1
             if min_front_dist > 160.0 and self.emergency_cooldown <= 0:
                 self.emergency_mode = False
-                self.emergency_dir = 0.0
 
         if self.pursuit_target is None: return 0
         px, py = self.pursuit_target
@@ -306,19 +297,22 @@ class BoatEnv:
         heading_error = wrap(heading_target - self.boat_heading)
 
         if self.emergency_mode:
-            # 비상시에는 고정된 방향으로 일관되게 선회하여 좌우 진동 차단
-            steer = self.emergency_dir * 0.85
-            self.prev_steer = steer
-            return steer
+            steer_gain = 0.95
+            avoid_multiplier = 0.08
         else:
             steer_gain = 0.775
             avoid_multiplier = 0.019
-            steer_raw = heading_error * steer_gain
-            steer_f = 0.4 * steer_raw + 0.6 * self.prev_steer
-            self.prev_steer = steer_f
             
-            avoid = reactive_avoidance(dists, self.rel_angles)
-            return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
+        steer_raw = heading_error * steer_gain
+        steer_f = 0.4 * steer_raw + 0.6 * self.prev_steer
+        self.prev_steer = steer_f
+        
+        avoid = reactive_avoidance(dists, self.rel_angles)
+        
+        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.25:
+            avoid *= 0.4
+            
+        return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 
     def render(self, hits):
         self.renderer.render(hits)
