@@ -15,8 +15,8 @@ def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25):
         
     ox = obstacles[:, 0]
     oy = obstacles[:, 1]
-    # 직선 판정 안전 여유를 10에서 2로 줄여 목적지 직진을 훨씬 쉽게 허용함
-    orad = obstacles[:, 2] + boat_radius + 2 
+    # 직선 판정 안전 여유를 10px로 확대하여 장애물 인근 아슬아슬한 직진 방지
+    orad = obstacles[:, 2] + boat_radius + 10 
     
     px = ox - bx
     py = oy - by

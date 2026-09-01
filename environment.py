@@ -276,19 +276,19 @@ class BoatEnv:
     def update_steering(self, dists):
         self.steer_timer += self.dt
         center_idx = self.lidar_beams // 2
-        span = self.lidar_beams // 12
+        span = self.lidar_beams // 9
         front_dists = dists[center_idx - span : center_idx + span]
         min_front_dist = np.min(front_dists)
         
         if not hasattr(self, 'emergency_cooldown'):
             self.emergency_cooldown = 0
             
-        if min_front_dist < 78.0:
+        if min_front_dist < 115.0:
             self.emergency_mode = True
-            self.emergency_cooldown = 14
+            self.emergency_cooldown = 18
         elif self.emergency_mode:
             self.emergency_cooldown -= 1
-            if min_front_dist > 118.0 and self.emergency_cooldown <= 0:
+            if min_front_dist > 160.0 and self.emergency_cooldown <= 0:
                 self.emergency_mode = False
 
         if self.pursuit_target is None: return 0
