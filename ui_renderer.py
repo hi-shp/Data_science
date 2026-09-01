@@ -41,7 +41,7 @@ class EnvRenderer:
                 ry = by + math.sin(ray_ang) * env.lidar_range
                 pygame.draw.line(env.screen, (0, 100, 60), (int(bx), int(by)), (int(rx), int(ry)), 1)
 
-        # 3. 실제 선박 유체역학 항적 웨이크 + 장애물 충돌 미세 찰랑임 (Realistic Ship Wakes & Soft Buoy Splash)
+        # 3. 실제 선박 유체역학 항적 웨이크 + 장애물 반사/산란 미세 거품 (Realistic Wakes & Scattering Bubbles)
         env.wake_surf.fill((0, 0, 0, 0))
         
         # 부표 밑에 자연스럽게 맺히는 부드러운 백색 수면 물거품 아우라 (Soft White Buoy Waterline Foam)
@@ -67,14 +67,24 @@ class EnvRenderer:
                     pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.75)), (int(w[0]), int(w[1])), int(w[2] * 0.52))
         env.wakes = [w for w in env.wakes if w[3] > 0]
         
-        # 장애물 충돌 시 발생하는 작고 부드러운 미세 물보라 (Small Gentle Splash)
+        # 장애물 충돌 시 발생하는 자글자글한 미세 거품 파편들 (Scattered Micro-Bubbles)
         if hasattr(env, 'reflected_wakes'):
             for rw in env.reflected_wakes:
-                rw[2] += 0.35
-                rw[3] -= 5.5
-                if rw[3] > 0 and rw[2] < 7.0:
-                    pygame.draw.circle(env.wake_surf, (240, 250, 255, int(rw[3] * 0.6)), (int(rw[0]), int(rw[1])), int(rw[2]))
-            env.reflected_wakes = [rw for rw in env.reflected_wakes if rw[3] > 0 and rw[2] < 7.0]
+                if len(rw) >= 6:
+                    rw[0] += rw[4]
+                    rw[1] += rw[5]
+                    rw[4] *= 0.88
+                    rw[5] *= 0.88
+                rw[2] += 0.15
+                rw[3] -= 4.2
+                if rw[3] > 0:
+                    pygame.draw.circle(env.wake_surf, (255, 255, 255, int(rw[3])), (int(rw[0]), int(rw[1])), int(rw[2]))
+                    pygame.draw.circle(env.wake_surf, (220, 240, 255, int(rw[3] * 0.6)), (int(rw[0]), int(rw[1])), int(rw[2] + 1.2), 1)
+            env.reflected_wakes = [rw for rw in env.reflected_wakes if rw[3] > 0]
+            
+        # 장애물 부표 위치의 파도/구름을 완전히 지워 가림 처리 (Obstacle Clean Masking)
+        for ox, oy, r in env.dynamic_obstacles:
+            pygame.draw.circle(env.wake_surf, (0, 0, 0, 0), (int(ox), int(oy)), int(r + 1))
         
         env.screen.blit(env.wake_surf, (0, 0))
         env.screen.blit(env.trail, (0, 0))

@@ -261,19 +261,31 @@ class BoatEnv:
                 cy = self.boat_pos[1] - sh * 38
                 self.wakes.append([cx + random.uniform(-3, 3), cy + random.uniform(-3, 3), 4.5, 120 * intensity, -ch * 0.8, -sh * 0.8])
 
-        # 파도-장애물 충돌 반사파 (Wave-Obstacle Reflection & Back-Scattering)
+        # 파도-장애물 물리 상호작용 (Wave Absorption & Frothy Micro-Bubble Scattering)
         if len(self.wakes) > 0 and len(self.dynamic_obstacles) > 0:
             for w in self.wakes:
-                if w[3] > 35 and w[2] > 6:
-                    for ox, oy, ob_r in self.dynamic_obstacles:
-                        dx = w[0] - ox; dy = w[1] - oy
-                        dist = math.hypot(dx, dy)
-                        # 파도 전면이 부표 표면에 닿는 순간 반사파 링 생성
-                        if abs(dist - (w[2] + ob_r)) < 5.0:
-                            if random.random() < 0.32:
-                                contact_x = ox + (dx / (dist + 1e-5)) * (ob_r + 2)
-                                contact_y = oy + (dy / (dist + 1e-5)) * (ob_r + 2)
-                                self.reflected_wakes.append([contact_x, contact_y, 2.0, w[3] * 0.8])
+                for ox, oy, ob_r in self.dynamic_obstacles:
+                    dx = w[0] - ox; dy = w[1] - oy
+                    dist = math.hypot(dx, dy)
+                    
+                    # 1. 장애물 내부로 들어간 파도는 완전히 소멸/흡수 (Absorption)
+                    if dist < ob_r + 2:
+                        w[3] = 0
+                        break
+                    
+                    # 2. 장애물 둘레에 파도가 닿으면 자글자글한 미세 거품 파편들이 반사 산란 (Frothy Spray & Scattering)
+                    if abs(dist - (w[2] + ob_r)) < 6.0 and w[3] > 35:
+                        if random.random() < 0.35:
+                            # 3~5개의 자글자글한 미세 기포 생성
+                            for _ in range(random.randint(3, 5)):
+                                angle = math.atan2(dy, dx) + random.uniform(-0.8, 0.8)
+                                spd = random.uniform(0.8, 2.2)
+                                fx = ox + math.cos(angle) * (ob_r + random.uniform(1.5, 4.0))
+                                fy = oy + math.sin(angle) * (ob_r + random.uniform(1.5, 4.0))
+                                self.reflected_wakes.append([
+                                    fx, fy, random.uniform(1.2, 2.6), w[3] * 0.85,
+                                    math.cos(angle) * spd, math.sin(angle) * spd
+                                ])
 
     def collide(self):
         ox = self.dynamic_obstacles[:, 0]
