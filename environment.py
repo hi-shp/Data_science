@@ -55,7 +55,7 @@ class BoatEnv:
         self.mass = 12
         self.inertia = 6
         self.drag = 0.2
-        self.rot_drag = 1.7
+        self.rot_drag = 1.1
         self.boat_radius = 25
         
         self.trail = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
@@ -201,12 +201,10 @@ class BoatEnv:
     def step(self, L, R):
         tL = self.pwm_to_thrust(L)
         tR = self.pwm_to_thrust(R)
-        # 220도 범위 내 최소 장애물 거리에 비례하여 연속적으로 속도 조절 (근접 시에만 110px 이하에서 적절히 감속)
+        # 220도 범위 내 최소 장애물 거리에 따른 순수 연속 함수 속도 제어 (Smooth Continuous Speed Function)
         em_dist = float(getattr(self, 'min_wide_dist', 999.0))
-        clear_ratio = np.clip((em_dist - 30.0) / 80.0, 0.0, 1.0)
-        # 110px 이상에서는 100% 최대 속도, 30px 이하 초근접 시에도 65% 속도를 유지하여 빠르고 시원하게 항해
-        speed_factor = 0.65 + 0.35 * clear_ratio
-        target_fwd = ((tL + tR) / 6.5) * speed_factor
+        speed_factor = math.tanh(em_dist / 65.0)
+        target_fwd = ((tL + tR) / 6.0) * speed_factor
             
         if not hasattr(self, 'current_fwd'):
             self.current_fwd = 0.0
