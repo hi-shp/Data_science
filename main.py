@@ -71,21 +71,27 @@ def run():
                 env.visited.add((p[1], p[0]))
                 env.current_wp = None
 
+        # 1차 웨이포인트 양쪽 장애물의 실시간 위치 추종 갱신
+        if env.current_wp is not None:
+            id1, id2 = env.current_wp["pair"]
+            if id1 in env.cluster_ids and id2 in env.cluster_ids:
+                idx1 = env.cluster_ids.index(id1)
+                idx2 = env.cluster_ids.index(id2)
+                c1_now = env.clusters[idx1]
+                c2_now = env.clusters[idx2]
+                env.current_wp["c1"] = c1_now
+                env.current_wp["c2"] = c2_now
+                env.current_wp["pos"] = (c1_now + c2_now) / 2.0
+            elif new_wp is not None:
+                env.current_wp = new_wp
+
         if new_wp is not None:
             if env.current_wp is None:
                 env.current_wp = new_wp
             else:
                 dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
                 if dist_to_curr > 80:
-                    vec_curr = env.current_wp["pos"] - env.boat_pos
-                    vec_new = new_wp["pos"] - env.boat_pos
-                    
-                    ang_curr = math.atan2(vec_curr[1], vec_curr[0])
-                    ang_new = math.atan2(vec_new[1], vec_new[0])
-                    angle_diff = abs(wrap(ang_new - ang_curr))
-                    
                     threshold = 1.1
-
                     if new_wp["score"] > env.current_wp["score"] * threshold:
                         env.current_wp = new_wp
                         

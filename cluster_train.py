@@ -311,6 +311,20 @@ class FastBoatSim:
                 self.visited.add(p); self.visited.add((p[1], p[0]))
                 self.current_wp = None
 
+        # 1차 웨이포인트 양쪽 장애물의 실시간 위치 추종 갱신
+        if self.current_wp is not None:
+            id1, id2 = self.current_wp["pair"]
+            if id1 in self.cluster_ids and id2 in self.cluster_ids:
+                idx1 = self.cluster_ids.index(id1)
+                idx2 = self.cluster_ids.index(id2)
+                c1_now = self.clusters[idx1]
+                c2_now = self.clusters[idx2]
+                self.current_wp["c1"] = c1_now
+                self.current_wp["c2"] = c2_now
+                self.current_wp["pos"] = (c1_now + c2_now) / 2.0
+            elif new_wp is not None:
+                self.current_wp = new_wp
+
         if new_wp is not None:
             if self.current_wp is None:
                 self.current_wp = new_wp
