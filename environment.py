@@ -306,7 +306,7 @@ class BoatEnv:
     def get_pwm(self, steer):
         dead = 0.02
         if abs(steer) < dead: steer = 0
-        mid = 1500; rng = 270  # 210 -> 270 (최대 회전 출력 한계를 대폭 확장)
+        mid = 1500; rng = 240  # 210 -> 270 (최대 회전 출력 한계를 대폭 확장)
         m = np.log1p(3 * abs(steer)) / np.log(4)
         d = m * rng
         if steer >= 0: L = mid - d; R = mid + d
