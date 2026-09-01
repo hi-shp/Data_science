@@ -517,7 +517,8 @@ def main():
             candidate = best_params if generation == 1 else mutate_params(best_params, scale=0.04 + 0.03 * (generation % 3 == 0))
 
             t0 = time.time()
-            tasks_stage1 = [(seed_offset + i, candidate) for i in range(48)]
+            # 24코어 맞춤 96회 (24 x 4) 1단계 탐색
+            tasks_stage1 = [(seed_offset + i, candidate) for i in range(96)]
             results_stage1 = pool.map(run_sim_task, tasks_stage1, chunksize=2)
             t_elapsed1 = time.time() - t0
 
@@ -526,27 +527,27 @@ def main():
             timeouts1 = sum(1 for r, f in results_stage1 if r == 'timeout')
             rate1 = goals1 / len(results_stage1) * 100.0
 
-            # 터미널 실시간 진행률 바 출력
             bar_len = 20
             filled_len = int(bar_len * rate1 / 100)
             bar = '#' * filled_len + '-' * (bar_len - filled_len)
             
             tag = "[ELITE]" if rate1 >= 90.0 else ""
-            print(f"Gen {generation:03d} | [{bar}] {rate1:5.1f}% | Goal: {goals1:2d}/48 | Col: {collisions1:2d} | Time: {t_elapsed1:.2f}s {tag}", flush=True)
+            print(f"Gen {generation:03d} | [{bar}] {rate1:5.1f}% | Goal: {goals1:2d}/96 | Col: {collisions1:2d} | Time: {t_elapsed1:.2f}s {tag}", flush=True)
 
             if rate1 >= 88.0 or generation == 1:
                 t0_2 = time.time()
-                tasks_stage2 = [(seed_offset + 500 + i, candidate) for i in range(100)]
-                results_stage2 = pool.map(run_sim_task, tasks_stage2, chunksize=4)
+                # 24코어 맞춤 120회 (24 x 5) 2단계 정밀 검증
+                tasks_stage2 = [(seed_offset + 500 + i, candidate) for i in range(120)]
+                results_stage2 = pool.map(run_sim_task, tasks_stage2, chunksize=2)
                 t_elapsed2 = time.time() - t0_2
 
                 goals2 = sum(1 for r, f in results_stage2 if r == 'goal')
                 collisions2 = sum(1 for r, f in results_stage2 if r == 'collide')
                 timeouts2 = sum(1 for r, f in results_stage2 if r == 'timeout')
-                rate2 = goals2 / 100.0 * 100.0
+                rate2 = goals2 / len(results_stage2) * 100.0
 
                 bar2 = '#' * int(bar_len * rate2 / 100) + '-' * (bar_len - int(bar_len * rate2 / 100))
-                print(f"   ↳ [Stage 2 Precision] [{bar2}] {rate2:5.1f}% ({goals2:3d}/100) | Col: {collisions2:2d} | Time: {t_elapsed2:.2f}s", flush=True)
+                print(f"   ↳ [Stage 2 Precision] [{bar2}] {rate2:5.1f}% ({goals2:3d}/120) | Col: {collisions2:2d} | Time: {t_elapsed2:.2f}s", flush=True)
 
                 if rate2 >= best_rate:
                     best_rate = rate2
@@ -556,7 +557,7 @@ def main():
                     with open("best_learned_params.json", "w") as f:
                         json.dump(best_params, f, indent=2)
 
-                if goals2 == 100 or rate2 >= 95.0:
+                if goals2 == 120 or rate2 >= 95.0:
                     print("\n==================================================================", flush=True)
                     print(f"  TARGET SUCCESS RATE ({rate2:.1f}%) ACHIEVED! BEST PARAMS SAVED.", flush=True)
                     print("==================================================================", flush=True)

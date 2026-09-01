@@ -58,7 +58,7 @@ def extract_clusters_from_grid(grid):
     clusters = []
     for lb in range(1, num_features + 1):
         ys, xs = np.where(labeled_array == lb)
-        if len(xs) < 2:
+        if len(xs) == 0:
             continue
         cx = np.mean(xs) * GRID + GRID / 2.0
         cy = np.mean(ys) * GRID + GRID / 2.0
