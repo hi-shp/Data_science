@@ -85,14 +85,11 @@ class EnvRenderer:
                 if p is not None:
                     pygame.draw.circle(env.screen, (255, 255, 0), (int(p[0]), int(p[1])), 2)
 
-        # Safety Envelope (안전 반경 오버레이)
-        self.safety_surf.fill((0, 0, 0, 0))
-        safety_r = int(env.boat_radius + 18)
-        em = getattr(env, 'emergency_mode', False)
-        safety_color = (255, 50, 50, 45) if em else (0, 220, 140, 22)
-        pygame.draw.circle(self.safety_surf, safety_color, (60, 60), safety_r)
-        pygame.draw.circle(self.safety_surf, (255, 60, 60, 120) if em else (0, 240, 160, 60), (60, 60), safety_r, 1)
-        env.screen.blit(self.safety_surf, (int(bx - 60), int(by - 60)))
+        # Emergency Alert Indicator (비상 상황 시에만 선체 루프에 미세 경보 스트로브 점등)
+        if getattr(env, 'emergency_mode', False):
+            alert_flash = (math.sin(env.frame * 0.4) > 0)
+            if alert_flash:
+                pygame.draw.circle(env.screen, (255, 60, 50, 180), (int(bx), int(by)), 24, 2)
                 
         # 목표점: 해양 항로 비콘 (Nautical Beacon Target)
         pulse = math.sin(env.frame * 0.09) * 4.5
@@ -142,7 +139,7 @@ class EnvRenderer:
                 pygame.draw.circle(env.screen, (255, 255, 255), (int(px_t), int(py_t)), 10, 2)
                 pygame.draw.circle(env.screen, (255, 50, 150), (int(px_t), int(py_t)), 5)
 
-        # 6. 선박 형상 정밀 렌더링 (카타마란 + 항해등 + 듀얼 모터 + 라이다 회전)
+        # 6. 선박 형상 정밀 렌더링
         self._draw_boat_hull(bx, by, ch, sh)
 
         # 7. 하단 대시보드 UI
@@ -174,34 +171,34 @@ class EnvRenderer:
         
         # 선체 하부 앰비언트 수중 그림자
         env.shadow_surf.fill((0, 0, 0, 0))
-        shadow_offset = 7
+        shadow_offset = 6
         left_shadow = [(p[0]+shadow_offset, p[1]+shadow_offset) for p in left_h]
         right_shadow = [(p[0]+shadow_offset, p[1]+shadow_offset) for p in right_h]
-        pygame.draw.polygon(env.shadow_surf, (8, 30, 55, 150), left_shadow)
-        pygame.draw.polygon(env.shadow_surf, (8, 30, 55, 150), right_shadow)
+        pygame.draw.polygon(env.shadow_surf, (10, 45, 75, 110), left_shadow)
+        pygame.draw.polygon(env.shadow_surf, (10, 45, 75, 110), right_shadow)
         env.screen.blit(env.shadow_surf, (0, 0))
 
-        # 좌/우 선체 (군함/실험선 건메탈 그레이 - Tone 1: Gunmetal Grey)
-        pygame.draw.polygon(env.screen, (52, 60, 70), left_h)
-        pygame.draw.polygon(env.screen, (28, 34, 40), left_h, 2)
-        pygame.draw.polygon(env.screen, (52, 60, 70), right_h)
-        pygame.draw.polygon(env.screen, (28, 34, 40), right_h, 2)
+        # 좌/우 선체 (밝고 산뜻한 모던 네이비 그레이 - Tone 1: Modern Naval Grey)
+        pygame.draw.polygon(env.screen, (88, 98, 112), left_h)
+        pygame.draw.polygon(env.screen, (48, 56, 66), left_h, 2)
+        pygame.draw.polygon(env.screen, (88, 98, 112), right_h)
+        pygame.draw.polygon(env.screen, (48, 56, 66), right_h, 2)
 
         # 좌우 선체 상단 하이라이트 스트립
         left_deck_line = [TR(left_center, L*0.35, 0), TR(left_center, -L*0.35, 0)]
         right_deck_line = [TR(right_center, L*0.35, 0), TR(right_center, -L*0.35, 0)]
-        pygame.draw.line(env.screen, (85, 96, 108), left_deck_line[0], left_deck_line[1], 2)
-        pygame.draw.line(env.screen, (85, 96, 108), right_deck_line[0], right_deck_line[1], 2)
+        pygame.draw.line(env.screen, (135, 148, 164), left_deck_line[0], left_deck_line[1], 2)
+        pygame.draw.line(env.screen, (135, 148, 164), right_deck_line[0], right_deck_line[1], 2)
 
-        # 중앙 연결 브릿지 데크 (투톤 대비 - Tone 2: Crisp Platinum Deck)
+        # 중앙 연결 브릿지 데크 (밝은 플래티넘 실버 - Tone 2: Bright Platinum Deck)
         deck_corners = [
             TR((bx, by), L*0.25, -GAP*0.85),
             TR((bx, by), L*0.25, GAP*0.85),
             TR((bx, by), -L*0.35, GAP*0.85),
             TR((bx, by), -L*0.35, -GAP*0.85)
         ]
-        pygame.draw.polygon(env.screen, (210, 218, 228), deck_corners)
-        pygame.draw.polygon(env.screen, (90, 100, 112), deck_corners, 1)
+        pygame.draw.polygon(env.screen, (228, 235, 244), deck_corners)
+        pygame.draw.polygon(env.screen, (110, 122, 136), deck_corners, 1)
 
         # 데크 중앙 미끄럼 방지 패드 라인
         deck_pad = [
@@ -210,80 +207,69 @@ class EnvRenderer:
             TR((bx, by), -L*0.30, GAP*0.65),
             TR((bx, by), -L*0.30, -GAP*0.65)
         ]
-        pygame.draw.polygon(env.screen, (165, 175, 188), deck_pad)
+        pygame.draw.polygon(env.screen, (180, 192, 206), deck_pad)
 
-        # 캐빈 조종실 팟 (Stealth Tactical Cabin)
+        # 캐빈 조종실 팟 (Tactical Research Cabin)
         cabin_corners = [
             TR((bx, by), L*0.16, -GAP*0.55),
             TR((bx, by), L*0.16, GAP*0.55),
             TR((bx, by), -L*0.16, GAP*0.55),
             TR((bx, by), -L*0.16, -GAP*0.55)
         ]
-        pygame.draw.polygon(env.screen, (75, 84, 96), cabin_corners)
-        pygame.draw.polygon(env.screen, (35, 42, 50), cabin_corners, 1)
+        pygame.draw.polygon(env.screen, (112, 124, 138), cabin_corners)
+        pygame.draw.polygon(env.screen, (55, 65, 76), cabin_corners, 1)
 
-        # 틴팅 전면 윈드실드 창문 (Tinted Marine Cockpit Glass)
+        # 틴팅 전면 윈드실드 창문 (Reflective Marine Glass)
         windshield = [
             TR((bx, by), L*0.13, -GAP*0.42),
             TR((bx, by), L*0.13, GAP*0.42),
             TR((bx, by), L*0.04, GAP*0.42),
             TR((bx, by), L*0.04, -GAP*0.42)
         ]
-        pygame.draw.polygon(env.screen, (28, 105, 160), windshield)
-        pygame.draw.line(env.screen, (180, 230, 255), TR((bx, by), L*0.12, -GAP*0.3), TR((bx, by), L*0.06, GAP*0.3), 1)
+        pygame.draw.polygon(env.screen, (35, 125, 185), windshield)
+        pygame.draw.line(env.screen, (210, 240, 255), TR((bx, by), L*0.12, -GAP*0.3), TR((bx, by), L*0.06, GAP*0.3), 1)
 
         # 후방 GPS 수신기 마스트 돔 & 통신 휩 안테나 (GPS Dome & Whip Antenna)
         gps_pos = TR((bx, by), -L*0.22, GAP*0.35)
-        pygame.draw.circle(env.screen, (245, 248, 255), gps_pos, 4)
-        pygame.draw.circle(env.screen, (60, 70, 80), gps_pos, 4, 1)
+        pygame.draw.circle(env.screen, (250, 252, 255), gps_pos, 4)
+        pygame.draw.circle(env.screen, (70, 80, 92), gps_pos, 4, 1)
         # 휩 안테나
         ant_pos = TR((bx, by), -L*0.24, -GAP*0.35)
-        pygame.draw.circle(env.screen, (30, 35, 40), ant_pos, 2)
-        pygame.draw.line(env.screen, (200, 210, 220), ant_pos, (ant_pos[0]-1, ant_pos[1]-6), 2)
+        pygame.draw.circle(env.screen, (35, 42, 50), ant_pos, 2)
+        pygame.draw.line(env.screen, (215, 225, 235), ant_pos, (ant_pos[0]-1, ant_pos[1]-6), 2)
 
-        # BlueRobotics T500 스타일 덕트형 언더워터 쓰러스터 (T500 Ducted Thrusters)
+        # 선체 일체형 소형 T500 덕트 쓰러스터 (Integrated Compact T500 Thrusters)
         t_ch, t_sh = ch, sh
-        t_nx, t_ny = -sh, ch  # 법선 벡터
+        t_nx, t_ny = -sh, ch
+        d_len = 11; d_rad = 4.8
         
         for m_center in [left_center, right_center]:
-            # 트랜섬 마운트 브래킷
-            mount_p = TR(m_center, -L*0.48, 0)
-            pivot_p = TR(m_center, -L*0.53, 0)
-            pygame.draw.line(env.screen, (32, 38, 45), mount_p, pivot_p, 3)
+            p_center = TR(m_center, -L*0.50, 0)
             
-            # T500 외곽 원통형 덕트 노즐 (Kort Nozzle Duct Shroud, L=16, R=6.5)
-            d_len = 15; d_rad = 6.5
-            p_center = pivot_p
-            
-            # 덕트 외곽 4개 모서리
+            # 덕트 노즐 모서리
             d_fl = (int(p_center[0] + (d_len*0.5)*t_ch - d_rad*t_nx), int(p_center[1] + (d_len*0.5)*t_sh - d_rad*t_ny))
             d_fr = (int(p_center[0] + (d_len*0.5)*t_ch + d_rad*t_nx), int(p_center[1] + (d_len*0.5)*t_sh + d_rad*t_ny))
             d_rr = (int(p_center[0] - (d_len*0.5)*t_ch + d_rad*t_nx), int(p_center[1] - (d_len*0.5)*t_sh + d_rad*t_ny))
             d_rl = (int(p_center[0] - (d_len*0.5)*t_ch - d_rad*t_nx), int(p_center[1] - (d_len*0.5)*t_sh - d_rad*t_ny))
             
-            # 덕트 노즐 쉘 (Dark Composite Shroud)
-            pygame.draw.polygon(env.screen, (24, 28, 34), [d_fl, d_fr, d_rr, d_rl])
-            pygame.draw.polygon(env.screen, (55, 65, 78), [d_fl, d_fr, d_rr, d_rl], 1)
+            # 일체형 덕트 쉘
+            pygame.draw.polygon(env.screen, (32, 38, 46), [d_fl, d_fr, d_rr, d_rl])
+            pygame.draw.polygon(env.screen, (68, 78, 92), [d_fl, d_fr, d_rr, d_rl], 1)
             
-            # 덕트 좌우 에어로 립 라인
-            pygame.draw.line(env.screen, (70, 150, 200), d_fl, d_rl, 2)
-            pygame.draw.line(env.screen, (70, 150, 200), d_fr, d_rr, 2)
+            # 중앙 모터 코어 & 프로펠러
+            m_f = (int(p_center[0] + 3*t_ch), int(p_center[1] + 3*t_sh))
+            m_r = (int(p_center[0] - 4*t_ch), int(p_center[1] - 4*t_sh))
+            pygame.draw.line(env.screen, (18, 22, 28), m_f, m_r, 3)
             
-            # 중앙 토피도 모터 코어 & 스테이터 허브 (Central Torpedo Stator)
-            m_f = (int(p_center[0] + 5*t_ch), int(p_center[1] + 5*t_sh))
-            m_r = (int(p_center[0] - 6*t_ch), int(p_center[1] - 6*t_sh))
-            pygame.draw.line(env.screen, (15, 18, 22), m_f, m_r, 4)
-            pygame.draw.circle(env.screen, (35, 42, 50), m_f, 2)
-            
-            # 내부 프로펠러 허브 (Propeller inside Duct)
-            prop_c = (int(p_center[0] - 2*t_ch), int(p_center[1] - 2*t_sh))
-            p_b1 = (int(prop_c[0] - 5*t_nx), int(prop_c[1] - 5*t_ny))
-            p_b2 = (int(prop_c[0] + 5*t_nx), int(prop_c[1] + 5*t_ny))
-            pygame.draw.line(env.screen, (200, 210, 225), p_b1, p_b2, 2)
+            prop_c = (int(p_center[0] - 1*t_ch), int(p_center[1] - 1*t_sh))
+            p_b1 = (int(prop_c[0] - 3.5*t_nx), int(prop_c[1] - 3.5*t_ny))
+            p_b2 = (int(prop_c[0] + 3.5*t_nx), int(prop_c[1] + 3.5*t_ny))
+            pygame.draw.line(env.screen, (225, 235, 245), p_b1, p_b2, 2)
 
         # 중앙 회전식 라이다 센서 돔 (Rotating LiDAR Sensor Pod)
+        # 중앙 회전식 라이다 센서 돔 (Rotating LiDAR Sensor Pod)
         Lidar_pos = TR((bx, by), -L*0.05, 0)
-        pygame.draw.circle(env.screen, (32, 36, 42), Lidar_pos, 6)
+        pygame.draw.circle(env.screen, (42, 48, 56), Lidar_pos, 6)
         pygame.draw.circle(env.screen, (255, 215, 30), Lidar_pos, 3)
         # 라이다 360도 스캔 레이저 펄스 회전선
         scan_ang = env.frame * 0.35
