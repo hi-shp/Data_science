@@ -189,16 +189,11 @@ class BoatEnv:
             self.dynamic_obstacles[i, 0] = ox + sway_x
             self.dynamic_obstacles[i, 1] = oy + sway_y
             
-            # 부표가 위아래로 들썩일 때 배처럼 부드러운 백색 구름 거품들이 원형으로 퍼져나감
-            if (self.frame + i * 13) % 22 == 0:
-                for k in range(6):
-                    ang = k * (math.pi / 3) + random.uniform(-0.15, 0.15)
-                    fx = self.dynamic_obstacles[i, 0] + math.cos(ang) * (r + 1.5)
-                    fy = self.dynamic_obstacles[i, 1] + math.sin(ang) * (r + 1.5)
-                    self.reflected_wakes.append([
-                        fx, fy, 1.2, 85,
-                        math.cos(ang) * 0.55, math.sin(ang) * 0.55
-                    ])
+            # 부표 중앙을 기준으로 부드러운 백색 원형 구름 파도가 주기적으로 퍼져나감
+            if (self.frame + i * 14) % 28 == 0:
+                self.reflected_wakes.append([
+                    self.dynamic_obstacles[i, 0], self.dynamic_obstacles[i, 1], r + 1.2, 75
+                ])
 
     def pwm_to_thrust(self, p):
         return p * 10

@@ -44,18 +44,13 @@ class EnvRenderer:
         # 3. 실제 선박 유체역학 항적 웨이크 + 장애물 반사/산란 미세 거품 (Realistic Wakes & Scattering Bubbles)
         env.wake_surf.fill((0, 0, 0, 0))
         
-        # 부표 밑에 배처럼 몽글몽글 피어나는 백색 수면 물거품 구름 클러스터 (Organic Waterline Foam Cloud Puffs)
+        # 부표 중앙을 기준으로 부표 표면 밖으로 아주 살짝 피어나는 백색 수면 구름 (Concentric White Cloud Foam Aura)
         for ox, oy, r in env.dynamic_obstacles:
-            for k in range(6):
-                ang = k * (math.pi / 3) + math.sin(env.frame * 0.05 + ox * 0.08 + k) * 0.35
-                p_dist = r * 0.70 + math.sin(env.frame * 0.07 + k * 1.3 + oy * 0.05) * 1.8
-                px = int(ox + math.cos(ang) * p_dist)
-                py = int(oy + math.sin(ang) * p_dist)
-                p_rad = int(3.2 + math.sin(env.frame * 0.06 + k) * 1.0)
-                
-                # 배와 동일한 질감의 백색 수면 구름/물거품 클러스터
-                pygame.draw.circle(env.wake_surf, (220, 238, 255, 55), (px, py), p_rad + 2)
-                pygame.draw.circle(env.wake_surf, (255, 255, 255, 90), (px, py), p_rad)
+            pulse_f = math.sin(env.frame * 0.05 + ox * 0.06 + oy * 0.06) * 1.0
+            outer_cloud_r = r + 3.0 + pulse_f
+            inner_cloud_r = r + 1.5 + pulse_f * 0.5
+            pygame.draw.circle(env.wake_surf, (220, 240, 255, 60), (int(ox), int(oy)), int(outer_cloud_r))
+            pygame.draw.circle(env.wake_surf, (255, 255, 255, 95), (int(ox), int(oy)), int(inner_cloud_r))
 
         for w in env.wakes:
             # w: [x, y, radius, alpha, vx, vy]
@@ -74,24 +69,25 @@ class EnvRenderer:
                     pygame.draw.circle(env.wake_surf, (255, 255, 255, int(w[3] * 0.65)), (int(w[0]), int(w[1])), int(w[2] * 0.45))
         env.wakes = [w for w in env.wakes if w[3] > 0]
         
-        # 장애물 충돌 시 발생하는 자글자글한 미세 거품 파편들 (Scattered Micro-Bubbles)
+        # 장애물 충돌 반사 및 부표 들썩임 시 퍼지는 원형 백색 구름 파도
         if hasattr(env, 'reflected_wakes'):
             for rw in env.reflected_wakes:
-                if len(rw) >= 6:
-                    rw[0] += rw[4]
-                    rw[1] += rw[5]
-                    rw[4] *= 0.88
-                    rw[5] *= 0.88
-                rw[2] += 0.15
-                rw[3] -= 4.2
-                if rw[3] > 0:
-                    pygame.draw.circle(env.wake_surf, (255, 255, 255, int(rw[3])), (int(rw[0]), int(rw[1])), int(rw[2]))
-                    pygame.draw.circle(env.wake_surf, (220, 240, 255, int(rw[3] * 0.6)), (int(rw[0]), int(rw[1])), int(rw[2] + 1.2), 1)
+                if len(rw) == 4:
+                    rw[2] += 0.45
+                    rw[3] -= 3.0
+                    if rw[3] > 0:
+                        pygame.draw.circle(env.wake_surf, (225, 242, 255, int(rw[3] * 0.5)), (int(rw[0]), int(rw[1])), int(rw[2]), 2)
+                elif len(rw) >= 6:
+                    rw[0] += rw[4]; rw[1] += rw[5]
+                    rw[4] *= 0.88; rw[5] *= 0.88
+                    rw[2] += 0.15; rw[3] -= 4.2
+                    if rw[3] > 0:
+                        pygame.draw.circle(env.wake_surf, (255, 255, 255, int(rw[3])), (int(rw[0]), int(rw[1])), int(rw[2]))
             env.reflected_wakes = [rw for rw in env.reflected_wakes if rw[3] > 0]
             
         # 장애물 부표 위치의 파도/구름을 완전히 지워 가림 처리 (Obstacle Clean Masking)
         for ox, oy, r in env.dynamic_obstacles:
-            pygame.draw.circle(env.wake_surf, (0, 0, 0, 0), (int(ox), int(oy)), int(r + 1))
+            pygame.draw.circle(env.wake_surf, (0, 0, 0, 0), (int(ox), int(oy)), int(r + 0.5))
         
         env.screen.blit(env.wake_surf, (0, 0))
         env.screen.blit(env.trail, (0, 0))
