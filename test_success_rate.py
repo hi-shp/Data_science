@@ -5,7 +5,6 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import time
 import math
 import random
-import json
 import numpy as np
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -15,14 +14,14 @@ pygame.init()
 
 from environment import BoatEnv
 from perception import lidar_hits_np, update_grid, extract_clusters_from_grid, match_clusters
-from navigation import target_is_clear, find_gap, reactive_avoidance
+from navigation import find_gap, target_is_clear
 from utils import wrap, make_bezier_path, pure_pursuit
 
 def run_single_episode(seed, max_frames=4000):
     random.seed(seed)
     np.random.seed(seed)
     
-    # 헤드리스 환경 생성
+    # 헤드리스 환경 생성 (현재 설정된 물리 및 파라미터 그대로 사용)
     env = BoatEnv()
     
     # 시드 기반 재설정
@@ -202,7 +201,7 @@ def run_single_episode(seed, max_frames=4000):
 def main():
     total_episodes = 1000
     num_workers = max(1, mp.cpu_count() - 2)
-    print(f"[*] 1,000회 시뮬레이션 평가 시작 (병렬 프로세스: {num_workers}개)")
+    print(f"[*] 1,000회 자율운항 성공률 테스트 시작 (병렬 워커: {num_workers}개)")
     
     start_time = time.time()
     results = []
@@ -210,69 +209,60 @@ def main():
     collision_count = 0
     timeout_count = 0
     
-    log_file = "evaluation_1000_results.log"
-    summary_file = "evaluation_1000_summary.json"
+    out_file = "success_rate_1000.txt"
+    seeds = [200000 + i * 43 for i in range(total_episodes)]
     
-    with open(log_file, "w") as f_log:
-        f_log.write(f"Evaluation Started: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f_log.write("Episode | Seed | Status | Frames | Final Distance\n")
-        f_log.write("-" * 55 + "\n")
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        future_to_idx = {executor.submit(run_single_episode, s): i for i, s in enumerate(seeds)}
         
-        seeds = [100000 + i * 37 for i in range(total_episodes)]
-        
-        with ProcessPoolExecutor(max_workers=num_workers) as executor:
-            future_to_idx = {executor.submit(run_single_episode, s): i for i, s in enumerate(seeds)}
+        for future in as_completed(future_to_idx):
+            res = future.result()
+            results.append(res)
             
-            for future in as_completed(future_to_idx):
-                idx = future_to_idx[future]
-                res = future.result()
-                results.append(res)
+            if res['status'] == 'SUCCESS':
+                success_count += 1
+            elif res['status'] == 'COLLISION':
+                collision_count += 1
+            else:
+                timeout_count += 1
                 
-                if res['status'] == 'SUCCESS':
-                    success_count += 1
-                elif res['status'] == 'COLLISION':
-                    collision_count += 1
-                else:
-                    timeout_count += 1
-                    
-                done_count = len(results)
-                sr = (success_count / done_count) * 100.0
-                cr = (collision_count / done_count) * 100.0
-                
-                log_line = f"[{done_count:4d}/{total_episodes}] Seed: {res['seed']} | {res['status']:9s} | Frames: {res['frames']:4d} | Dist: {res['final_dist']:6.1f}px | Success Rate: {sr:5.1f}%"
-                f_log.write(log_line + "\n")
-                f_log.flush()
-                
-                if done_count % 25 == 0 or done_count == total_episodes:
-                    elapsed = time.time() - start_time
-                    fps = done_count / elapsed
-                    print(f"진행: {done_count:4d}/{total_episodes} ({done_count/total_episodes*100:5.1f}%) | 성공: {success_count} ({sr:5.1f}%) | 충돌: {collision_count} ({cr:5.1f}%) | 경과: {elapsed:.1f}초 ({fps:.1f} ep/s)")
-                    
-                    summary_data = {
-                        'total_episodes': total_episodes,
-                        'completed': done_count,
-                        'success_count': success_count,
-                        'collision_count': collision_count,
-                        'timeout_count': timeout_count,
-                        'success_rate_pct': round(sr, 2),
-                        'collision_rate_pct': round(cr, 2),
-                        'timeout_rate_pct': round((timeout_count / done_count) * 100.0, 2),
-                        'avg_frames': float(np.mean([r['frames'] for r in results])),
-                        'elapsed_seconds': round(elapsed, 1),
-                        'status': 'IN_PROGRESS' if done_count < total_episodes else 'COMPLETED',
-                        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
-                    }
-                    with open(summary_file, "w") as f_sum:
-                        json.dump(summary_data, f_sum, indent=2)
+            done = len(results)
+            if done % 50 == 0 or done == total_episodes:
+                sr = (success_count / done) * 100.0
+                cr = (collision_count / done) * 100.0
+                elapsed = time.time() - start_time
+                print(f"진행: {done:4d}/{total_episodes} ({done/total_episodes*100:5.1f}%) | 성공: {success_count} ({sr:5.1f}%) | 충돌: {collision_count} ({cr:5.1f}%) | 경과: {elapsed:.1f}초")
 
-    total_time = time.time() - start_time
+    elapsed_total = time.time() - start_time
     final_sr = (success_count / total_episodes) * 100.0
-    print("\n" + "=" * 60)
-    print(f"[*] 1,000회 평가 완료! 총 소요 시간: {total_time:.1f}초")
-    print(f"[*] 성공 횟수: {success_count} / {total_episodes} ({final_sr:.2f}%)")
-    print(f"[*] 충돌 횟수: {collision_count} / {total_episodes} ({(collision_count/total_episodes)*100:.2f}%)")
-    print(f"[*] 타임아웃: {timeout_count} / {total_episodes} ({(timeout_count/total_episodes)*100:.2f}%)")
-    print("=" * 60)
+    final_cr = (collision_count / total_episodes) * 100.0
+    final_tr = (timeout_count / total_episodes) * 100.0
+    avg_frames = float(np.mean([r['frames'] for r in results]))
+    
+    # 텍스트 결과 저장
+    report = f"""============================================================
+              1,000-RUN SUCCESS RATE EVALUATION REPORT
+============================================================
+Date: {time.strftime('%Y-%m-%d %H:%M:%S')}
+Total Episodes:  {total_episodes}
+Success Count:   {success_count} / {total_episodes}
+Collision Count: {collision_count} / {total_episodes}
+Timeout Count:   {timeout_count} / {total_episodes}
+
+------------------------------------------------------------
+>> SUCCESS RATE:   {final_sr:.2f} %
+>> COLLISION RATE: {final_cr:.2f} %
+>> TIMEOUT RATE:   {final_tr:.2f} %
+------------------------------------------------------------
+Average Frames per Episode: {avg_frames:.1f} frames
+Total Elapsed Time:         {elapsed_total:.1f} seconds ({elapsed_total/60.0:.1f} minutes)
+============================================================
+"""
+    with open(out_file, "w") as f:
+        f.write(report)
+        
+    print("\n" + report)
+    print(f"[*] 결과가 '{out_file}' 파일에 정상 저장되었습니다.")
 
 if __name__ == '__main__':
     main()
