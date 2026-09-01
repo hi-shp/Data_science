@@ -209,8 +209,8 @@ class BoatEnv:
         if not hasattr(self, 'current_fwd'):
             self.current_fwd = 0.0
             
-        # 부드럽고 묵직한 선회 조타 (너무 휙 돌지 않도록 조타 토크 및 감쇠 조절)
-        mom = (tR - tL) * 0.0039
+        self.current_fwd = self.current_fwd * 0.95 + target_fwd * 0.05
+        mom = (tR - tL) * 0.00665
         hv = np.array([math.cos(self.boat_heading), math.sin(self.boat_heading)])
         
         acc = self.current_fwd / self.mass
@@ -235,13 +235,13 @@ class BoatEnv:
                              
         ang_acc = (mom - self.rot_drag * self.boat_ang_vel) / self.inertia
         self.boat_ang_vel += ang_acc * self.dt
-        self.boat_ang_vel *= 0.80
+        self.boat_ang_vel *= 0.84
         
         d_head = self.boat_ang_vel * self.dt
         self.boat_heading += d_head
         
-        # 회전 시 회전축이 후방(-L_pivot)에 위치하여 선회 시 선수가 돌고 선미가 킥되는 물리적 거동
-        L_pivot = 6.0
+        # 선미 추진 선박의 후방 회전축(L_pivot = 4.0px)에 따른 자연스러운 선회 궤적
+        L_pivot = 4.0
         lat_vec = np.array([-math.sin(self.boat_heading), math.cos(self.boat_heading)])
         self.boat_pos += lat_vec * (self.boat_ang_vel * L_pivot * self.dt)
 
