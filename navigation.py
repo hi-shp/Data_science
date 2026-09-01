@@ -32,6 +32,18 @@ def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25):
     
     return not np.any(d2 <= orad[valid]**2)
 
+def bezier_path_is_blocked(path, obstacles, boat_radius=25, margin=10):
+    if path is None or len(path) == 0 or len(obstacles) == 0:
+        return False
+    ox = obstacles[:, 0]
+    oy = obstacles[:, 1]
+    orad2 = (obstacles[:, 2] + boat_radius + margin) ** 2
+    for p in path:
+        px, py = p[0], p[1]
+        if np.any((ox - px)**2 + (oy - py)**2 <= orad2):
+            return True
+    return False
+
 def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, obstacles):
     bx, by = boat_pos
     tx, ty = target_pos

@@ -10,7 +10,7 @@ import time
 import json
 import random
 from perception import lidar_hits_np, update_grid, extract_clusters_from_grid, match_clusters
-from navigation import target_is_clear, reactive_avoidance
+from navigation import target_is_clear, reactive_avoidance, bezier_path_is_blocked
 from utils import wrap, make_bezier_path, pure_pursuit
 from config import WIDTH, HEIGHT, GRID, GRID_W, GRID_H
 
@@ -338,6 +338,16 @@ class FastBoatSim:
             self.path_timer = 0
             goal = self.target if self.current_wp is None else self.current_wp["pos"]
             self.bezier_path = make_bezier_path(self.boat_pos, self.boat_heading, goal)
+            
+            # 베지어 곡선 경로 상에 장애물이 놓이면 현재 웨이포인트 즉시 무효화 및 대체 갭으로 우회
+            if self.current_wp is not None and self.bezier_path is not None:
+                if bezier_path_is_blocked(self.bezier_path, self.dynamic_obstacles):
+                    p = self.current_wp["pair"]
+                    self.visited.add(p); self.visited.add((p[1], p[0]))
+                    self.current_wp = None
+                    self.bezier_path = None
+                    self.pursuit_target = None
+
             if self.bezier_path is not None:
                 self.pursuit_target = pure_pursuit(self.bezier_path, self.boat_pos, lookahead=52)
             if self.current_wp is not None and self.next_wp is not None:
