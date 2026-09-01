@@ -487,7 +487,8 @@ def main():
 
     pool = mp.Pool(processes=n_workers, initializer=worker_init)
     
-    best_params = {
+    json_path = "best_learned_params.json"
+    default_params = {
         'steer_gain': 0.7752,
         'steer_alpha': 0.3515,
         'mom_coeff': 0.00665,
@@ -506,10 +507,18 @@ def main():
         'wp_switch_thresh': 1.15
     }
 
-    # 초기 베이스라인 파라미터 파일 즉시 생성
-    with open("best_learned_params.json", "w") as f:
-        json.dump(best_params, f, indent=2)
-    print("  Initialized best_learned_params.json with baseline parameters.", flush=True)
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, "r") as f:
+                best_params = json.load(f)
+            print(f"  Loaded learned parameters from {json_path}", flush=True)
+        except Exception:
+            best_params = default_params
+    else:
+        best_params = default_params
+        with open(json_path, "w") as f:
+            json.dump(best_params, f, indent=2)
+        print(f"  Created {json_path} with baseline parameters.", flush=True)
 
     best_rate = 0.0
     generation = 0

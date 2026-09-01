@@ -1,3 +1,5 @@
+import os
+import json
 import pygame
 import numpy as np
 import math
@@ -18,6 +20,33 @@ class BoatEnv:
         pygame.display.set_caption("kaboat simulation")
         self.clock = pygame.time.Clock()
         self.dt = 0.04
+
+        # 학습된 최적 파라미터 자동 로드
+        self.params = {
+            'steer_gain': 0.7752,
+            'steer_alpha': 0.3515,
+            'mom_coeff': 0.00665,
+            'pwm_rng': 270.36,
+            'avoid_normal': 0.019,
+            'avoid_em': 0.11,
+            'clear_margin': 2.15,
+            'em_enter': 115.0,
+            'em_exit': 160.0,
+            'em_hold_frames': 18,
+            'align_exp': 5.0,
+            'fwd_exp': 3.0,
+            'clear_exp': 1.5,
+            'width_exp': 0.2,
+            'cluster_pen_w': 0.5,
+            'wp_switch_thresh': 1.15
+        }
+        json_path = "best_learned_params.json"
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, "r") as f:
+                    self.params.update(json.load(f))
+            except Exception:
+                pass
          
         self.lidar_beams = 180
         self.lidar_range = 350
