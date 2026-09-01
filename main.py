@@ -150,7 +150,7 @@ def run():
         env.validate_wp_obstacle_5x5()
 
         env.render(hits)
-        env.clock.tick(60)
+        env.clock.tick(120)
 
         if env.collide() or np.linalg.norm(env.target - env.boat_pos) < 70:
             ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
