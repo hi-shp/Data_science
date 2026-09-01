@@ -233,19 +233,8 @@ class BoatEnv:
             intensity = min(1.0, vel_norm / 11.0)
             sh = math.sin(h); ch = math.cos(h)
             GAP = 11; L = 84
-            
-            # 1. 선수 분기파 (Twin Bow Divergent Waves)
-            if self.frame % 3 == 0:
-                bow_lx = self.boat_pos[0] - sh * GAP + ch * (L * 0.42)
-                bow_ly = self.boat_pos[1] + ch * GAP + sh * (L * 0.42)
-                bow_rx = self.boat_pos[0] + sh * GAP + ch * (L * 0.42)
-                bow_ry = self.boat_pos[1] - ch * GAP + sh * (L * 0.42)
-                
-                # 선수 분기파는 좌우 바깥쪽으로 퍼짐
-                self.wakes.append([bow_lx, bow_ly, 2.0, 140 * intensity, -sh * 1.2 - ch * 0.3, ch * 1.2 - sh * 0.3])
-                self.wakes.append([bow_rx, bow_ry, 2.0, 140 * intensity, sh * 1.2 - ch * 0.3, -ch * 1.2 - sh * 0.3])
 
-            # 2. 선미 듀얼 쓰러스터 추진 제트 기포 (Twin Stern Roostertail & Jet Foam)
+            # 1. 선미 듀얼 쓰러스터 추진 제트 기포 (Twin Stern Roostertail & Jet Foam)
             if self.frame % 2 == 0:
                 stern_lx = self.boat_pos[0] - sh * GAP - ch * (L * 0.50)
                 stern_ly = self.boat_pos[1] + ch * GAP - sh * (L * 0.50)
@@ -255,7 +244,7 @@ class BoatEnv:
                 self.wakes.append([stern_lx + random.uniform(-1.5, 1.5), stern_ly + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.5, -sh * 0.5])
                 self.wakes.append([stern_rx + random.uniform(-1.5, 1.5), stern_ry + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.5, -sh * 0.5])
                 
-            # 3. 선미 후방 횡단 켈빈 파도 (Transverse Kelvin Wave Train)
+            # 2. 선미 후방 횡단 켈빈 파도 (Transverse Kelvin Wave Train)
             if self.frame % 4 == 0:
                 cx = self.boat_pos[0] - ch * 38
                 cy = self.boat_pos[1] - sh * 38

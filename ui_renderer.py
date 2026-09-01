@@ -44,6 +44,36 @@ class EnvRenderer:
         # 3. 실제 선박 유체역학 항적 웨이크 + 장애물 반사/산란 미세 거품 (Realistic Wakes & Scattering Bubbles)
         env.wake_surf.fill((0, 0, 0, 0))
         
+        # 고속 주행 시 전방 선수에서 후방으로 날렵하게 갈라지는 화살촉 쇄파 (Sharp Arrowhead Bow Waves)
+        vel_norm = np.linalg.norm(env.boat_vel)
+        if vel_norm > 2.0:
+            spray_i = min(1.0, vel_norm / 10.0)
+            spray_len = 28 + spray_i * 20
+            spray_spread = 14 + spray_i * 10
+            
+            GAP = 11; L = 84
+            # 좌/우 선수 첨단 위치
+            bow_l = (int(bx - sh * GAP + ch * (L * 0.44)), int(by + ch * GAP + sh * (L * 0.44)))
+            bow_r = (int(bx + sh * GAP + ch * (L * 0.44)), int(by - ch * GAP + sh * (L * 0.44)))
+            
+            # 좌측 화살촉 쐐기형 파도선 (뒤쪽 + 바깥쪽으로 예리하게 전개)
+            b_l_end = (int(bow_l[0] - ch * spray_len - sh * spray_spread), int(bow_l[1] - sh * spray_len + ch * spray_spread))
+            b_l_mid = (int(bow_l[0] - ch * (spray_len * 0.5) - sh * (spray_spread * 0.4)), int(bow_l[1] - sh * (spray_len * 0.5) + ch * (spray_spread * 0.4)))
+            
+            # 우측 화살촉 쐐기형 파도선
+            b_r_end = (int(bow_r[0] - ch * spray_len + sh * spray_spread), int(bow_r[1] - sh * spray_len - ch * spray_spread))
+            b_r_mid = (int(bow_r[0] - ch * (spray_len * 0.5) + sh * (spray_spread * 0.4)), int(bow_r[1] - sh * (spray_len * 0.5) - ch * (spray_spread * 0.4)))
+            
+            # 화살촉 백색 쇄파 라인 (Crisp White Arrowhead Spray Whiskers)
+            pygame.draw.line(env.wake_surf, (240, 250, 255, int(160 * spray_i)), bow_l, b_l_end, 2)
+            pygame.draw.line(env.wake_surf, (240, 250, 255, int(160 * spray_i)), bow_r, b_r_end, 2)
+            pygame.draw.line(env.wake_surf, (200, 230, 255, int(100 * spray_i)), (int(bow_l[0] + 1), int(bow_l[1] + 1)), b_l_end, 4)
+            pygame.draw.line(env.wake_surf, (200, 230, 255, int(100 * spray_i)), (int(bow_r[0] + 1), int(bow_r[1] + 1)), b_r_end, 4)
+            
+            # 화살촉 라인 미세 기포 하이라이트
+            pygame.draw.circle(env.wake_surf, (255, 255, 255, int(140 * spray_i)), b_l_mid, 2)
+            pygame.draw.circle(env.wake_surf, (255, 255, 255, int(140 * spray_i)), b_r_mid, 2)
+        
         # 부표 밑에 자연스럽게 맺히는 부드러운 백색 수면 물거품 아우라 (Soft White Buoy Waterline Foam)
         for ox, oy, r in env.dynamic_obstacles:
             pulse_f = math.sin(env.frame * 0.06 + ox * 0.05) * 1.5
