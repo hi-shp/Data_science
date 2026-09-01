@@ -80,9 +80,9 @@ class EnvRenderer:
                 elif len(rw) >= 6:
                     rw[0] += rw[4]; rw[1] += rw[5]
                     rw[4] *= 0.88; rw[5] *= 0.88
-                    rw[2] += 0.15; rw[3] -= 4.2
-                    if rw[3] > 0:
-                        pygame.draw.circle(env.wake_surf, (255, 255, 255, int(rw[3])), (int(rw[0]), int(rw[1])), int(rw[2]))
+                    rw[2] += 0.08; rw[3] -= 5.0
+                    if rw[3] > 0 and rw[2] > 0.3:
+                        pygame.draw.circle(env.wake_surf, (255, 255, 255, int(rw[3] * 0.9)), (int(rw[0]), int(rw[1])), max(1, int(rw[2])))
             env.reflected_wakes = [rw for rw in env.reflected_wakes if rw[3] > 0]
             
         # 장애물 부표 위치의 파도/구름을 완전히 지워 가림 처리 (Obstacle Clean Masking)
