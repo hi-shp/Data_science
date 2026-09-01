@@ -16,25 +16,17 @@ class EnvRenderer:
 
     def render(self, hits):
         env = self.env
-        # 1. 심해 그라데이션 해수면 배경
-        env.screen.fill((16, 68, 115))
+        # 1. 깔끔하고 눈이 편안한 마린 블루 수면 배경 (Clean Ocean Water)
+        env.screen.fill((26, 85, 142))
         
-        # 해양 차트 미세 그리드 격자 (Sonar Depth Grid)
-        for gx in range(0, env.w, 100):
-            pygame.draw.line(env.screen, (22, 82, 132), (gx, 0), (gx, env.sim_h), 1)
-        for gy in range(0, env.sim_h, 100):
-            pygame.draw.line(env.screen, (22, 82, 132), (0, gy), (env.w, gy), 1)
-
-        # 역동적인 다층 수면 파도 물결 (Dynamic Ocean Waves & Caustics)
-        wave_t = env.frame * 0.04
-        for i in range(15, env.sim_h, 45):
-            for j in range(15, env.w, 65):
-                wx = j + math.cos(wave_t + i * 0.08) * 14
-                wy = i + math.sin(wave_t * 0.8 + j * 0.08) * 7
-                w_len = 22 + math.sin(wave_t + j * 0.05) * 8
-                # 파도 하이라이트
-                pygame.draw.line(env.screen, (32, 112, 172), (int(wx), int(wy)), (int(wx + w_len), int(wy)), 2)
-                pygame.draw.line(env.screen, (70, 160, 225), (int(wx + 4), int(wy - 1)), (int(wx + w_len * 0.6), int(wy - 1)), 1)
+        # 은은하고 자연스러운 미세 수면 잔물결 (Gentle Minimalist Waves)
+        wave_t = env.frame * 0.03
+        for i in range(25, env.sim_h, 55):
+            for j in range(25, env.w, 75):
+                wx = j + math.cos(wave_t + i * 0.05) * 10
+                wy = i + math.sin(wave_t * 0.7 + j * 0.05) * 5
+                w_len = 16 + math.sin(wave_t + j * 0.04) * 6
+                pygame.draw.line(env.screen, (38, 102, 164), (int(wx), int(wy)), (int(wx + w_len), int(wy)), 1)
 
         bx, by = env.boat_pos
         h = env.boat_heading
@@ -249,28 +241,45 @@ class EnvRenderer:
         pygame.draw.circle(env.screen, (30, 35, 40), ant_pos, 2)
         pygame.draw.line(env.screen, (200, 210, 220), ant_pos, (ant_pos[0]-1, ant_pos[1]-6), 2)
 
-        # 선체와 평행하게 고정된 정밀 듀얼 아웃보드 쓰러스터 (Fixed Parallel Thrusters)
+        # BlueRobotics T500 스타일 덕트형 언더워터 쓰러스터 (T500 Ducted Thrusters)
         t_ch, t_sh = ch, sh
+        t_nx, t_ny = -sh, ch  # 법선 벡터
         
         for m_center in [left_center, right_center]:
-            # 마운트 브래킷
+            # 트랜섬 마운트 브래킷
             mount_p = TR(m_center, -L*0.48, 0)
-            pivot_p = TR(m_center, -L*0.54, 0)
-            pygame.draw.line(env.screen, (30, 35, 42), mount_p, pivot_p, 4)
+            pivot_p = TR(m_center, -L*0.53, 0)
+            pygame.draw.line(env.screen, (32, 38, 45), mount_p, pivot_p, 3)
             
-            # 쓰러스터 모터 본체 (Engine Cowling: 선체와 완전 평행 고정)
-            cowl_f = (int(pivot_p[0] + 5*t_ch), int(pivot_p[1] + 5*t_sh))
-            cowl_b = (int(pivot_p[0] - 8*t_ch), int(pivot_p[1] - 8*t_sh))
-            pygame.draw.line(env.screen, (40, 48, 56), cowl_f, cowl_b, 6)
-            pygame.draw.line(env.screen, (80, 92, 104), cowl_f, cowl_b, 2)
+            # T500 외곽 원통형 덕트 노즐 (Kort Nozzle Duct Shroud, L=16, R=6.5)
+            d_len = 15; d_rad = 6.5
+            p_center = pivot_p
             
-            # 프로펠러 허브 & 트윈 블레이드 (Propeller Hub & Twin Blades)
-            prop_p = (int(pivot_p[0] - 10*t_ch), int(pivot_p[1] - 10*t_sh))
-            pygame.draw.circle(env.screen, (24, 28, 34), prop_p, 3)
-            # 프로펠러 블레이드
-            p_blade1 = (int(prop_p[0] - 4*t_sh), int(prop_p[1] + 4*t_ch))
-            p_blade2 = (int(prop_p[0] + 4*t_sh), int(prop_p[1] - 4*t_ch))
-            pygame.draw.line(env.screen, (220, 228, 238), p_blade1, p_blade2, 2)
+            # 덕트 외곽 4개 모서리
+            d_fl = (int(p_center[0] + (d_len*0.5)*t_ch - d_rad*t_nx), int(p_center[1] + (d_len*0.5)*t_sh - d_rad*t_ny))
+            d_fr = (int(p_center[0] + (d_len*0.5)*t_ch + d_rad*t_nx), int(p_center[1] + (d_len*0.5)*t_sh + d_rad*t_ny))
+            d_rr = (int(p_center[0] - (d_len*0.5)*t_ch + d_rad*t_nx), int(p_center[1] - (d_len*0.5)*t_sh + d_rad*t_ny))
+            d_rl = (int(p_center[0] - (d_len*0.5)*t_ch - d_rad*t_nx), int(p_center[1] - (d_len*0.5)*t_sh - d_rad*t_ny))
+            
+            # 덕트 노즐 쉘 (Dark Composite Shroud)
+            pygame.draw.polygon(env.screen, (24, 28, 34), [d_fl, d_fr, d_rr, d_rl])
+            pygame.draw.polygon(env.screen, (55, 65, 78), [d_fl, d_fr, d_rr, d_rl], 1)
+            
+            # 덕트 좌우 에어로 립 라인
+            pygame.draw.line(env.screen, (70, 150, 200), d_fl, d_rl, 2)
+            pygame.draw.line(env.screen, (70, 150, 200), d_fr, d_rr, 2)
+            
+            # 중앙 토피도 모터 코어 & 스테이터 허브 (Central Torpedo Stator)
+            m_f = (int(p_center[0] + 5*t_ch), int(p_center[1] + 5*t_sh))
+            m_r = (int(p_center[0] - 6*t_ch), int(p_center[1] - 6*t_sh))
+            pygame.draw.line(env.screen, (15, 18, 22), m_f, m_r, 4)
+            pygame.draw.circle(env.screen, (35, 42, 50), m_f, 2)
+            
+            # 내부 프로펠러 허브 (Propeller inside Duct)
+            prop_c = (int(p_center[0] - 2*t_ch), int(p_center[1] - 2*t_sh))
+            p_b1 = (int(prop_c[0] - 5*t_nx), int(prop_c[1] - 5*t_ny))
+            p_b2 = (int(prop_c[0] + 5*t_nx), int(prop_c[1] + 5*t_ny))
+            pygame.draw.line(env.screen, (200, 210, 225), p_b1, p_b2, 2)
 
         # 중앙 회전식 라이다 센서 돔 (Rotating LiDAR Sensor Pod)
         Lidar_pos = TR((bx, by), -L*0.05, 0)
