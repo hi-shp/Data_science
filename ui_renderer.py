@@ -79,8 +79,12 @@ class EnvRenderer:
         env.screen.blit(env.wake_surf, (0, 0))
         env.screen.blit(env.trail, (0, 0))
         
-        # 4. 해상 장애물 (오리지널 선명한 2D 부표)
+        # 4. 해상 장애물 (자연스러운 수중 그림자 + 선명한 2D 부표)
         for ox, oy, r in env.dynamic_obstacles:
+            # 부표 수중 앰비언트 그림자 (Realistic Underwater Shadow)
+            pygame.draw.circle(env.screen, (10, 42, 75, 140), (int(ox + 4), int(oy + 4)), int(r + 1))
+            
+            # 선명한 2D 부표 바디
             pygame.draw.circle(env.screen, (200, 50, 35), (int(ox), int(oy)), int(r))
             pygame.draw.circle(env.screen, (240, 80, 55), (int(ox - 1), int(oy - 1)), int(r * 0.78))
             pygame.draw.circle(env.screen, (255, 200, 190), (int(ox - 1), int(oy - 1)), int(r * 0.42))
