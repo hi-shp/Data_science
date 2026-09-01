@@ -234,7 +234,23 @@ class BoatEnv:
             sh = math.sin(h); ch = math.cos(h)
             GAP = 11; L = 84
 
-            # 1. 선미 듀얼 쓰러스터 추진 제트 기포 (Twin Stern Roostertail & Jet Foam - 컴팩트 기포)
+            # 1. 선수 조파저항 쇄파 구름 (Bow Divergent Wave Foam Clouds - 화살촉 궤적으로 사선 방출)
+            if self.frame % 2 == 0:
+                bow_lx = self.boat_pos[0] - sh * GAP + ch * (L * 0.44)
+                bow_ly = self.boat_pos[1] + ch * GAP + sh * (L * 0.44)
+                bow_rx = self.boat_pos[0] + sh * GAP + ch * (L * 0.44)
+                bow_ry = self.boat_pos[1] - ch * GAP + sh * (L * 0.44)
+                
+                # 켈빈 쇄파 각도(뒤쪽 + 바깥쪽)로 전개되는 속도 벡터 -> 자연스러운 화살촉 구름 라인 형성
+                vx_l = -ch * 0.65 - sh * 1.25
+                vy_l = -sh * 0.65 + ch * 1.25
+                vx_r = -ch * 0.65 + sh * 1.25
+                vy_r = -sh * 0.65 - ch * 1.25
+                
+                self.wakes.append([bow_lx, bow_ly, 1.5, 150 * intensity, vx_l, vy_l])
+                self.wakes.append([bow_rx, bow_ry, 1.5, 150 * intensity, vx_r, vy_r])
+
+            # 2. 선미 듀얼 쓰러스터 추진 제트 기포 (Twin Stern Roostertail & Jet Foam - 컴팩트 기포)
             if self.frame % 2 == 0:
                 stern_lx = self.boat_pos[0] - sh * GAP - ch * (L * 0.50)
                 stern_ly = self.boat_pos[1] + ch * GAP - sh * (L * 0.50)
@@ -244,7 +260,7 @@ class BoatEnv:
                 self.wakes.append([stern_lx + random.uniform(-1.0, 1.0), stern_ly + random.uniform(-1.0, 1.0), 1.8, 170 * intensity, -ch * 0.5, -sh * 0.5])
                 self.wakes.append([stern_rx + random.uniform(-1.0, 1.0), stern_ry + random.uniform(-1.0, 1.0), 1.8, 170 * intensity, -ch * 0.5, -sh * 0.5])
                 
-            # 2. 선미 후방 횡단 켈빈 파도 (Transverse Kelvin Wave Train - 컴팩트 기포)
+            # 3. 선미 후방 횡단 켈빈 파도 (Transverse Kelvin Wave Train - 컴팩트 기포)
             if self.frame % 4 == 0:
                 cx = self.boat_pos[0] - ch * 38
                 cy = self.boat_pos[1] - sh * 38
