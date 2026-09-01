@@ -2,3 +2,6 @@
 screenshot/
 __pycache__/
 *.pyc
+data/
+*.pth
+*.npz
