@@ -147,7 +147,6 @@ def run():
 
         env.validate_wp_grid()
         env.validate_wp_obstacle_5x5()
-        env.validate_wp_path()
 
         env.render(hits)
         env.clock.tick(60)

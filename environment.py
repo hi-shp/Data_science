@@ -302,22 +302,6 @@ class BoatEnv:
                         self.visited.add(p); self.visited.add((p[1], p[0]))
                         self.current_wp = None; return
 
-    def validate_wp_path(self):
-        if self.current_wp is None or self.bezier_path is None or len(self.bezier_path) == 0:
-            return
-        ox = self.dynamic_obstacles[:, 0]
-        oy = self.dynamic_obstacles[:, 1]
-        orad2 = (self.dynamic_obstacles[:, 2] + self.boat_radius + 10.0) ** 2
-        for p in self.bezier_path:
-            px, py = p[0], p[1]
-            if np.any((ox - px)**2 + (oy - py)**2 <= orad2):
-                p = self.current_wp["pair"]
-                self.visited.add(p); self.visited.add((p[1], p[0]))
-                self.current_wp = None
-                self.bezier_path = None
-                self.pursuit_target = None
-                return
-
     def update_steering(self, dists):
         self.steer_timer += self.dt
         center_idx = self.lidar_beams // 2

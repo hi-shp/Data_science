@@ -142,6 +142,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         obs_f = obstacles[mask]
         
         min_clear = 9999
+        near_clear_penalty = 1.0
         for (ox2, oy2, r2) in obs_f:
             px = ox2 - bx
             py = oy2 - by
@@ -153,8 +154,13 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             if d < min_clear:
                 min_clear = d
                 
+            # 보트 눈앞(160px 이내) 장애물과의 간격이 좁을 경우(45px 미만) 선제적 페널티 부여
+            d_boat = math.hypot(px, py)
+            if d_boat < 160 and d < 45.0:
+                near_clear_penalty *= max(0.1, (max(d, 0.0) / 45.0) ** 1.5)
+                
         min_clear = max(min_clear, 0)
-        path_clear = min(min_clear / 150, 1)**2.5 
+        path_clear = min(min_clear / 160, 1)**2.2
         
         cnt = 0
         for (ox2, oy2, r2) in obs_f:
@@ -181,7 +187,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         gap_w = np.linalg.norm(c2 - c1)
         width_w = min(gap_w / 90, 1)
         
-        sc = heading_align**5 * forward_proj**3 * lateral_full**0.5 * path_clear**1.5 * width_w**0.2 * cluster_pen * depth_pen
+        sc = (heading_align**4.5) * (forward_proj**2.8) * (lateral_full**0.5) * (path_clear**2.0) * (width_w**0.2) * cluster_pen * depth_pen * near_clear_penalty
         
         if sc > best_sc:
             best_sc = sc

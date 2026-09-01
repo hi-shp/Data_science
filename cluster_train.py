@@ -338,16 +338,6 @@ class FastBoatSim:
             self.path_timer = 0
             goal = self.target if self.current_wp is None else self.current_wp["pos"]
             self.bezier_path = make_bezier_path(self.boat_pos, self.boat_heading, goal)
-            
-            # 베지어 곡선 경로 상에 장애물이 놓이면 현재 웨이포인트 즉시 무효화 및 대체 갭으로 우회
-            if self.current_wp is not None and self.bezier_path is not None:
-                if bezier_path_is_blocked(self.bezier_path, self.dynamic_obstacles):
-                    p = self.current_wp["pair"]
-                    self.visited.add(p); self.visited.add((p[1], p[0]))
-                    self.current_wp = None
-                    self.bezier_path = None
-                    self.pursuit_target = None
-
             if self.bezier_path is not None:
                 self.pursuit_target = pure_pursuit(self.bezier_path, self.boat_pos, lookahead=52)
             if self.current_wp is not None and self.next_wp is not None:
