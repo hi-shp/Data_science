@@ -272,16 +272,16 @@ class BoatEnv:
                         w[3] = 0
                         break
                     
-                    # 2. 장애물 둘레에 파도가 닿으면 자글자글한 초미세 거품 파편들이 반사 산란 (Frothy Micro-Spray & Scattering - 절반 크기)
-                    if abs(dist - (w[2] + ob_r)) < 5.5 and w[3] > 35:
+                    # 2. 장애물 둘레에 파도가 닿으면 자글자글한 초미세 나노 거품 파편들이 반사 산란 (Nano-Spray Droplets)
+                    if abs(dist - (w[2] + ob_r)) < 5.0 and w[3] > 35:
                         if random.random() < 0.35:
                             for _ in range(random.randint(2, 4)):
                                 angle = math.atan2(dy, dx) + random.uniform(-0.8, 0.8)
-                                spd = random.uniform(0.8, 2.0)
-                                fx = ox + math.cos(angle) * (ob_r + random.uniform(1.0, 3.0))
-                                fy = oy + math.sin(angle) * (ob_r + random.uniform(1.0, 3.0))
+                                spd = random.uniform(0.8, 1.8)
+                                fx = ox + math.cos(angle) * (ob_r + random.uniform(0.8, 2.2))
+                                fy = oy + math.sin(angle) * (ob_r + random.uniform(0.8, 2.2))
                                 self.reflected_wakes.append([
-                                    fx, fy, random.uniform(0.6, 1.2), w[3] * 0.85,
+                                    fx, fy, random.uniform(0.3, 0.65), w[3] * 0.85,
                                     math.cos(angle) * spd, math.sin(angle) * spd
                                 ])
 
