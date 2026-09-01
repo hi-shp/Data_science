@@ -246,18 +246,22 @@ class BoatEnv:
             GAP = 11; L = 84
 
             # 선미 듀얼 쓰러스터 추진 제트 기포 및 후방 횡단 웨이크 (Enlarged Stern Roostertail & Trailing Foam)
+            PO = 11
+            cx_hull = self.boat_pos[0] + ch * PO
+            cy_hull = self.boat_pos[1] + sh * PO
+            
             if self.frame % 2 == 0:
-                stern_lx = self.boat_pos[0] - sh * GAP - ch * (L * 0.50)
-                stern_ly = self.boat_pos[1] + ch * GAP - sh * (L * 0.50)
-                stern_rx = self.boat_pos[0] + sh * GAP - ch * (L * 0.50)
-                stern_ry = self.boat_pos[1] - ch * GAP - sh * (L * 0.50)
+                stern_lx = cx_hull - sh * GAP - ch * (L * 0.50)
+                stern_ly = cy_hull + ch * GAP - sh * (L * 0.50)
+                stern_rx = cx_hull + sh * GAP - ch * (L * 0.50)
+                stern_ry = cy_hull - ch * GAP - sh * (L * 0.50)
                 
                 self.wakes.append([stern_lx + random.uniform(-1.5, 1.5), stern_ly + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.65, -sh * 0.65])
                 self.wakes.append([stern_rx + random.uniform(-1.5, 1.5), stern_ry + random.uniform(-1.5, 1.5), 3.0, 180 * intensity, -ch * 0.65, -sh * 0.65])
                 
             if self.frame % 3 == 0:
-                cx = self.boat_pos[0] - ch * 42
-                cy = self.boat_pos[1] - sh * 42
+                cx = cx_hull - ch * 42
+                cy = cy_hull - sh * 42
                 self.wakes.append([cx + random.uniform(-2.5, 2.5), cy + random.uniform(-2.5, 2.5), 4.5, 130 * intensity, -ch * 0.85, -sh * 0.85])
 
         # 파도-장애물 물리 상호작용 (Wave Absorption & Frothy Micro-Bubble Scattering)
