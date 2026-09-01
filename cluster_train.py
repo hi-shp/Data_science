@@ -429,16 +429,15 @@ def run_sim_task(args):
     seed, params = args
     sim = _worker_sim
     sim.reset(seed)
-    # 1100프레임으로 제한하여 불필요한 타임아웃 낭비 제거 및 4배 가속
-    for _ in range(1100):
+    # 1800px 횡단에 필요한 2800프레임 설정
+    for _ in range(2800):
         status = sim.step_sim(params)
         if status != 'running':
             return status, sim.frame
-    return 'timeout', 1100
+    return 'timeout', 2800
 
 def mutate_params(base, scale=0.03):
     p = copy.deepcopy(base)
-    # 한 번에 모든 파라미터를 흔들지 않고 2~3개만 미세 조정하여 밸런스 붕괴 방지
     keys = list(p.keys())
     selected_keys = random.sample(keys, k=random.randint(2, 4))
     
@@ -507,7 +506,12 @@ def main():
         'wp_switch_thresh': 1.15
     }
 
-    best_rate = 88.0
+    # 초기 베이스라인 파라미터 파일 즉시 생성
+    with open("best_learned_params.json", "w") as f:
+        json.dump(best_params, f, indent=2)
+    print("  Initialized best_learned_params.json with baseline parameters.", flush=True)
+
+    best_rate = 0.0
     generation = 0
 
     try:

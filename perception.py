@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.ndimage import label
+from scipy.ndimage import label, center_of_mass
 from config import GRID, GRID_W, GRID_H
 
 def lidar_hits_np(boat_pos, boat_heading, rel_angles, obstacles, lidar_range):
@@ -55,15 +55,10 @@ def extract_clusters_from_grid(grid):
     if not np.any(mask):
         return []
     labeled_array, num_features = label(mask)
-    clusters = []
-    for lb in range(1, num_features + 1):
-        ys, xs = np.where(labeled_array == lb)
-        if len(xs) == 0:
-            continue
-        cx = np.mean(xs) * GRID + GRID / 2.0
-        cy = np.mean(ys) * GRID + GRID / 2.0
-        clusters.append(np.array([cx, cy], dtype=np.float32))
-    return clusters
+    if num_features == 0:
+        return []
+    centers = center_of_mass(mask, labeled_array, range(1, num_features + 1))
+    return [np.array([cx * GRID + GRID/2.0, cy * GRID + GRID/2.0], dtype=np.float32) for cy, cx in centers]
 
 def match_clusters(prev_clusters, prev_ids, new_clusters):
     if len(prev_clusters) == 0:
