@@ -13,8 +13,9 @@ from utils import wrap, make_bezier_path, pure_pursuit
 
 def main():
     env = BoatEnv()
+    env.sim_speed = 4  # 4배속 기본 설정
     
-    total_episodes = 1000
+    total_episodes = 10000
     completed_episodes = 0
     success_count = 0
     collision_count = 0
@@ -27,28 +28,35 @@ def main():
         sr = (success_count / completed_episodes * 100.0) if completed_episodes > 0 else 0.0
         cr = (collision_count / completed_episodes * 100.0) if completed_episodes > 0 else 0.0
         
+        eta_seconds = (elapsed / completed_episodes) * (total_episodes - completed_episodes) if completed_episodes > 0 else 0
+        eta_str = f"{eta_seconds/3600.0:.2f} hours ({eta_seconds/60.0:.1f} min)" if not is_final else "DONE"
+        
         status_str = "COMPLETED" if is_final else f"IN PROGRESS ({completed_episodes}/{total_episodes})"
         report = f"""============================================================
-              1,000-RUN SUCCESS RATE EVALUATION REPORT
+             10,000-RUN SUCCESS RATE EVALUATION REPORT
 ============================================================
 Status:          {status_str}
 Last Updated:    {time.strftime('%Y-%m-%d %H:%M:%S')}
-Total Episodes:  {total_episodes}
-Completed:       {completed_episodes} / {total_episodes} ({completed_episodes/total_episodes*100:.1f}%)
+Total Episodes:  {total_episodes:,}
+Speed:           4x Fast-Forward
+Completed:       {completed_episodes:,} / {total_episodes:,} ({completed_episodes/total_episodes*100:.2f}%)
 
-Success Count:   {success_count}
-Collision Count: {collision_count}
+Success Count:   {success_count:,}
+Collision Count: {collision_count:,}
 
 ------------------------------------------------------------
 >> SUCCESS RATE:   {sr:.2f} %
 >> COLLISION RATE: {cr:.2f} %
 ------------------------------------------------------------
-Elapsed Time:    {elapsed/60.0:.1f} minutes ({elapsed:.1f} seconds)
+Elapsed Time:    {elapsed/3600.0:.2f} hours ({elapsed/60.0:.1f} min)
+Estimated ETA:   {eta_str}
 ============================================================
 """
         with open(out_file, "w") as f:
             f.write(report)
-        print(f"[{completed_episodes:4d}/{total_episodes}] Success: {success_count} ({sr:5.1f}%) | Collision: {collision_count} ({cr:5.1f}%)")
+            f.flush()
+            os.fsync(f.fileno())
+        print(f"[{completed_episodes:5d}/{total_episodes}] Success: {success_count} ({sr:5.2f}%) | Collision: {collision_count} ({cr:5.2f}%) | Elapsed: {elapsed/60.0:.1f}m | ETA: {eta_str}", flush=True)
 
     # 초기 파일 생성
     save_report(is_final=False)
@@ -64,12 +72,11 @@ Elapsed Time:    {elapsed/60.0:.1f} minutes ({elapsed:.1f} seconds)
                     env.handle_click(e.pos)
 
         if completed_episodes >= total_episodes:
-            # 1,000회 완료 시 화면 렌더링 유지
             env.clock.tick(30)
             continue
 
-        # 실시간 배속 설정에 따른 서브스텝 실행
-        sub_steps = max(1, int(getattr(env, 'sim_speed', 1)))
+        # 실시간 4배속 설정에 따른 서브스텝 실행
+        sub_steps = max(1, int(getattr(env, 'sim_speed', 4)))
         hits = None
         
         for _ in range(sub_steps):
@@ -167,6 +174,7 @@ Elapsed Time:    {elapsed/60.0:.1f} minutes ({elapsed:.1f} seconds)
             env.path_timer += env.dt
             if env.path_timer >= 0.01:
                 env.path_timer = 0
+                env.path_surf.fill((0, 0, 0, 0))
                 boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
                 if env.current_wp is None:
                     # 목적지까지 장애물이 없어 바로 직행하는 경우: 최소 곡률로 목적지 직진
@@ -178,7 +186,7 @@ Elapsed Time:    {elapsed/60.0:.1f} minutes ({elapsed:.1f} seconds)
                     env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     
                 if env.bezier_path is not None:
-                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=65)
+                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)
                     
                 if env.current_wp is not None and env.next_wp is not None:
                     vec = env.current_wp["pos"] - env.boat_pos
@@ -193,7 +201,7 @@ Elapsed Time:    {elapsed/60.0:.1f} minutes ({elapsed:.1f} seconds)
             visual_target = env.pursuit_target
             if env.current_wp is not None and env.next_pursuit_target is not None and env.pursuit_target is not None:
                 dist_to_wp = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                if dist_to_wp < 85:
+                if dist_to_wp < 50:
                     env.pursuit_target = env.next_pursuit_target
 
             steer = env.update_steering(dists)
@@ -216,7 +224,7 @@ Elapsed Time:    {elapsed/60.0:.1f} minutes ({elapsed:.1f} seconds)
                     collision_count += 1
                 completed_episodes += 1
                 
-                # 결과 파일 업데이트
+                # 결과 파일 실시간 업데이트
                 save_report(is_final=(completed_episodes >= total_episodes))
                 
                 env.reset()
