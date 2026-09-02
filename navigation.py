@@ -48,6 +48,44 @@ def bezier_path_is_blocked(path, obstacles, boat_radius=25, margin=10):
             return True
     return False
 
+def is_turn_sector_blocked(boat_pos, curr_wp_pos, new_wp_pos, obstacles, boat_radius=25, turn_radius=140.0):
+    if obstacles is None or len(obstacles) == 0:
+        return False
+        
+    v_curr = curr_wp_pos - boat_pos
+    v_new = new_wp_pos - boat_pos
+    
+    ang_curr = math.atan2(v_curr[1], v_curr[0])
+    ang_new = math.atan2(v_new[1], v_new[0])
+    ang_diff = wrap(ang_new - ang_curr)
+    
+    # 회전 각도 차이가 30도 미만이면 부채꼴 가로막힘 위험 없음
+    if abs(ang_diff) < np.deg2rad(30):
+        return False
+        
+    ox = obstacles[:, 0]
+    oy = obstacles[:, 1]
+    orad = obstacles[:, 2] + boat_radius + 6.0
+    
+    dx = ox - boat_pos[0]
+    dy = oy - boat_pos[1]
+    dists = np.hypot(dx, dy)
+    
+    close_mask = dists <= (turn_radius + orad)
+    if not np.any(close_mask):
+        return False
+        
+    obs_close_dx = dx[close_mask]
+    obs_close_dy = dy[close_mask]
+    obs_angles = np.arctan2(obs_close_dy, obs_close_dx)
+    
+    for obs_ang in obs_angles:
+        rel_ang = wrap(obs_ang - ang_curr)
+        if (ang_diff > 0 and 0 <= rel_ang <= ang_diff) or (ang_diff < 0 and ang_diff <= rel_ang <= 0):
+            return True
+            
+    return False
+
 def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, obstacles):
     bx, by = boat_pos
     tx, ty = target_pos

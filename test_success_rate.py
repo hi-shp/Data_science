@@ -8,7 +8,7 @@ import numpy as np
 
 from environment import BoatEnv
 from perception import lidar_hits_np, update_grid, extract_clusters_from_grid, match_clusters
-from navigation import find_gap, target_is_clear
+from navigation import find_gap, target_is_clear, bezier_path_is_blocked, is_turn_sector_blocked
 from utils import wrap, make_bezier_path, pure_pursuit
 
 def main():
@@ -144,7 +144,11 @@ Elapsed Time:    {elapsed/60.0:.1f} minutes ({elapsed:.1f} seconds)
                     if dist_to_curr > 80:
                         threshold = 1.1
                         if new_wp["score"] > env.current_wp["score"] * threshold:
-                            env.current_wp = new_wp
+                            if not is_turn_sector_blocked(env.boat_pos, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius):
+                                boat_spd_test = math.hypot(env.boat_vel[0], env.boat_vel[1])
+                                cand_path = make_bezier_path(env.boat_pos, env.boat_heading, new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_speed=boat_spd_test)
+                                if not bezier_path_is_blocked(cand_path, env.dynamic_obstacles, env.boat_radius, margin=8):
+                                    env.current_wp = new_wp
 
             if env.current_wp is not None and not clear_to_target:
                 if target_is_clear(env.current_wp["pos"], env.target, env.dynamic_obstacles):
