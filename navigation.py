@@ -48,55 +48,6 @@ def bezier_path_is_blocked(path, obstacles, boat_radius=25, margin=10):
             return True
     return False
 
-def is_turn_sector_blocked(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obstacles, boat_radius=25, turn_radius=150.0):
-    if obstacles is None or len(obstacles) == 0:
-        return False
-        
-    bx, by = boat_pos
-    v_new = new_wp_pos - boat_pos
-    ang_new = math.atan2(v_new[1], v_new[0])
-    
-    if curr_wp_pos is not None:
-        v_curr = curr_wp_pos - boat_pos
-        ang_curr = math.atan2(v_curr[1], v_curr[0])
-    else:
-        ang_curr = boat_heading
-        
-    ang_diff_wp = wrap(ang_new - ang_curr)
-    ang_diff_hd = wrap(ang_new - boat_heading)
-    
-    # 회전 각도 차이가 둘 다 15도 미만이면 선회 가로막힘 위험 없음
-    if abs(ang_diff_wp) < np.deg2rad(15) and abs(ang_diff_hd) < np.deg2rad(15):
-        return False
-        
-    ox = obstacles[:, 0]
-    oy = obstacles[:, 1]
-    orad = obstacles[:, 2] + boat_radius + 6.0
-    
-    dx = ox - bx
-    dy = oy - by
-    dists = np.hypot(dx, dy)
-    
-    close_mask = dists <= (turn_radius + orad)
-    if not np.any(close_mask):
-        return False
-        
-    obs_close_dx = dx[close_mask]
-    obs_close_dy = dy[close_mask]
-    obs_angles = np.arctan2(obs_close_dy, obs_close_dx)
-    
-    for obs_ang in obs_angles:
-        # 1. 기존 웨이포인트 -> 새 웨이포인트 선회 부채꼴 검사
-        rel_wp = wrap(obs_ang - ang_curr)
-        if (ang_diff_wp > 0 and 0 <= rel_wp <= ang_diff_wp) or (ang_diff_wp < 0 and ang_diff_wp <= rel_wp <= 0):
-            return True
-        # 2. 현재 선박 헤딩 -> 새 웨이포인트 선회 부채꼴 검사
-        rel_hd = wrap(obs_ang - boat_heading)
-        if (ang_diff_hd > 0 and 0 <= rel_hd <= ang_diff_hd) or (ang_diff_hd < 0 and ang_diff_hd <= rel_hd <= 0):
-            return True
-            
-    return False
-
 def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, obstacles):
     bx, by = boat_pos
     tx, ty = target_pos
@@ -156,10 +107,6 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         
         # 1. 갭(mid)이 현재 위치보다 목적지에 실질적으로(최소 30px 이상) 가까워져야 함 (1픽셀 차이 측방/미미한 전진 갭 배제)
         if dist_mid_to_target >= dist_to_target - 30.0:
-            continue
-            
-        # 2. 현재 선박 헤딩에서 해당 갭으로 꺾을 때 정면 부채꼴 영역에 가로막는 장애물이 있으면 제외
-        if is_turn_sector_blocked(boat_pos, boat_heading, None, mid, obstacles, boat_radius=25, turn_radius=130.0):
             continue
             
         forward_progress = np.dot(rel / distm, gps_vec)
