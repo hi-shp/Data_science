@@ -126,18 +126,21 @@ def run():
                 env.path_surf.fill((0, 0, 0, 0))
                 
                 if env.current_wp is None:
+                    # 목적지까지 장애물이 없어 바로 직행하는 경우: 최소 곡률로 목적지 직진
                     goal = env.target
+                    env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=None)
                 else:
+                    # 웨이포인트(갭) 우회 통과 구간: 장애물을 넉넉히 둘러가도록 외측 굴곡 및 곡률 부여
                     goal = env.current_wp["pos"]
+                    env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius)
                     
-                env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal)
                 if env.bezier_path is not None:
                     env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)
                     
                 if env.current_wp is not None and env.next_wp is not None:
                     vec = env.current_wp["pos"] - env.boat_pos
                     next_start_head = math.atan2(vec[1], vec[0])
-                    env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_start_head, env.next_wp["pos"])
+                    env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_start_head, env.next_wp["pos"], obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius)
                     if env.next_bezier_path is not None:
                         env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=75)
                 else:
