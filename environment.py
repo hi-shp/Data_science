@@ -55,7 +55,7 @@ class BoatEnv:
         self.mass = 13
         self.inertia = 5
         self.drag = 0.2
-        self.rot_drag = 0.2
+        self.rot_drag = 0.5
         self.boat_radius = 25
         
         # 선체 표면 기하 형상 (ui_renderer의 선체 렌더링과 100% 일치하는 정밀 히트박스)

@@ -179,6 +179,8 @@ def run():
             env.validate_wp_obstacle_5x5()
 
             if env.collide() or np.linalg.norm(env.target - env.boat_pos) < 70:
+                is_success = (np.linalg.norm(env.target - env.boat_pos) < 70 and not env.collide())
+                tag = "SUCCESS" if is_success else "FAIL"
                 ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 outdir = r"screenshot"
                 if not os.path.exists(outdir):
@@ -186,8 +188,10 @@ def run():
                         os.makedirs(outdir)
                     except:
                         pass
-                p = os.path.join(outdir, f"{ts}.png")
+                p = os.path.join(outdir, f"{ts}_{tag}.png")
                 try:
+                    if hits is not None:
+                        env.render(hits)
                     pygame.image.save(env.screen, p)
                 except:
                     pass
