@@ -58,6 +58,23 @@ class BoatEnv:
         self.rot_drag = 0.1
         self.boat_radius = 25
         
+        # 선체 표면 기하 형상 (ui_renderer의 선체 렌더링과 100% 일치하는 정밀 히트박스)
+        GAP = 11.0; L = 84.0; W = 16.0
+        hull_local = [
+            (L*0.50, 0.0), (L*0.12, W),
+            (-L*0.28, W*0.85), (-L*0.48, W*0.6),
+            (-L*0.50, 0.0), (-L*0.48, -W*0.6),
+            (-L*0.28, -W*0.85), (L*0.12, -W)
+        ]
+        self.left_hull_local = [(p[0], p[1] + GAP) for p in hull_local]
+        self.right_hull_local = [(p[0], p[1] - GAP) for p in hull_local]
+        self.deck_local = [
+            (L * 0.25, -GAP * 0.85),
+            (L * 0.25, GAP * 0.85),
+            (-L * 0.35, GAP * 0.85),
+            (-L * 0.35, -GAP * 0.85)
+        ]
+        
         self.trail = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
         self.path_surf = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
         self.wake_surf = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
@@ -310,15 +327,78 @@ class BoatEnv:
                                 ])
 
     def collide(self):
+        bx, by = self.boat_pos
+        ch = math.cos(self.boat_heading)
+        sh = math.sin(self.boat_heading)
+        
+        # 1. 벽면 충돌: 선체 꼭짓점들의 실제 외곽 좌표 검사
+        if bx < 45 or bx > self.w - 45 or by < 45 or by > self.sim_h - 45:
+            for poly in (self.left_hull_local, self.right_hull_local):
+                for px_l, py_l in poly:
+                    wx = bx + px_l * ch - py_l * sh
+                    wy = by + px_l * sh + py_l * ch
+                    if wx <= 0 or wx >= self.w or wy <= 0 or wy >= self.sim_h:
+                        return True
+
+        # 2. 장애물 충돌: 선체 로컬 좌표계로 변환하여 3개 선체 폴리곤(좌/우 선체, 데크)과 원형 장애물 정밀 표면 충돌 검사
+        if len(self.dynamic_obstacles) == 0:
+            return False
+            
         ox = self.dynamic_obstacles[:, 0]
         oy = self.dynamic_obstacles[:, 1]
-        rr = self.dynamic_obstacles[:, 2] + self.boat_radius
-        dx = ox - self.boat_pos[0]
-        dy = oy - self.boat_pos[1]
-        hit = np.any(dx*dx + dy*dy <= rr*rr)
-        wall = (self.boat_pos[0] <= 0 or self.boat_pos[0] >= self.w or
-                self.boat_pos[1] <= 0 or self.boat_pos[1] >= self.sim_h)
-        return hit or wall
+        orr = self.dynamic_obstacles[:, 2]
+        
+        dx = ox - bx
+        dy = oy - by
+        
+        x_loc = dx * ch + dy * sh
+        y_loc = -dx * sh + dy * ch
+        
+        # 바운딩 박스 1차 고속 필터링 (선체 길이 L/2=42px, 선폭 W_tot/2=27px)
+        cand_mask = (abs(x_loc) <= 42.0 + orr) & (abs(y_loc) <= 27.0 + orr)
+        if not np.any(cand_mask):
+            return False
+            
+        cand_indices = np.where(cand_mask)[0]
+        polys = (self.left_hull_local, self.right_hull_local, self.deck_local)
+        
+        for idx in cand_indices:
+            px = x_loc[idx]
+            py = y_loc[idx]
+            r = orr[idx]
+            r2 = r * r
+            
+            for poly in polys:
+                # 2-1. 장애물 중심이 선체 폴리곤 내부인지 검사 (Ray-casting)
+                inside = False
+                n = len(poly)
+                for i in range(n):
+                    j = (i - 1) % n
+                    xi, yi = poly[i]
+                    xj, yj = poly[j]
+                    if ((yi > py) != (yj > py)) and (px < (xj - xi) * (py - yi) / (yj - yi + 1e-12) + xi):
+                        inside = not inside
+                if inside:
+                    return True
+                    
+                # 2-2. 장애물 중심과 선체 각 모서리 선분 사이의 최단 거리 검사
+                for i in range(n):
+                    x1, y1 = poly[i]
+                    x2, y2 = poly[(i + 1) % n]
+                    vx = x2 - x1
+                    vy = y2 - y1
+                    seg_len_sq = vx * vx + vy * vy
+                    if seg_len_sq < 1e-8:
+                        dist_sq = (px - x1)**2 + (py - y1)**2
+                    else:
+                        t = max(0.0, min(1.0, ((px - x1) * vx + (py - y1) * vy) / seg_len_sq))
+                        cx = x1 + t * vx
+                        cy = y1 + t * vy
+                        dist_sq = (px - cx)**2 + (py - cy)**2
+                    if dist_sq <= r2:
+                        return True
+                        
+        return False
 
     def get_pwm(self, steer):
         dead = 0.02
