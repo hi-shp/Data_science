@@ -1,17 +1,19 @@
 ============================================================
-              1,000-RUN SUCCESS RATE EVALUATION REPORT
+             10,000-RUN SUCCESS RATE EVALUATION REPORT
 ============================================================
-Status:          COMPLETED
-Last Updated:    2026-09-02 03:43:12
-Total Episodes:  1000
-Completed:       1000 / 1000 (100.0%)
+Status:          IN PROGRESS (86/10000)
+Last Updated:    2026-09-02 17:39:42
+Total Episodes:  10,000
+Speed:           4x Fast-Forward
+Completed:       86 / 10,000 (0.86%)
 
-Success Count:   971
-Collision Count: 29
+Success Count:   84
+Collision Count: 2
 
 ------------------------------------------------------------
->> SUCCESS RATE:   97.10 %
->> COLLISION RATE: 2.90 %
+>> SUCCESS RATE:   97.67 %
+>> COLLISION RATE: 2.33 %
 ------------------------------------------------------------
-Elapsed Time:    273.5 minutes (16409.3 seconds)
+Elapsed Time:    0.18 hours (10.9 min)
+Estimated ETA:   20.92 hours (1255.0 min)
 ============================================================

@@ -13,7 +13,7 @@ from utils import wrap, make_bezier_path, pure_pursuit
 
 def main():
     env = BoatEnv()
-    env.sim_speed = 4  # 4배속 기본 설정
+    env.sim_speed = 4
     
     total_episodes = 10000
     completed_episodes = 0
@@ -29,16 +29,15 @@ def main():
         cr = (collision_count / completed_episodes * 100.0) if completed_episodes > 0 else 0.0
         
         eta_seconds = (elapsed / completed_episodes) * (total_episodes - completed_episodes) if completed_episodes > 0 else 0
-        eta_str = f"{eta_seconds/3600.0:.2f} hours ({eta_seconds/60.0:.1f} min)" if not is_final else "DONE"
+        eta_str = f"{eta_seconds/3600.0:.2f} hours ({eta_seconds/60.0:.1f} min)" if not is_final else "COMPLETED"
         
         status_str = "COMPLETED" if is_final else f"IN PROGRESS ({completed_episodes}/{total_episodes})"
         report = f"""============================================================
-             10,000-RUN SUCCESS RATE EVALUATION REPORT
+              SUCCESS RATE EVALUATION REPORT
 ============================================================
 Status:          {status_str}
 Last Updated:    {time.strftime('%Y-%m-%d %H:%M:%S')}
 Total Episodes:  {total_episodes:,}
-Speed:           4x Fast-Forward
 Completed:       {completed_episodes:,} / {total_episodes:,} ({completed_episodes/total_episodes*100:.2f}%)
 
 Success Count:   {success_count:,}
@@ -75,7 +74,7 @@ Estimated ETA:   {eta_str}
             env.clock.tick(30)
             continue
 
-        # 실시간 4배속 설정에 따른 서브스텝 실행
+        # 4배속 서브스텝 고속 반복 실행
         sub_steps = max(1, int(getattr(env, 'sim_speed', 4)))
         hits = None
         
@@ -190,8 +189,8 @@ Estimated ETA:   {eta_str}
                     
                 if env.current_wp is not None and env.next_wp is not None:
                     vec = env.current_wp["pos"] - env.boat_pos
-                    next_start_head = math.atan2(vec[1], vec[0])
-                    env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_start_head, env.next_wp["pos"], obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
+                    next_head = math.atan2(vec[1], vec[0])
+                    env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_head, env.next_wp["pos"], obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     if env.next_bezier_path is not None:
                         env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=75)
                 else:
@@ -232,7 +231,7 @@ Estimated ETA:   {eta_str}
 
         if hits is not None:
             env.render(hits)
-        env.clock.tick(60)
+        env.clock.tick(0)  # 인위적 지연 없이 최대 속도로 시뮬레이션 가속
 
     pygame.quit()
 
