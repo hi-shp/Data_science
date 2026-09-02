@@ -652,10 +652,11 @@ class EnvRenderer:
         spd_txt = self.small_font.render(f"Speed: {speed_knots:.1f} kt", True, (220, 235, 255))
         hud_surf.blit(spd_txt, (10, 32))
         
-        # 속도 바
+        # 속도 바 (실제 최고 속도 45.0 px/s 기준 정밀 스케일링)
         bar_w = 125
         pygame.draw.rect(hud_surf, (30, 50, 70), (10, 48, bar_w, 7))
-        fill_w = int(min(speed / 15.0, 1.0) * bar_w)
+        speed_ratio = float(np.clip(speed / 45.0, 0.0, 1.0))
+        fill_w = int(speed_ratio * bar_w)
         bar_color = (255, 80, 60) if em else (0, 200, 100)
         pygame.draw.rect(hud_surf, bar_color, (10, 48, fill_w, 7))
         
