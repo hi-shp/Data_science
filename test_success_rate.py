@@ -134,17 +134,22 @@ Elapsed Time:    {elapsed/60.0:.1f} minutes ({elapsed:.1f} seconds)
                     env.current_wp["c2"] = c2_now
                     env.current_wp["pos"] = (c1_now + c2_now) / 2.0
                 elif new_wp is not None:
-                    env.current_wp = new_wp
+                    if not is_turn_sector_blocked(env.boat_pos, env.boat_heading, None, new_wp["pos"], env.dynamic_obstacles, env.boat_radius):
+                        env.current_wp = new_wp
 
             if new_wp is not None:
                 if env.current_wp is None:
-                    env.current_wp = new_wp
+                    if not is_turn_sector_blocked(env.boat_pos, env.boat_heading, None, new_wp["pos"], env.dynamic_obstacles, env.boat_radius):
+                        boat_spd_test = math.hypot(env.boat_vel[0], env.boat_vel[1])
+                        cand_path = make_bezier_path(env.boat_pos, env.boat_heading, new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_speed=boat_spd_test)
+                        if not bezier_path_is_blocked(cand_path, env.dynamic_obstacles, env.boat_radius, margin=8):
+                            env.current_wp = new_wp
                 else:
                     dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
                     if dist_to_curr > 80:
                         threshold = 1.1
                         if new_wp["score"] > env.current_wp["score"] * threshold:
-                            if not is_turn_sector_blocked(env.boat_pos, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius):
+                            if not is_turn_sector_blocked(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius):
                                 boat_spd_test = math.hypot(env.boat_vel[0], env.boat_vel[1])
                                 cand_path = make_bezier_path(env.boat_pos, env.boat_heading, new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_speed=boat_spd_test)
                                 if not bezier_path_is_blocked(cand_path, env.dynamic_obstacles, env.boat_radius, margin=8):

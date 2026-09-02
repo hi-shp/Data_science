@@ -485,9 +485,9 @@ class BoatEnv:
         
         avoid = reactive_avoidance(dists, self.rel_angles)
         
-        # 반발력 정상 작동: 웨이포인트 선회 방향과 반대로 충돌할 때만 상쇄 방지를 위해 소프트 감쇠(0.25) 적용
-        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.15:
-            avoid *= 0.25
+        # 정면 근접 장애물 보호: 전방 장애물(min_front_dist <= 140)이 있을 때는 회피 반발력을 절대 감쇠시키지 않음
+        if min_front_dist > 140.0 and self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.15:
+            avoid *= 0.45
             
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 
