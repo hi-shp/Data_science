@@ -5,7 +5,7 @@ import datetime
 import os
 from environment import BoatEnv
 from perception import lidar_hits_np, update_grid, extract_clusters_from_grid, match_clusters
-from navigation import find_gap, target_is_clear
+from navigation import find_gap, target_is_clear, is_direct_target_safe
 from utils import wrap, make_bezier_path, pure_pursuit
 
 def run():
@@ -43,9 +43,10 @@ def run():
             )
 
             dist_to_target = np.linalg.norm(env.target - env.boat_pos)
-            clear_to_target = target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles)
+            boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
+            clear_to_target = is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd)
 
-            # 목적지까지 장애물이 없으면 거리와 무관하게 즉시 목적지 직행 (기존/신규 웨이포인트 모두 해제)
+            # 목적지까지 회전 궤적 및 직선 경로에 장애물이 전혀 없을 때만 목적지 직행
             if clear_to_target:
                 new_wp = None
                 env.current_wp = None
@@ -137,9 +138,9 @@ def run():
                 
                 boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
                 if env.current_wp is None:
-                    # 목적지까지 장애물이 없어 바로 직행하는 경우: 최소 곡률로 목적지 직진
+                    # 목적지 직행 상황에서도 회전 궤적 주변 장애물을 넉넉히 우회할 수 있도록 obstacles 전달
                     goal = env.target
-                    env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=None, boat_speed=boat_spd)
+                    env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                 else:
                     # 웨이포인트(갭) 우회 통과 구간: 속도 기반 선행 회전 및 장애물 외측 굴곡 곡률 부여
                     goal = env.current_wp["pos"]

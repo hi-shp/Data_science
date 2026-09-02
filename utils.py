@@ -71,29 +71,32 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     
     for (ox, oy, orad) in obstacles:
         obs_pos = np.array([ox, oy], dtype=np.float32)
-        vec_obs = obs_pos - p0
-        proj = np.dot(vec_obs, u_dir)
+        dists = np.linalg.norm(nominal_pts - obs_pos, axis=1)
+        min_idx = np.argmin(dists)
+        min_dist = dists[min_idx]
+        t_idx = min_idx / 29.0
         
-        if 0 < proj < d:
-            dists = np.linalg.norm(nominal_pts - obs_pos, axis=1)
-            min_idx = np.argmin(dists)
-            min_dist = dists[min_idx]
-            t_idx = min_idx / 29.0
-            
-            safe_margin = orad + boat_radius + min_clearance
-            encroach = safe_margin - min_dist
-            
-            if encroach > 0:
+        safe_margin = orad + boat_radius + min_clearance
+        encroach = safe_margin - min_dist
+        
+        if encroach > 0:
+            pt = nominal_pts[min_idx]
+            vec_from_obs = pt - obs_pos
+            norm_vec = np.linalg.norm(vec_from_obs)
+            if norm_vec > 1e-4:
+                push_dir = vec_from_obs / norm_vec
+            else:
                 side = np.dot(obs_pos - p0, n_dir)
                 push_dir = -n_dir if side >= 0 else n_dir
-                push_mag = min(100.0, encroach * 1.6)
                 
-                w1 = max(0.2, 1.0 - t_idx * 0.7)
-                w2 = max(0.2, t_idx * 0.7 + 0.3)
-                
-                shift_p1 += push_dir * (push_mag * w1)
-                shift_p2 += push_dir * (push_mag * w2)
-                
+            push_mag = min(120.0, encroach * 1.6)
+            
+            w1 = max(0.2, 1.0 - t_idx * 0.7)
+            w2 = max(0.2, t_idx * 0.7 + 0.3)
+            
+            shift_p1 += push_dir * (push_mag * w1)
+            shift_p2 += push_dir * (push_mag * w2)
+            
     p1 = p1 + shift_p1
     p2 = p2 + shift_p2
 

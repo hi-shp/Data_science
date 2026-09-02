@@ -48,6 +48,16 @@ def bezier_path_is_blocked(path, obstacles, boat_radius=25, margin=10):
             return True
     return False
 
+def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_radius=25, boat_speed=0.0):
+    if not target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius):
+        return False
+    from utils import make_bezier_path
+    # 목적지까지 회전하는 실제 베지어 궤적이 장애물과 충돌하는지 검증
+    test_path = make_bezier_path(boat_pos, boat_heading, target_pos, obstacles=obstacles, boat_radius=boat_radius, boat_speed=boat_speed)
+    if bezier_path_is_blocked(test_path, obstacles, boat_radius=boat_radius, margin=8.0):
+        return False
+    return True
+
 def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, obstacles):
     bx, by = boat_pos
     tx, ty = target_pos
