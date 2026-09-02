@@ -30,16 +30,16 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     goal_angle = math.atan2(v_to_goal[1], v_to_goal[0])
     ang_diff = abs(wrap(goal_angle - boat_heading))
     
-    # 1. 장애물이 없는 목적지 직행 상황: 곡률을 작고 타이트하게 유지하여 최단 거리로 직진
+    # 1. 장애물이 없는 목적지 직행 상황: 곡률을 대폭 줄여 목적지를 향해 직선에 가깝게 직행
     if obstacles is None or len(obstacles) == 0:
-        forward_dist = min(65, d * 0.35) * max(0.25, math.cos(ang_diff * 0.5))
+        forward_dist = min(35.0, d * 0.20) * max(0.15, math.cos(ang_diff * 0.5))
         forward = np.array([math.cos(boat_heading), math.sin(boat_heading)])
         p1 = boat_pos + forward * forward_dist
 
         v_goal = p3 - p1
         norm_v_goal = np.linalg.norm(v_goal)
         v_goal_n = np.zeros(2) if norm_v_goal < 1e-6 else v_goal / norm_v_goal
-        p2 = p3 - v_goal_n * min(65, d * 0.35)
+        p2 = p3 - v_goal_n * min(35.0, d * 0.20)
         return cubic_bezier(p0, p1, p2, p3, n=90)
 
     # 2. 웨이포인트 추종 및 장애물 통과 구간: 넉넉한 전방 투영 거리와 외측 굴곡으로 장애물을 넉넉히 우회
