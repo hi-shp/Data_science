@@ -151,7 +151,7 @@ def run():
 
             if env.current_wp is not None and env.next_pursuit_target is not None and env.pursuit_target is not None:
                 dist_to_wp = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                if dist_to_wp < 70:
+                if dist_to_wp < 90:
                     env.pursuit_target = env.next_pursuit_target
 
             steer = env.update_steering(dists)
