@@ -218,9 +218,9 @@ class BoatEnv:
     def step(self, L, R):
         tL = self.pwm_to_thrust(L)
         tR = self.pwm_to_thrust(R)
-        # 220도 범위 내 최소 장애물 거리에 따른 순수 연속 함수 속도 제어 (장애물 근접 시 대폭 감속)
+        # 220도 범위 내 최소 장애물 거리에 따른 순수 연속 함수 속도 제어 (장애물 근접 시 최소 속도를 더욱 낮추어 서행)
         em_dist = float(getattr(self, 'min_wide_dist', 999.0))
-        speed_factor = (math.tanh(em_dist / 90.0)) ** 1.35
+        speed_factor = (math.tanh(em_dist / 110.0)) ** 1.85
         target_fwd = ((tL + tR) / 6.0) * speed_factor
             
         if not hasattr(self, 'current_fwd'):
