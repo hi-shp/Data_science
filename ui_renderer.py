@@ -10,9 +10,9 @@ class EnvRenderer:
         self.real_cam_surf = pygame.Surface((320, 220), pygame.SRCALPHA)
         self.safety_surf = pygame.Surface((120, 120), pygame.SRCALPHA)
         self.hud_surf = pygame.Surface((210, 110), pygame.SRCALPHA)
-        self.font = pygame.font.SysFont(None, 24)
-        self.bold_font = pygame.font.SysFont(None, 26, bold=True)
-        self.small_font = pygame.font.SysFont(None, 18)
+        self.font = pygame.font.SysFont(['notosanscjk', 'notoserifcjk', 'nanumgothic', 'sans-serif'], 20)
+        self.bold_font = pygame.font.SysFont(['notosanscjk', 'notoserifcjk', 'nanumgothic', 'sans-serif'], 22, bold=True)
+        self.small_font = pygame.font.SysFont(['notosanscjk', 'notoserifcjk', 'nanumgothic', 'sans-serif'], 16)
 
     def render(self, hits):
         env = self.env
@@ -639,11 +639,11 @@ class EnvRenderer:
         em = getattr(env, 'emergency_mode', False)
         has_wp = env.current_wp is not None
         if em:
-            mode_txt = self.bold_font.render("\u26a0 EMERGENCY", True, (255, 80, 60))
+            mode_txt = self.bold_font.render("회피중 (AVOIDING)", True, (255, 80, 60))
         elif has_wp:
-            mode_txt = self.bold_font.render("\u25c8 GAP PASS", True, (0, 255, 220))
+            mode_txt = self.bold_font.render("우회 통과 (GAP)", True, (0, 255, 220))
         else:
-            mode_txt = self.bold_font.render("\u25b6 CRUISING", True, (50, 230, 120))
+            mode_txt = self.bold_font.render("직항 순항 (CRUISE)", True, (50, 230, 120))
         hud_surf.blit(mode_txt, (10, 6))
         
         # 속도
