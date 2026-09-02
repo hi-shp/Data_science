@@ -472,7 +472,7 @@ class BoatEnv:
         heading_error = wrap(heading_target - self.boat_heading)
 
         # 거리에 따라 연속적으로 조향 및 회피력 스케일링
-        clear_ratio = np.clip((min_front_dist - 80.0) / 200.0, 0.0, 1.0)
+        clear_ratio = np.clip((min_front_dist - 100.0) / 200.0, 0.0, 1.0)
         steer_gain = self.params['steer_gain'] + (1.0 - clear_ratio) * 0.12
         avoid_multiplier = self.params['avoid_normal'] + (1.0 - clear_ratio) * (self.params['avoid_em'] * 0.25)
             
