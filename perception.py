@@ -1,6 +1,11 @@
 import numpy as np
-from scipy.ndimage import label, center_of_mass
+from scipy.ndimage import label
 from config import GRID, GRID_W, GRID_H
+
+# 고속 연산을 위한 그리드 인덱스 배열 사전 생성
+_Y_INDICES, _X_INDICES = np.indices((GRID_H, GRID_W), dtype=np.float32)
+_Y_FLAT = _Y_INDICES.ravel()
+_X_FLAT = _X_INDICES.ravel()
 
 def lidar_hits_np(boat_pos, boat_heading, rel_angles, obstacles, lidar_range):
     if len(obstacles) == 0:
@@ -29,12 +34,10 @@ def lidar_hits_np(boat_pos, boat_heading, rel_angles, obstacles, lidar_range):
 
     d_final = np.min(t, axis=1).astype(np.float32)
     
-    hits = []
-    for i, d in enumerate(d_final):
-        if d < lidar_range:
-            hits.append((float(x0 + vx[i, 0] * d), float(y0 + vy[i, 0] * d)))
-        else:
-            hits.append(None)
+    valid = d_final < lidar_range
+    hits_x = x0 + vx[:, 0] * d_final
+    hits_y = y0 + vy[:, 0] * d_final
+    hits = [(float(hx), float(hy)) if v else None for hx, hy, v in zip(hits_x, hits_y, valid)]
 
     return d_final, hits
 
@@ -42,12 +45,16 @@ def init_grid():
     return np.zeros((GRID_H, GRID_W), dtype=np.float32)
 
 def update_grid(grid, hits):
-    for p in hits:
-        if p is None: continue
-        gx = int(p[0] // GRID)
-        gy = int(p[1] // GRID)
-        if 0 <= gx < GRID_W and 0 <= gy < GRID_H:
-            grid[gy, gx] = min(grid[gy, gx] + 1.0, 20.0)
+    valid_pts = [p for p in hits if p is not None]
+    if not valid_pts:
+        return
+    pts = np.asarray(valid_pts, dtype=np.float32)
+    gx = (pts[:, 0] // GRID).astype(np.int32)
+    gy = (pts[:, 1] // GRID).astype(np.int32)
+    valid = (gx >= 0) & (gx < GRID_W) & (gy >= 0) & (gy < GRID_H)
+    if np.any(valid):
+        np.add.at(grid, (gy[valid], gx[valid]), 1.0)
+        np.clip(grid, 0.0, 20.0, out=grid)
 
 def extract_clusters_from_grid(grid):
     OCC = 2.0
@@ -57,8 +64,19 @@ def extract_clusters_from_grid(grid):
     labeled_array, num_features = label(mask)
     if num_features == 0:
         return []
-    centers = center_of_mass(mask, labeled_array, range(1, num_features + 1))
-    return [np.array([cx * GRID + GRID/2.0, cy * GRID + GRID/2.0], dtype=np.float32) for cy, cx in centers]
+    
+    flat_labels = labeled_array.ravel()
+    counts = np.bincount(flat_labels, minlength=num_features + 1)[1:]
+    sum_y = np.bincount(flat_labels, weights=_Y_FLAT, minlength=num_features + 1)[1:]
+    sum_x = np.bincount(flat_labels, weights=_X_FLAT, minlength=num_features + 1)[1:]
+    
+    valid = counts > 0
+    cy = sum_y[valid] / counts[valid]
+    cx = sum_x[valid] / counts[valid]
+    
+    world_x = cx * GRID + GRID / 2.0
+    world_y = cy * GRID + GRID / 2.0
+    return [np.array([wx, wy], dtype=np.float32) for wx, wy in zip(world_x, world_y)]
 
 def match_clusters(prev_clusters, prev_ids, new_clusters):
     if len(prev_clusters) == 0:

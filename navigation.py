@@ -152,48 +152,45 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         mask = d2_obs <= (distm + 200)**2
         obs_f = obstacles[mask]
         
-        min_clear = 9999
-        near_clear_penalty = 1.0
-        for (ox2, oy2, r2) in obs_f:
-            px = ox2 - bx
-            py = oy2 - by
-            t = (px*vx + py*vy) / seg2
-            t = max(0, min(1, t))
-            cx = bx + t*vx
-            cy = by + t*vy
-            d = math.sqrt((ox2 - cx)**2 + (oy2 - cy)**2) - r2
-            if d < min_clear:
-                min_clear = d
-                
+        if len(obs_f) > 0:
+            px = obs_f[:, 0] - bx
+            py = obs_f[:, 1] - by
+            t = np.clip((px * vx + py * vy) / seg2, 0.0, 1.0)
+            cx = bx + t * vx
+            cy = by + t * vy
+            dists_to_seg = np.sqrt((obs_f[:, 0] - cx)**2 + (obs_f[:, 1] - cy)**2) - obs_f[:, 2]
+            min_clear = float(np.min(dists_to_seg))
+            
             # 보트 눈앞(160px 이내) 장애물과의 간격이 좁을 경우(45px 미만) 선제적 페널티 부여
-            d_boat = math.hypot(px, py)
-            if d_boat < 160 and d < 45.0:
-                near_clear_penalty *= max(0.1, (max(d, 0.0) / 45.0) ** 1.5)
+            d_boat = np.hypot(px, py)
+            close_mask = (d_boat < 160.0) & (dists_to_seg < 45.0)
+            if np.any(close_mask):
+                close_d = np.maximum(dists_to_seg[close_mask], 0.0)
+                near_clear_penalty = float(np.prod(np.maximum(0.1, (close_d / 45.0) ** 1.5)))
+            else:
+                near_clear_penalty = 1.0
+                
+            cnt = int(np.sum((obs_f[:, 0] - mx)**2 + (obs_f[:, 1] - my)**2 < 10000.0))
+            cluster_pen = math.exp(-0.5 * cnt)
+            
+            depth_pen = 1.0
+            if distm > 10:
+                dir_x = mx - bx
+                dir_y = my - by
+                norm_x = dir_x / distm
+                norm_y = dir_y / distm
+                past_x = mx + norm_x * 120
+                past_y = my + norm_y * 120
+                past_blocked = int(np.sum((obs_f[:, 0] - past_x)**2 + (obs_f[:, 1] - past_y)**2 < 6400.0))
+                depth_pen = math.exp(-1.5 * past_blocked)
+        else:
+            min_clear = 9999.0
+            near_clear_penalty = 1.0
+            cluster_pen = 1.0
+            depth_pen = 1.0
                 
         min_clear = max(min_clear, 0)
         path_clear = min(min_clear / 160, 1)**2.2
-        
-        cnt = 0
-        for (ox2, oy2, r2) in obs_f:
-            if (ox2 - mx)**2 + (oy2 - my)**2 < 100*100:
-                cnt += 1
-        cluster_pen = math.exp(-0.5 * cnt)
-        
-        dir_x = mx - bx
-        dir_y = my - by
-        depth_pen = 1.0
-        if distm > 10:
-            norm_x = dir_x / distm
-            norm_y = dir_y / distm
-            past_x = mx + norm_x * 120
-            past_y = my + norm_y * 120
-            
-            past_blocked = 0
-            for (ox2, oy2, r2) in obs_f:
-                if (ox2 - past_x)**2 + (oy2 - past_y)**2 < 80*80:
-                    past_blocked += 1
-            
-            depth_pen = math.exp(-1.5 * past_blocked)
         
         gap_w = np.linalg.norm(c2 - c1)
         width_w = min(gap_w / 90, 1)
@@ -207,12 +204,13 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     return best
 
 def reactive_avoidance(dists, angles):
-    SAFE = 450
-    sigma = 200 
-    a = 0.
-    for d, ang in zip(dists, angles):
-        if d < SAFE:
-            w = math.exp(-(d / sigma)**2)
-            front = max(1.2 - abs(ang) / (math.pi/2), 0.3)
-            a -= w * front * math.sin(ang)
-    return a
+    SAFE = 450.0
+    sigma = 200.0
+    mask = dists < SAFE
+    if not np.any(mask):
+        return 0.0
+    d = dists[mask]
+    ang = angles[mask]
+    w = np.exp(-((d / sigma)**2))
+    front = np.maximum(1.2 - np.abs(ang) / (np.pi / 2.0), 0.3)
+    return float(np.sum(-w * front * np.sin(ang)))

@@ -303,28 +303,34 @@ class BoatEnv:
 
         # 파도-장애물 물리 상호작용 (Wave Absorption & Frothy Micro-Bubble Scattering)
         if len(self.wakes) > 0 and len(self.dynamic_obstacles) > 0:
-            for w in self.wakes:
-                for ox, oy, ob_r in self.dynamic_obstacles:
-                    dx = w[0] - ox; dy = w[1] - oy
-                    dist = math.hypot(dx, dy)
-                    
-                    # 1. 장애물 내부로 들어간 파도는 완전히 소멸/흡수 (Absorption)
-                    if dist < ob_r + 2:
-                        w[3] = 0
-                        break
-                    
-                    # 2. 장애물 둘레에 파도가 닿으면 자글자글한 초미세 나노 거품 파편들이 반사 산란 (Nano-Spray Droplets)
-                    if abs(dist - (w[2] + ob_r)) < 5.0 and w[3] > 35:
-                        if random.random() < 0.35:
-                            for _ in range(random.randint(2, 4)):
-                                angle = math.atan2(dy, dx) + random.uniform(-0.8, 0.8)
-                                spd = random.uniform(0.8, 1.8)
-                                fx = ox + math.cos(angle) * (ob_r + random.uniform(0.8, 2.2))
-                                fy = oy + math.sin(angle) * (ob_r + random.uniform(0.8, 2.2))
-                                self.reflected_wakes.append([
-                                    fx, fy, random.uniform(0.3, 0.65), w[3] * 0.85,
-                                    math.cos(angle) * spd, math.sin(angle) * spd
-                                ])
+            bx, by = self.boat_pos
+            dx_b = self.dynamic_obstacles[:, 0] - bx
+            dy_b = self.dynamic_obstacles[:, 1] - by
+            near_mask = dx_b * dx_b + dy_b * dy_b < 180.0 * 180.0
+            if np.any(near_mask):
+                near_obs = self.dynamic_obstacles[near_mask]
+                for w in self.wakes:
+                    for ox, oy, ob_r in near_obs:
+                        dx = w[0] - ox; dy = w[1] - oy
+                        dist = math.hypot(dx, dy)
+                        
+                        # 1. 장애물 내부로 들어간 파도는 완전히 소멸/흡수 (Absorption)
+                        if dist < ob_r + 2:
+                            w[3] = 0
+                            break
+                        
+                        # 2. 장애물 둘레에 파도가 닿으면 자글자글한 초미세 나노 거품 파편들이 반사 산란 (Nano-Spray Droplets)
+                        if abs(dist - (w[2] + ob_r)) < 5.0 and w[3] > 35:
+                            if random.random() < 0.35:
+                                for _ in range(random.randint(2, 4)):
+                                    angle = math.atan2(dy, dx) + random.uniform(-0.8, 0.8)
+                                    spd = random.uniform(0.8, 1.8)
+                                    fx = ox + math.cos(angle) * (ob_r + random.uniform(0.8, 2.2))
+                                    fy = oy + math.sin(angle) * (ob_r + random.uniform(0.8, 2.2))
+                                    self.reflected_wakes.append([
+                                        fx, fy, random.uniform(0.3, 0.65), w[3] * 0.85,
+                                        math.cos(angle) * spd, math.sin(angle) * spd
+                                    ])
 
     def collide(self):
         bx, by = self.boat_pos
