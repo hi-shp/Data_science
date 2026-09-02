@@ -18,7 +18,7 @@ def cubic_bezier(p0, p1, p2, p3, n=90):
     B = (1-T)**3 * p0 + 3*(1-T)**2*T*p1 + 3*(1-T)*T**2*p2 + T**3*p3
     return B
 
-def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=25, min_clearance=35.0):
+def make_bezier_path(boat_pos, boat_heading, goal):
     d = np.linalg.norm(goal - boat_pos)
     if d < 1:
         return None
@@ -26,12 +26,12 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     p0 = boat_pos.copy()
     p3 = goal.copy()
 
-    # 각도 편차에 따른 전방 제어점 거리 축소 (관성으로 인한 외측 쏠림 방지 및 타이트한 직진 추종)
+    # 각도 편차에 따른 전방 제어점 거리 축소 (관성으로 인한 외측 쏠림 방지)
     v_to_goal = p3 - p0
     goal_angle = math.atan2(v_to_goal[1], v_to_goal[0])
     ang_diff = abs(wrap(goal_angle - boat_heading))
     
-    # 꺾이는 각도가 클수록 전방 돌출을 줄이고 곡선 시작점을 당겨 즉각적인 회전 유도 (예전의 직관적인 곡률)
+    # 꺾이는 각도가 클수록 전방 돌출을 줄이고 곡선 시작점을 당겨 즉각적인 회전 유도
     forward_dist = min(65, d * 0.35) * max(0.25, math.cos(ang_diff * 0.5))
     
     forward = np.array([math.cos(boat_heading), math.sin(boat_heading)])
@@ -42,46 +42,6 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     v_goal_n = np.zeros(2) if norm_v_goal < 1e-6 else v_goal / norm_v_goal
         
     p2 = p3 - v_goal_n * min(65, d * 0.35)
-
-    # 장애물 회피를 위한 베지어 제어점(p1, p2) 외측 굴곡/우회 처리 (Obstacle-avoiding Bezier curve deflection)
-    if obstacles is not None and len(obstacles) > 0:
-        nominal_pts = cubic_bezier(p0, p1, p2, p3, n=30)
-        
-        u_dir = (p3 - p0) / d
-        n_dir = np.array([-u_dir[1], u_dir[0]], dtype=np.float32)
-        
-        shift_p1 = np.zeros(2, dtype=np.float32)
-        shift_p2 = np.zeros(2, dtype=np.float32)
-        
-        for (ox, oy, orad) in obstacles:
-            obs_pos = np.array([ox, oy], dtype=np.float32)
-            vec_obs = obs_pos - p0
-            proj = np.dot(vec_obs, u_dir)
-            
-            # 장애물이 출발점과 도착점 전방 구간에 위치하는 경우
-            if 0 < proj < d:
-                dists = np.linalg.norm(nominal_pts - obs_pos, axis=1)
-                min_idx = np.argmin(dists)
-                min_dist = dists[min_idx]
-                t_idx = min_idx / 29.0
-                
-                safe_margin = orad + boat_radius + min_clearance
-                encroach = safe_margin - min_dist
-                
-                if encroach > 0:
-                    side = np.dot(obs_pos - p0, n_dir)
-                    push_dir = -n_dir if side >= 0 else n_dir
-                    
-                    push_mag = min(130.0, encroach * 1.6)
-                    
-                    w1 = max(0.2, 1.0 - t_idx * 0.7)
-                    w2 = max(0.2, t_idx * 0.7 + 0.3)
-                    
-                    shift_p1 += push_dir * (push_mag * w1)
-                    shift_p2 += push_dir * (push_mag * w2)
-                    
-        p1 = p1 + shift_p1
-        p2 = p2 + shift_p2
 
     return cubic_bezier(p0, p1, p2, p3, n=90)
 
