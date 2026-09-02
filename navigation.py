@@ -103,7 +103,12 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         mx, my = mid
         rel = mid - boat_pos
         distm = np.linalg.norm(rel) + 1e-6
+        dist_mid_to_target = np.linalg.norm(target_pos - mid)
         
+        # 1. 갭(mid)이 현재 위치보다 목적지에 실질적으로(최소 30px 이상) 가까워져야 함 (1픽셀 차이 측방/미미한 전진 갭 배제)
+        if dist_mid_to_target >= dist_to_target - 30.0:
+            continue
+            
         forward_progress = np.dot(rel / distm, gps_vec)
         # 목적지 방향 전진 성분이 부족하거나(측면/후방 회피) 목적지보다 멀면 제외
         min_progress = 0.55 if dist_to_target < 300 else 0.40
@@ -113,8 +118,8 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         ang_mid = math.atan2(rel[1], rel[0])
         ang_err = wrap(ang_mid - gps_heading)
         
-        # 목적지 방향과 45도 이상 어긋나는 무리한 측방 갭 제외
-        if abs(ang_err) > np.deg2rad(45):
+        # 목적지 방향과 40도 이상 어긋나는 무리한 측방 갭 제외
+        if abs(ang_err) > np.deg2rad(40):
             continue
             
         gx = int(mx // GRID)

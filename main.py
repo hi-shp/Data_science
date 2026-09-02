@@ -64,13 +64,19 @@ def run():
                 vec_to_wp = env.current_wp["pos"] - env.boat_pos
                 dnow = np.linalg.norm(vec_to_wp)
                 
+                # 1. 웨이포인트 근접 시 해제 (25px 이내)
                 if dnow < 25:
                     should_clear = True
                     
                 wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
                 angle_diff = abs(wrap(wp_angle - env.boat_heading))
                 
+                # 2. 웨이포인트를 지나쳐 측후방으로 넘어가면 즉시 해제하여 직진
                 if angle_diff > np.pi / 2:
+                    should_clear = True
+                    
+                # 3. 선박 위치에서 목적지까지 장애물이 없으면 즉시 해제하여 목적지 직행
+                if target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
                     should_clear = True
                     
                 if should_clear:
@@ -104,19 +110,23 @@ def run():
                             env.current_wp = new_wp
                             
             if env.current_wp is not None and not clear_to_target:
-                temp_visited = env.visited.copy()
-                temp_visited.add(env.current_wp["pair"])
-                temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
-                
-                vec = env.current_wp["pos"] - env.boat_pos
-                next_head = math.atan2(vec[1], vec[0])
-                
-                env.next_wp = find_gap(
-                    env.clusters, env.cluster_ids,
-                    env.current_wp["pos"], next_head,
-                    env.target, temp_visited,
-                    env.grid, env.dynamic_obstacles
-                )
+                # 현재 웨이포인트에서 목적지까지 장애물이 없으면 다음 웨이포인트를 찾지 않고 목적지 방향 직결
+                if target_is_clear(env.current_wp["pos"], env.target, env.dynamic_obstacles):
+                    env.next_wp = None
+                else:
+                    temp_visited = env.visited.copy()
+                    temp_visited.add(env.current_wp["pair"])
+                    temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
+                    
+                    vec = env.current_wp["pos"] - env.boat_pos
+                    next_head = math.atan2(vec[1], vec[0])
+                    
+                    env.next_wp = find_gap(
+                        env.clusters, env.cluster_ids,
+                        env.current_wp["pos"], next_head,
+                        env.target, temp_visited,
+                        env.grid, env.dynamic_obstacles
+                    )
             else:
                 env.next_wp = None
 
@@ -136,7 +146,7 @@ def run():
                     env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     
                 if env.bezier_path is not None:
-                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=65)
+                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)
                     
                 if env.current_wp is not None and env.next_wp is not None:
                     vec = env.current_wp["pos"] - env.boat_pos
@@ -152,7 +162,7 @@ def run():
 
             if env.current_wp is not None and env.next_pursuit_target is not None and env.pursuit_target is not None:
                 dist_to_wp = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                if dist_to_wp < 90:
+                if dist_to_wp < 50:
                     env.pursuit_target = env.next_pursuit_target
 
             steer = env.update_steering(dists)

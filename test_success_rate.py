@@ -115,6 +115,8 @@ Elapsed Time:    {elapsed/60.0:.1f} minutes ({elapsed:.1f} seconds)
                 angle_diff = abs(wrap(wp_angle - env.boat_heading))
                 if angle_diff > np.pi / 2:
                     should_clear = True
+                if target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
+                    should_clear = True
                 if should_clear:
                     p = env.current_wp["pair"]
                     env.visited.add(p)
@@ -145,17 +147,20 @@ Elapsed Time:    {elapsed/60.0:.1f} minutes ({elapsed:.1f} seconds)
                             env.current_wp = new_wp
 
             if env.current_wp is not None and not clear_to_target:
-                temp_visited = env.visited.copy()
-                temp_visited.add(env.current_wp["pair"])
-                temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
-                vec = env.current_wp["pos"] - env.boat_pos
-                next_head = math.atan2(vec[1], vec[0])
-                env.next_wp = find_gap(
-                    env.clusters, env.cluster_ids,
-                    env.current_wp["pos"], next_head,
-                    env.target, temp_visited,
-                    env.grid, env.dynamic_obstacles
-                )
+                if target_is_clear(env.current_wp["pos"], env.target, env.dynamic_obstacles):
+                    env.next_wp = None
+                else:
+                    temp_visited = env.visited.copy()
+                    temp_visited.add(env.current_wp["pair"])
+                    temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
+                    vec = env.current_wp["pos"] - env.boat_pos
+                    next_head = math.atan2(vec[1], vec[0])
+                    env.next_wp = find_gap(
+                        env.clusters, env.cluster_ids,
+                        env.current_wp["pos"], next_head,
+                        env.target, temp_visited,
+                        env.grid, env.dynamic_obstacles
+                    )
             else:
                 env.next_wp = None
 
