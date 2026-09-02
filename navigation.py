@@ -13,21 +13,25 @@ def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25):
     if dist_t2 < 1e-6:
         return True
         
+    dist_t = math.sqrt(dist_t2)
+    ux = vx / dist_t
+    uy = vy / dist_t
+    
     ox = obstacles[:, 0]
     oy = obstacles[:, 1]
-    # 직선 판정 안전 여유를 10px로 확대하여 장애물 인근 아슬아슬한 직진 방지
-    orad = obstacles[:, 2] + boat_radius + 10 
+    orad = obstacles[:, 2] + boat_radius + 4.0  # 안전 여유 4px
     
     px = ox - bx
     py = oy - by
-    t = (px * vx + py * vy) / dist_t2
+    proj = px * ux + py * uy
     
-    valid = (t >= 0.0) & (t <= 1.0)
+    # 선박 바로 옆에 있거나(proj < 10) 이미 지나친 장애물은 전방 직선 경로를 가로막지 않음
+    valid = (proj >= 10.0) & (proj <= dist_t)
     if not np.any(valid):
         return True
         
-    cx = bx + t[valid] * vx
-    cy = by + t[valid] * vy
+    cx = bx + proj[valid] * ux
+    cy = by + proj[valid] * uy
     d2 = (ox[valid] - cx)**2 + (oy[valid] - cy)**2
     
     return not np.any(d2 <= orad[valid]**2)
@@ -52,6 +56,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     dist_to_target = math.hypot(dx_t, dy_t)
     gps_heading = math.atan2(dy_t, dx_t)
 
+    # 목적지까지 직선 경로가 열려있으면 웨이포인트를 생성하지 않고 즉시 직행
     if target_is_clear(boat_pos, target_pos, obstacles):
         return None
         
@@ -61,12 +66,12 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     for i, c in enumerate(clusters):
         v = c - boat_pos
         dist = np.linalg.norm(v)
-        # 목적지보다 멀거나 전방 탐색각(75도)을 벗어난 측방/후방 장애물 엄격 제외
+        # 목적지보다 멀거나 전방 탐색각(65도)을 벗어난 측방/후방 장애물 엄격 제외
         if dist > dist_to_target - 25:
             continue
             
         ang = wrap(math.atan2(v[1], v[0]) - boat_heading)
-        if abs(ang) < np.deg2rad(75):
+        if abs(ang) < np.deg2rad(65):
             items.append((ang, dist, c, ids[i]))
             
     if len(items) < 2:
@@ -99,9 +104,17 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         rel = mid - boat_pos
         distm = np.linalg.norm(rel) + 1e-6
         
-        # 웨이포인트(mid)가 목적지 방향으로 전진하지 않거나(측면/후방) 목적지보다 멀면 무조건 제외
         forward_progress = np.dot(rel / distm, gps_vec)
-        if forward_progress < 0.25 or distm > dist_to_target - 20:
+        # 목적지 방향 전진 성분이 부족하거나(측면/후방 회피) 목적지보다 멀면 제외
+        min_progress = 0.55 if dist_to_target < 300 else 0.40
+        if forward_progress < min_progress or distm > dist_to_target - 25:
+            continue
+            
+        ang_mid = math.atan2(rel[1], rel[0])
+        ang_err = wrap(ang_mid - gps_heading)
+        
+        # 목적지 방향과 45도 이상 어긋나는 무리한 측방 갭 제외
+        if abs(ang_err) > np.deg2rad(45):
             continue
             
         gx = int(mx // GRID)
@@ -117,9 +130,6 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
                         break
             if blocked: break
         if blocked: continue
-        
-        ang_mid = math.atan2(rel[1], rel[0])
-        ang_err = wrap(ang_mid - gps_heading)
         
         heading_align = math.exp(-(ang_err / 0.9)**2)
         
