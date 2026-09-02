@@ -1,18 +1,18 @@
 {
-  "steer_gain": 0.7752,
+  "steer_gain": 0.852,
   "steer_alpha": 0.3515,
   "mom_coeff": 0.00665,
   "pwm_rng": 270.36,
   "avoid_normal": 0.05,
   "avoid_em": 0.8,
-  "clear_margin": 2.15,
+  "clear_margin": 10,
   "em_enter": 125.0,
   "em_exit": 160.0,
   "em_hold_frames": 18,
-  "align_exp": 5.0,
+  "align_exp": 6.0,
   "fwd_exp": 3.0,
   "clear_exp": 1.5,
   "width_exp": 0.2,
   "cluster_pen_w": 0.5,
-  "wp_switch_thresh": 1.15
+  "wp_switch_thresh": 1.0
 }
