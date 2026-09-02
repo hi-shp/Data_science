@@ -55,7 +55,7 @@ class BoatEnv:
         self.mass = 13
         self.inertia = 5
         self.drag = 0.2
-        self.rot_drag = 0.1
+        self.rot_drag = 0.2
         self.boat_radius = 25
         
         # 선체 표면 기하 형상 (ui_renderer의 선체 렌더링과 100% 일치하는 정밀 히트박스)
@@ -220,7 +220,7 @@ class BoatEnv:
         tR = self.pwm_to_thrust(R)
         # 220도 범위 내 최소 장애물 거리에 따른 순수 연속 함수 속도 제어 (장애물 근접 시 최소 속도를 더욱 낮추어 서행)
         em_dist = float(getattr(self, 'min_wide_dist', 999.0))
-        speed_factor = (math.tanh(em_dist / 110.0)) ** 1.85
+        speed_factor = (math.tanh(em_dist / 100.0)) ** 1.15
         target_fwd = ((tL + tR) / 6.0) * speed_factor
             
         if not hasattr(self, 'current_fwd'):
