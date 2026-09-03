@@ -51,7 +51,7 @@ class BoatEnv:
                 pass
          
         self.lidar_beams = 180
-        self.lidar_range = 300
+        self.lidar_range = 350
         self.rel_angles = np.linspace(-np.pi, np.pi, self.lidar_beams, endpoint=False)
         
         self.mass = 14

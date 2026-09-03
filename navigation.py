@@ -196,6 +196,9 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             continue
             
             
+        ang_mid = math.atan2(rel[1], rel[0])
+        ang_err = wrap(ang_mid - gps_heading)
+        
         gx = int(mx // GRID)
         gy = int(my // GRID)
         blocked = False
