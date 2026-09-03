@@ -1,0 +1,262 @@
+[
+  {
+    "case_id": "S1_fwd_5.5",
+    "params": {
+      "align_exp": 8.0,
+      "fwd_exp": 5.5,
+      "clear_exp": 100.0
+    },
+    "success_rate": 90.0,
+    "collision_rate": 10.0,
+    "timeout_count": 0,
+    "avg_frames": 1434.76,
+    "fitness": 848.852192
+  },
+  {
+    "case_id": "S2_AF_a5.0_f6.5",
+    "params": {
+      "align_exp": 5.0,
+      "fwd_exp": 6.5,
+      "clear_exp": 70
+    },
+    "success_rate": 89.0,
+    "collision_rate": 11.0,
+    "timeout_count": 0,
+    "avg_frames": 1409.27,
+    "fitness": 833.872584
+  },
+  {
+    "case_id": "S1_clear_70",
+    "params": {
+      "align_exp": 8.0,
+      "fwd_exp": 5.0,
+      "clear_exp": 70
+    },
+    "success_rate": 89.0,
+    "collision_rate": 11.0,
+    "timeout_count": 0,
+    "avg_frames": 1425.31,
+    "fitness": 833.859752
+  },
+  {
+    "case_id": "S1_clear_90",
+    "params": {
+      "align_exp": 8.0,
+      "fwd_exp": 5.0,
+      "clear_exp": 90
+    },
+    "success_rate": 88.0,
+    "collision_rate": 12.0,
+    "timeout_count": 0,
+    "avg_frames": 1398.33,
+    "fitness": 818.881336
+  },
+  {
+    "case_id": "S2_AF_a5.5_f4.0",
+    "params": {
+      "align_exp": 5.5,
+      "fwd_exp": 4.0,
+      "clear_exp": 70
+    },
+    "success_rate": 88.0,
+    "collision_rate": 12.0,
+    "timeout_count": 0,
+    "avg_frames": 1433.64,
+    "fitness": 818.853088
+  },
+  {
+    "case_id": "S1_fwd_3.5",
+    "params": {
+      "align_exp": 8.0,
+      "fwd_exp": 3.5,
+      "clear_exp": 100.0
+    },
+    "success_rate": 87.0,
+    "collision_rate": 13.0,
+    "timeout_count": 0,
+    "avg_frames": 1401.2,
+    "fitness": 803.87904
+  },
+  {
+    "case_id": "S2_AF_a5.5_f6.0",
+    "params": {
+      "align_exp": 5.5,
+      "fwd_exp": 6.0,
+      "clear_exp": 70
+    },
+    "success_rate": 86.0,
+    "collision_rate": 14.000000000000002,
+    "timeout_count": 0,
+    "avg_frames": 1388.02,
+    "fitness": 788.889584
+  },
+  {
+    "case_id": "S1_clear_80",
+    "params": {
+      "align_exp": 8.0,
+      "fwd_exp": 5.0,
+      "clear_exp": 80
+    },
+    "success_rate": 86.0,
+    "collision_rate": 14.000000000000002,
+    "timeout_count": 0,
+    "avg_frames": 1394.76,
+    "fitness": 788.884192
+  },
+  {
+    "case_id": "S1_align_5.0",
+    "params": {
+      "align_exp": 5.0,
+      "fwd_exp": 5.0,
+      "clear_exp": 100.0
+    },
+    "success_rate": 86.0,
+    "collision_rate": 14.000000000000002,
+    "timeout_count": 0,
+    "avg_frames": 1403.09,
+    "fitness": 788.877528
+  },
+  {
+    "case_id": "S1_fwd_4.0",
+    "params": {
+      "align_exp": 8.0,
+      "fwd_exp": 4.0,
+      "clear_exp": 100.0
+    },
+    "success_rate": 85.0,
+    "collision_rate": 15.0,
+    "timeout_count": 0,
+    "avg_frames": 1393.38,
+    "fitness": 773.885296
+  },
+  {
+    "case_id": "S1_clear_115",
+    "params": {
+      "align_exp": 8.0,
+      "fwd_exp": 5.0,
+      "clear_exp": 115
+    },
+    "success_rate": 85.0,
+    "collision_rate": 15.0,
+    "timeout_count": 0,
+    "avg_frames": 1398.63,
+    "fitness": 773.881096
+  },
+  {
+    "case_id": "S2_AF_a5.0_f8.0",
+    "params": {
+      "align_exp": 5.0,
+      "fwd_exp": 8.0,
+      "clear_exp": 70
+    },
+    "success_rate": 85.0,
+    "collision_rate": 15.0,
+    "timeout_count": 0,
+    "avg_frames": 1425.3,
+    "fitness": 773.85976
+  },
+  {
+    "case_id": "S1_fwd_5.0",
+    "params": {
+      "align_exp": 8.0,
+      "fwd_exp": 5.0,
+      "clear_exp": 100.0
+    },
+    "success_rate": 83.0,
+    "collision_rate": 17.0,
+    "timeout_count": 0,
+    "avg_frames": 1348.83,
+    "fitness": 743.920936
+  },
+  {
+    "case_id": "S1_clear_120",
+    "params": {
+      "align_exp": 8.0,
+      "fwd_exp": 5.0,
+      "clear_exp": 120
+    },
+    "success_rate": 83.0,
+    "collision_rate": 17.0,
+    "timeout_count": 0,
+    "avg_frames": 1374.11,
+    "fitness": 743.900712
+  },
+  {
+    "case_id": "S1_clear_110",
+    "params": {
+      "align_exp": 8.0,
+      "fwd_exp": 5.0,
+      "clear_exp": 110
+    },
+    "success_rate": 83.0,
+    "collision_rate": 17.0,
+    "timeout_count": 0,
+    "avg_frames": 1380.95,
+    "fitness": 743.89524
+  },
+  {
+    "case_id": "S1_align_6.5",
+    "params": {
+      "align_exp": 6.5,
+      "fwd_exp": 5.0,
+      "clear_exp": 100.0
+    },
+    "success_rate": 83.0,
+    "collision_rate": 17.0,
+    "timeout_count": 0,
+    "avg_frames": 1389.97,
+    "fitness": 743.888024
+  },
+  {
+    "case_id": "S1_align_6.0",
+    "params": {
+      "align_exp": 6.0,
+      "fwd_exp": 5.0,
+      "clear_exp": 100.0
+    },
+    "success_rate": 83.0,
+    "collision_rate": 17.0,
+    "timeout_count": 0,
+    "avg_frames": 1393.56,
+    "fitness": 743.885152
+  },
+  {
+    "case_id": "S1_clear_100",
+    "params": {
+      "align_exp": 8.0,
+      "fwd_exp": 5.0,
+      "clear_exp": 100
+    },
+    "success_rate": 83.0,
+    "collision_rate": 17.0,
+    "timeout_count": 0,
+    "avg_frames": 1399.69,
+    "fitness": 743.880248
+  },
+  {
+    "case_id": "S2_AF_a5.5_f3.5",
+    "params": {
+      "align_exp": 5.5,
+      "fwd_exp": 3.5,
+      "clear_exp": 70
+    },
+    "success_rate": 82.0,
+    "collision_rate": 18.0,
+    "timeout_count": 0,
+    "avg_frames": 1347.63,
+    "fitness": 728.921896
+  },
+  {
+    "case_id": "S2_AF_a5.0_f5.5",
+    "params": {
+      "align_exp": 5.0,
+      "fwd_exp": 5.5,
+      "clear_exp": 70
+    },
+    "success_rate": 82.0,
+    "collision_rate": 18.0,
+    "timeout_count": 0,
+    "avg_frames": 1349.16,
+    "fitness": 728.920672
+  }
+]

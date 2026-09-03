@@ -195,12 +195,6 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         if forward_progress < min_progress or distm > dist_to_target - 25:
             continue
             
-        ang_mid = math.atan2(rel[1], rel[0])
-        ang_err = wrap(ang_mid - gps_heading)
-        
-        # 목적지 방향과 40도 이상 어긋나는 무리한 측방 갭 제외
-        if abs(ang_err) > np.deg2rad(40):
-            continue
             
         gx = int(mx // GRID)
         gy = int(my // GRID)
