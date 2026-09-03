@@ -35,7 +35,7 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     # 1. 장애물이 없는 목적지 직행 상황: 곡률을 대폭 줄여 목적지를 향해 직선에 가깝게 직행
     if obstacles is None or len(obstacles) == 0:
         speed_ratio = np.clip(boat_speed / 80.0, 0.0, 1.0)
-        forward_dist = min(75.0, d * 0.20) * max(0.15, math.cos(ang_diff * 0.5)) * (1.0 - 0.25 * speed_ratio)
+        forward_dist = min(35.0, d * 0.20) * max(0.15, math.cos(ang_diff * 0.5)) * (1.0 - 0.25 * speed_ratio)
         p1 = boat_pos + forward * forward_dist
 
         v_goal = p3 - p1

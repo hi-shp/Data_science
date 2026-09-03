@@ -1,18 +1,18 @@
 ============================================================
               SUCCESS RATE EVALUATION REPORT
 ============================================================
-Status:          IN PROGRESS (166/10000)
-Last Updated:    2026-09-03 20:17:34
+Status:          IN PROGRESS (10/10000)
+Last Updated:    2026-09-03 20:21:13
 Total Episodes:  10,000
-Completed:       166 / 10,000 (1.66%)
+Completed:       10 / 10,000 (0.10%)
 
-Success Count:   1
-Collision Count: 165
+Success Count:   9
+Collision Count: 1
 
 ------------------------------------------------------------
->> SUCCESS RATE:   0.60 %
->> COLLISION RATE: 99.40 %
+>> SUCCESS RATE:   90.00 %
+>> COLLISION RATE: 10.00 %
 ------------------------------------------------------------
-Elapsed Time:    0.01 hours (0.9 min)
-Estimated ETA:   0.85 hours (51.0 min)
+Elapsed Time:    0.02 hours (1.5 min)
+Estimated ETA:   24.37 hours (1462.1 min)
 ============================================================
