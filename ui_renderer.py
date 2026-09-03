@@ -104,13 +104,12 @@ class EnvRenderer:
             pygame.draw.circle(env.screen, (255, 255, 255), (int(ox - 1), int(oy - 1)), int(r * 0.40))
             pygame.draw.circle(env.screen, (255, 255, 255), (int(ox), int(oy)), int(r * 0.20))
             
-        env.occ_surf.fill((0, 0, 0, 0))
-        occ = np.where(env.grid >= 3)
-        for gy, gx in zip(occ[0], occ[1]):
-            x = gx * 4
-            y = gy * 4
-            pygame.draw.rect(env.occ_surf, (220, 50, 50, 60), (x, y, 4, 4))
-        env.screen.blit(env.occ_surf, (0, 0))
+        occ_y, occ_x = np.where(env.grid >= 3)
+        if len(occ_x) > 0:
+            env.occ_surf.fill((0, 0, 0, 0))
+            for gx, gy in zip(occ_x, occ_y):
+                pygame.draw.rect(env.occ_surf, (220, 50, 50, 60), (gx * 4, gy * 4, 4, 4))
+            env.screen.blit(env.occ_surf, (0, 0))
             
         if env.show_lidar:
             for p in hits:
@@ -749,10 +748,12 @@ class EnvRenderer:
             path_len_m = float(np.sum(np.hypot(np.diff(pts[:, 0]), np.diff(pts[:, 1])))) / 50.0
             end_ym = ym[-1]
             
-            # 실시간 3차 함수 계수 계산 (y(0) = 0 제약 최소자승법)
+            # 실시간 3차 함수 계수 고속 계산 (y(0) = 0 제약 정규방정식 연산)
             if len(xm) >= 4 and (np.max(xm) - np.min(xm)) > 0.3:
                 A = np.stack([xm**3, xm**2, xm], axis=1)
-                (a, b, c), _, _, _ = np.linalg.lstsq(A, ym, rcond=None)
+                ATA = A.T @ A
+                ATA[0, 0] += 1e-4; ATA[1, 1] += 1e-4; ATA[2, 2] += 1e-4
+                a, b, c = np.linalg.solve(ATA, A.T @ ym)
             else:
                 a, b, c = 0.0, 0.0, 0.0
                 

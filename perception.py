@@ -43,7 +43,9 @@ def lidar_hits_np(boat_pos, boat_heading, rel_angles, obstacles, lidar_range):
     valid = d_final < lidar_range
     hits_x = x0 + vx[:, 0] * d_final
     hits_y = y0 + vy[:, 0] * d_final
-    hits = [(float(hx), float(hy)) if v else None for hx, hy, v in zip(hits_x, hits_y, valid)]
+    hits = [None] * len(d_final)
+    for idx in np.where(valid)[0]:
+        hits[idx] = (float(hits_x[idx]), float(hits_y[idx]))
 
     return d_final, hits
 
@@ -51,16 +53,13 @@ def init_grid():
     return np.zeros((GRID_H, GRID_W), dtype=np.float32)
 
 def update_grid(grid, hits):
-    valid_pts = [p for p in hits if p is not None]
-    if not valid_pts:
-        return
-    pts = np.asarray(valid_pts, dtype=np.float32)
-    gx = (pts[:, 0] // GRID).astype(np.int32)
-    gy = (pts[:, 1] // GRID).astype(np.int32)
-    valid = (gx >= 0) & (gx < GRID_W) & (gy >= 0) & (gy < GRID_H)
-    if np.any(valid):
-        np.add.at(grid, (gy[valid], gx[valid]), 1.0)
-        np.clip(grid, 0.0, 20.0, out=grid)
+    for p in hits:
+        if p is not None:
+            gx = int(p[0] // GRID)
+            gy = int(p[1] // GRID)
+            if 0 <= gx < GRID_W and 0 <= gy < GRID_H:
+                if grid[gy, gx] < 20.0:
+                    grid[gy, gx] += 1.0
 
 def extract_clusters_from_grid(grid):
     OCC = 2.0

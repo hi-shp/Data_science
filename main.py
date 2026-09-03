@@ -35,9 +35,11 @@ def run():
 
         # 실시간 배속 설정에 따른 서브스텝 반복 실행
         sub_steps = max(1, int(getattr(env, 'sim_speed', 1)))
+        plan_interval = 1 if sub_steps <= 2 else (2 if sub_steps <= 8 else 3)
         hits = None
+        new_wp = None
         
-        for _ in range(sub_steps):
+        for step_idx in range(sub_steps):
             env.frame += 1
             env.update_dynamic_obstacles()
 
@@ -50,36 +52,40 @@ def run():
             update_grid(env.grid, hits)
             env.grid *= 0.945
 
-            new_c = extract_clusters_from_grid(env.grid)
-            env.clusters, env.cluster_ids = match_clusters(
-                env.clusters, env.cluster_ids, new_c
-            )
-
-            dist_to_target = np.linalg.norm(env.target - env.boat_pos)
-            boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
-            clear_to_target = is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd)
-
-            # 목적지까지 회전 궤적 및 직선 경로에 장애물이 전혀 없을 때만 목적지 직행
-            if clear_to_target:
-                new_wp = None
-                env.current_wp = None
-                env.next_wp = None
-                env.candidate_wps = []
-            else:
-                # 경로 상에 장애물이 있으면 장애물 사이 갭(웨이포인트)을 찾아 안전하게 우회
-                new_wp = find_gap(
-                    env.clusters, env.cluster_ids,
-                    env.boat_pos, env.boat_heading,
-                    env.target, env.visited,
-                    env.grid, env.dynamic_obstacles,
-                    params=env.params
+            # 연산 부하 절감을 위한 적응형 인지/탐색 주기
+            if step_idx % plan_interval == 0 or step_idx == sub_steps - 1:
+                new_c = extract_clusters_from_grid(env.grid)
+                env.clusters, env.cluster_ids = match_clusters(
+                    env.clusters, env.cluster_ids, new_c
                 )
-                if new_wp is not None:
-                    env.candidate_wps = new_wp.get("candidates", [])
-                elif env.current_wp is not None:
-                    env.candidate_wps = env.current_wp.get("candidates", [])
-                else:
+
+                dist_to_target = np.linalg.norm(env.target - env.boat_pos)
+                boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
+                clear_to_target = is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd)
+
+                # 목적지까지 회전 궤적 및 직선 경로에 장애물이 전혀 없을 때만 목적지 직행
+                if clear_to_target:
+                    new_wp = None
+                    env.current_wp = None
+                    env.next_wp = None
                     env.candidate_wps = []
+                else:
+                    # 경로 상에 장애물이 있으면 장애물 사이 갭(웨이포인트)을 찾아 안전하게 우회
+                    new_wp = find_gap(
+                        env.clusters, env.cluster_ids,
+                        env.boat_pos, env.boat_heading,
+                        env.target, env.visited,
+                        env.grid, env.dynamic_obstacles,
+                        params=env.params
+                    )
+                    if new_wp is not None:
+                        env.candidate_wps = new_wp.get("candidates", [])
+                    elif env.current_wp is not None:
+                        env.candidate_wps = env.current_wp.get("candidates", [])
+                    else:
+                        env.candidate_wps = []
+            else:
+                boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
 
             if env.current_wp is not None:
                 should_clear = False
