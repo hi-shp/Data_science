@@ -509,12 +509,13 @@ class EnvRenderer:
 
         # 웨이포인트 및 최종 목표 지점 수직 오버레이 신호선
         marker_objs = []
-        if env.show_path1 and env.current_wp is not None:
+        show_paths = getattr(env, 'show_paths', True)
+        if show_paths and env.current_wp is not None:
             dx_w = env.current_wp["pos"][0] - bx; dy_w = env.current_wp["pos"][1] - by
             lf_w = dx_w * f_vec[0] + dy_w * f_vec[1]; lr_w = dx_w * r_vec[0] + dy_w * r_vec[1]
             marker_objs.append(('wp1', lf_w, lr_w))
 
-        if env.show_path2 and env.next_wp is not None:
+        if show_paths and env.next_wp is not None:
             dx_w2 = env.next_wp["pos"][0] - bx; dy_w2 = env.next_wp["pos"][1] - by
             lf_w2 = dx_w2 * f_vec[0] + dy_w2 * f_vec[1]; lr_w2 = dx_w2 * r_vec[0] + dy_w2 * r_vec[1]
             marker_objs.append(('wp2', lf_w2, lr_w2))
@@ -599,12 +600,12 @@ class EnvRenderer:
 
         # 라이다 거릿값 막대 위에 오버레이되는 웨이포인트 및 최종 목표 지점 핀 마커
         overlay_objs = []
-        if env.show_path1 and env.current_wp is not None:
+        if show_paths and env.current_wp is not None:
             dx_w = env.current_wp["pos"][0] - bx; dy_w = env.current_wp["pos"][1] - by
             lf_w = dx_w * f_vec[0] + dy_w * f_vec[1]; lr_w = dx_w * r_vec[0] + dy_w * r_vec[1]
             if lf_w > 2.0: overlay_objs.append(('wp1', lf_w, lr_w))
 
-        if env.show_path2 and env.next_wp is not None:
+        if show_paths and env.next_wp is not None:
             dx_w2 = env.next_wp["pos"][0] - bx; dy_w2 = env.next_wp["pos"][1] - by
             lf_w2 = dx_w2 * f_vec[0] + dy_w2 * f_vec[1]; lr_w2 = dx_w2 * r_vec[0] + dy_w2 * r_vec[1]
             if lf_w2 > 2.0: overlay_objs.append(('wp2', lf_w2, lr_w2))
