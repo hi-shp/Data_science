@@ -165,14 +165,6 @@ Estimated ETA:   {eta_str}
                     env.target, temp_visited,
                     env.grid, env.dynamic_obstacles
                 )
-                if env.next_wp is None:
-                    env.next_wp = {
-                        "pos": env.target.copy(),
-                        "c1": env.target + np.array([0.0, -15.0]),
-                        "c2": env.target + np.array([0.0, 15.0]),
-                        "score": 999.0,
-                        "pair": (-1, -1)
-                    }
             else:
                 env.next_wp = None
 

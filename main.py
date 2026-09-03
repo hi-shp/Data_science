@@ -118,22 +118,13 @@ def run():
                 vec = env.current_wp["pos"] - env.boat_pos
                 next_head = math.atan2(vec[1], vec[0])
                 
-                # 2차 갭 탐색
+                # 2차 갭 탐색 (1차 웨이포인트 이후 전방에 장애물 갭이 존재하면 주황색 2차 웨이포인트로 표출)
                 env.next_wp = find_gap(
                     env.clusters, env.cluster_ids,
                     env.current_wp["pos"], next_head,
                     env.target, temp_visited,
                     env.grid, env.dynamic_obstacles
                 )
-                # 2차 장애물이 없더라도 목적지를 2차 웨이포인트로 지정하여 주황색 2차 경로가 항상 생성되도록 연결
-                if env.next_wp is None:
-                    env.next_wp = {
-                        "pos": env.target.copy(),
-                        "c1": env.target + np.array([0.0, -15.0]),
-                        "c2": env.target + np.array([0.0, 15.0]),
-                        "score": 999.0,
-                        "pair": (-1, -1)
-                    }
             else:
                 env.next_wp = None
 
