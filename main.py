@@ -5,7 +5,7 @@ import datetime
 import os
 from environment import BoatEnv
 from perception import lidar_hits_np, update_grid, extract_clusters_from_grid, match_clusters
-from navigation import find_gap, target_is_clear, is_direct_target_safe
+from navigation import find_gap, target_is_clear, is_direct_target_safe, is_waypoint_switch_safe
 from utils import wrap, make_bezier_path, pure_pursuit
 
 def run():
@@ -98,7 +98,8 @@ def run():
                     env.current_wp["c2"] = c2_now
                     env.current_wp["pos"] = (c1_now + c2_now) / 2.0
                 elif new_wp is not None:
-                    env.current_wp = new_wp
+                    if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd):
+                        env.current_wp = new_wp
 
             if new_wp is not None:
                 if env.current_wp is None:
@@ -108,7 +109,9 @@ def run():
                     if dist_to_curr > 80:
                         threshold = 1.1
                         if new_wp["score"] > env.current_wp["score"] * threshold:
-                            env.current_wp = new_wp
+                            # 새 웨이포인트로 선회하는 부채꼴 및 베지어 궤적 상에 정면 장애물이 없을 때만 안전하게 스위칭
+                            if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd):
+                                env.current_wp = new_wp
                             
             if env.current_wp is not None and not clear_to_target:
                 temp_visited = env.visited.copy()
