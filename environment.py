@@ -51,7 +51,7 @@ class BoatEnv:
                 pass
          
         self.lidar_beams = 180
-        self.lidar_range = 350
+        self.lidar_range = 320
         self.rel_angles = np.linspace(-np.pi, np.pi, self.lidar_beams, endpoint=False)
         
         self.mass = 14
@@ -85,7 +85,7 @@ class BoatEnv:
         
         self.obs_n = 80
         self.obs_r = 17
-        self.min_obs = 110
+        self.min_obs = 120
         
         self.grid = init_grid()
         self.clusters = []

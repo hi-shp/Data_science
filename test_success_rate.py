@@ -8,7 +8,7 @@ import numpy as np
 
 from environment import BoatEnv
 from perception import lidar_hits_np, update_grid, extract_clusters_from_grid, match_clusters
-from navigation import find_gap, target_is_clear, is_direct_target_safe, is_waypoint_switch_safe
+from navigation import find_gap, target_is_clear, is_direct_target_safe, is_waypoint_switch_safe, is_front_blocked
 from utils import wrap, make_bezier_path, pure_pursuit
 
 def main():
@@ -21,7 +21,7 @@ def main():
     collision_count = 0
     
     start_time = time.time()
-    out_file = "success_rate_1000.txt"
+    out_file = "success_rate_10000_20260903.txt"
     
     def save_report(is_final=False):
         elapsed = time.time() - start_time
@@ -57,7 +57,6 @@ Estimated ETA:   {eta_str}
             os.fsync(f.fileno())
         print(f"[{completed_episodes:5d}/{total_episodes}] Success: {success_count} ({sr:5.2f}%) | Collision: {collision_count} ({cr:5.2f}%) | Elapsed: {elapsed/60.0:.1f}m | ETA: {eta_str}", flush=True)
 
-    # 초기 파일 생성
     save_report(is_final=False)
 
     running = True
@@ -74,7 +73,6 @@ Estimated ETA:   {eta_str}
             env.clock.tick(30)
             continue
 
-        # 4배속 서브스텝 고속 반복 실행
         sub_steps = max(1, int(getattr(env, 'sim_speed', 4)))
         hits = None
         
@@ -104,13 +102,21 @@ Estimated ETA:   {eta_str}
                 new_wp = None
                 env.current_wp = None
                 env.next_wp = None
+                env.candidate_wps = []
             else:
                 new_wp = find_gap(
                     env.clusters, env.cluster_ids,
                     env.boat_pos, env.boat_heading,
                     env.target, env.visited,
-                    env.grid, env.dynamic_obstacles
+                    env.grid, env.dynamic_obstacles,
+                    params=env.params
                 )
+                if new_wp is not None:
+                    env.candidate_wps = new_wp.get("candidates", [])
+                elif env.current_wp is not None:
+                    env.candidate_wps = env.current_wp.get("candidates", [])
+                else:
+                    env.candidate_wps = []
 
             if env.current_wp is not None:
                 should_clear = False
@@ -129,6 +135,7 @@ Estimated ETA:   {eta_str}
                     env.visited.add(p)
                     env.visited.add((p[1], p[0]))
                     env.current_wp = None
+                    env.candidate_wps = []
 
             if env.current_wp is not None:
                 id1, id2 = env.current_wp["pair"]
@@ -140,6 +147,10 @@ Estimated ETA:   {eta_str}
                     env.current_wp["c1"] = c1_now
                     env.current_wp["c2"] = c2_now
                     env.current_wp["pos"] = (c1_now + c2_now) / 2.0
+                    if new_wp is not None and (new_wp["pair"] == env.current_wp["pair"] or new_wp["pair"] == (id2, id1)):
+                        env.current_wp["score"] = new_wp["score"]
+                        if "factors" in new_wp:
+                            env.current_wp["factors"] = new_wp["factors"]
                 elif new_wp is not None:
                     if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd):
                         env.current_wp = new_wp
@@ -147,12 +158,12 @@ Estimated ETA:   {eta_str}
             if new_wp is not None:
                 if env.current_wp is None:
                     env.current_wp = new_wp
-                else:
+                elif new_wp["pair"] != env.current_wp["pair"] and new_wp["pair"] != (env.current_wp["pair"][1], env.current_wp["pair"][0]):
                     dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                    if dist_to_curr > 80:
-                        threshold = 1.1
+                    front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=120.0, fov_deg=65.0)
+                    if not front_blocked and dist_to_curr > 80:
+                        threshold = float(env.params.get('wp_switch_thresh', 1.15))
                         if new_wp["score"] > env.current_wp["score"] * threshold:
-                            # 새 웨이포인트로 선회하는 부채꼴 및 베지어 궤적 상에 정면 장애물이 없을 때만 안전하게 스위칭
                             if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd):
                                 env.current_wp = new_wp
 
@@ -166,7 +177,8 @@ Estimated ETA:   {eta_str}
                     env.clusters, env.cluster_ids,
                     env.current_wp["pos"], next_head,
                     env.target, temp_visited,
-                    env.grid, env.dynamic_obstacles
+                    env.grid, env.dynamic_obstacles,
+                    params=env.params
                 )
             else:
                 env.next_wp = None
@@ -177,23 +189,21 @@ Estimated ETA:   {eta_str}
                 env.path_surf.fill((0, 0, 0, 0))
                 boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
                 if env.current_wp is None:
-                    # 목적지 직행 상황에서도 회전 궤적 주변 장애물을 넉넉히 우회할 수 있도록 obstacles 전달
                     goal = env.target
                     env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                 else:
-                    # 웨이포인트(갭) 우회 통과 구간: 속도 기반 선행 회전 및 장애물 외측 굴곡 곡률 부여
                     goal = env.current_wp["pos"]
                     env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     
                 if env.bezier_path is not None:
-                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=65)
+                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)
                     
                 if env.current_wp is not None and env.next_wp is not None:
                     vec = env.current_wp["pos"] - env.boat_pos
                     next_head = math.atan2(vec[1], vec[0])
                     env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_head, env.next_wp["pos"], obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     if env.next_bezier_path is not None:
-                        env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=65)
+                        env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=75)
                 else:
                     env.next_bezier_path = None
                     env.next_pursuit_target = None
@@ -216,7 +226,7 @@ Estimated ETA:   {eta_str}
             env.validate_wp_obstacle_5x5()
 
             # 에피소드 종료 판정
-            if env.collide() or np.linalg.norm(env.target - env.boat_pos) < 70:
+            if env.collide() or np.linalg.norm(env.target - env.boat_pos) < 70 or env.frame > 2500:
                 is_success = (np.linalg.norm(env.target - env.boat_pos) < 70 and not env.collide())
                 tag = "SUCCESS" if is_success else "FAIL"
                 if is_success:
@@ -225,15 +235,15 @@ Estimated ETA:   {eta_str}
                     collision_count += 1
                 completed_episodes += 1
                 
-                # 에피소드 종료 순간 스크린샷 캡처 및 저장
+                # 에피소드 종료 순간 스크린샷 캡처 및 저장 (규칙: {timestamp}_{SUCCESS/FAIL}.png)
                 ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 outdir = r"screenshot"
                 if not os.path.exists(outdir):
                     try:
                         os.makedirs(outdir)
-                    except:
+                    except Exception:
                         pass
-                p = os.path.join(outdir, f"{ts}_ep{completed_episodes:05d}_{tag}.png")
+                p = os.path.join(outdir, f"{ts}_{tag}.png")
                 try:
                     if hits is not None:
                         env.render(hits)
@@ -241,15 +251,13 @@ Estimated ETA:   {eta_str}
                 except Exception:
                     pass
                 
-                # 결과 파일 실시간 업데이트
                 save_report(is_final=(completed_episodes >= total_episodes))
-                
                 env.reset()
                 break
 
         if hits is not None:
             env.render(hits)
-        env.clock.tick(0)  # 인위적 지연 없이 최대 속도로 시뮬레이션 가속
+        env.clock.tick(0)
 
     pygame.quit()
 
