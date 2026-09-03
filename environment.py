@@ -53,7 +53,7 @@ class BoatEnv:
         self.rel_angles = np.linspace(-np.pi, np.pi, self.lidar_beams, endpoint=False)
         
         self.mass = 14
-        self.inertia = 4.5
+        self.inertia = 4.2
         self.drag = 0.2
         self.rot_drag = 0.7
         self.boat_radius = 25
@@ -83,7 +83,7 @@ class BoatEnv:
         
         self.obs_n = 80
         self.obs_r = 17
-        self.min_obs = 120
+        self.min_obs = 110
         
         self.grid = init_grid()
         self.clusters = []
@@ -108,10 +108,11 @@ class BoatEnv:
         self.obstacles = np.array([])
         self.dynamic_obstacles = np.array([])
         
-        self.show_path1 = True
-        self.show_path2 = True
+        self.show_paths = True
+        self.show_candidates = True
         self.show_lidar = True
         self.show_lidar_range = True
+        self.candidate_wps = []
         
         self.cb1_rect = pygame.Rect(40, 670, 20, 20)
         self.cb2_rect = pygame.Rect(40, 710, 20, 20)
@@ -185,9 +186,9 @@ class BoatEnv:
 
     def handle_click(self, pos):
         if self.cb1_rect.collidepoint(pos):
-            self.show_path1 = not self.show_path1
+            self.show_paths = not self.show_paths
         elif self.cb2_rect.collidepoint(pos):
-            self.show_path2 = not self.show_path2
+            self.show_candidates = not self.show_candidates
         elif self.cb3_rect.collidepoint(pos):
             self.show_lidar = not self.show_lidar
         elif self.cb4_rect.collidepoint(pos):
@@ -337,17 +338,8 @@ class BoatEnv:
         bx, by = self.boat_pos
         ch = math.cos(self.boat_heading)
         sh = math.sin(self.boat_heading)
-        
-        # 1. 벽면 충돌: 선체 꼭짓점들의 실제 외곽 좌표 검사
-        if bx < 45 or bx > self.w - 45 or by < 45 or by > self.sim_h - 45:
-            for poly in (self.left_hull_local, self.right_hull_local):
-                for px_l, py_l in poly:
-                    wx = bx + px_l * ch - py_l * sh
-                    wy = by + px_l * sh + py_l * ch
-                    if wx <= 0 or wx >= self.w or wy <= 0 or wy >= self.sim_h:
-                        return True
 
-        # 2. 장애물 충돌: 선체 로컬 좌표계로 변환하여 3개 선체 폴리곤(좌/우 선체, 데크)과 원형 장애물 정밀 표면 충돌 검사
+        # 장애물 충돌: 선체 로컬 좌표계로 변환하여 3개 선체 폴리곤(좌/우 선체, 데크)과 원형 장애물 정밀 표면 충돌 검사
         if len(self.dynamic_obstacles) == 0:
             return False
             

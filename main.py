@@ -51,6 +51,7 @@ def run():
                 new_wp = None
                 env.current_wp = None
                 env.next_wp = None
+                env.candidate_wps = []
             else:
                 # 경로 상에 장애물이 있으면 장애물 사이 갭(웨이포인트)을 찾아 안전하게 우회
                 new_wp = find_gap(
@@ -59,6 +60,12 @@ def run():
                     env.target, env.visited,
                     env.grid, env.dynamic_obstacles
                 )
+                if new_wp is not None:
+                    env.candidate_wps = new_wp.get("candidates", [])
+                elif env.current_wp is not None:
+                    env.candidate_wps = env.current_wp.get("candidates", [])
+                else:
+                    env.candidate_wps = []
 
             if env.current_wp is not None:
                 should_clear = False
@@ -85,6 +92,7 @@ def run():
                     env.visited.add(p)
                     env.visited.add((p[1], p[0]))
                     env.current_wp = None
+                    env.candidate_wps = []
 
             # 1차 웨이포인트 양쪽 장애물의 실시간 위치 추종 갱신
             if env.current_wp is not None:
@@ -149,7 +157,7 @@ def run():
                     env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     
                 if env.bezier_path is not None:
-                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=65)
+                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)
                     
                 if env.current_wp is not None and env.next_wp is not None:
                     vec = env.current_wp["pos"] - env.boat_pos

@@ -134,7 +134,9 @@ class EnvRenderer:
         env.screen.blit(env.path_surf, (0, 0))
         
         # 5. 경로 및 타겟 점
-        if env.show_path2:
+        # 5. 1차 및 2차 통합 경로 및 타겟 점 렌더링
+        show_paths = getattr(env, 'show_paths', True)
+        if show_paths:
             if env.next_wp is not None:
                 nwp = env.next_wp
                 pygame.draw.line(env.screen, (255, 140, 0), (int(nwp["c1"][0]), int(nwp["c1"][1])), (int(nwp["c2"][0]), int(nwp["c2"][1])), 3)
@@ -151,7 +153,6 @@ class EnvRenderer:
                 pygame.draw.circle(env.screen, (255, 255, 255), (int(px_nt), int(py_nt)), 8, 2)
                 pygame.draw.circle(env.screen, (255, 150, 50), (int(px_nt), int(py_nt)), 4)
 
-        if env.show_path1:
             if env.current_wp is not None:
                 wp = env.current_wp
                 pygame.draw.line(env.screen, (0, 255, 200), (int(wp["c1"][0]), int(wp["c1"][1])), (int(wp["c2"][0]), int(wp["c2"][1])), 4)
@@ -167,6 +168,23 @@ class EnvRenderer:
                 px_t, py_t = env.pursuit_target
                 pygame.draw.circle(env.screen, (255, 255, 255), (int(px_t), int(py_t)), 10, 2)
                 pygame.draw.circle(env.screen, (255, 50, 150), (int(px_t), int(py_t)), 5)
+
+        # 6. 차순위 후보 웨이포인트 렌더링 (투명도 적용)
+        if getattr(env, 'show_candidates', True) and getattr(env, 'candidate_wps', None):
+            cand_surf = pygame.Surface((env.w, env.h), pygame.SRCALPHA)
+            cand_colors = [(80, 210, 255, 130), (255, 180, 70, 120)]
+            for rank_idx, cand in enumerate(env.candidate_wps[:2]):
+                col = cand_colors[rank_idx % len(cand_colors)]
+                c1, c2 = cand["c1"], cand["c2"]
+                mid = cand["pos"]
+                pygame.draw.line(cand_surf, col, (int(c1[0]), int(c1[1])), (int(c2[0]), int(c2[1])), 2)
+                pygame.draw.circle(cand_surf, (col[0], col[1], col[2], 50), (int(mid[0]), int(mid[1])), 9)
+                pygame.draw.circle(cand_surf, col, (int(mid[0]), int(mid[1])), 9, 2)
+                pygame.draw.circle(cand_surf, (col[0], col[1], col[2], 210), (int(mid[0]), int(mid[1])), 3)
+                
+                txt_rank = self.small_font.render(f"#{rank_idx + 2}", True, (col[0], col[1], col[2]))
+                cand_surf.blit(txt_rank, (int(mid[0]) + 10, int(mid[1]) - 8))
+            env.screen.blit(cand_surf, (0, 0))
 
         # 6. 선박 형상 정밀 렌더링
         self._draw_boat_hull(bx, by, ch, sh)
@@ -317,12 +335,12 @@ class EnvRenderer:
 
         # 체크박스 렌더링
         pygame.draw.rect(env.screen, (255, 255, 255), env.cb1_rect, 2)
-        if env.show_path1: pygame.draw.rect(env.screen, (0, 255, 200), env.cb1_rect.inflate(-6, -6))
-        env.screen.blit(self.font.render("Show 1st Path Set", True, (255, 255, 255)), (70, 672))
+        if getattr(env, 'show_paths', True): pygame.draw.rect(env.screen, (0, 255, 200), env.cb1_rect.inflate(-6, -6))
+        env.screen.blit(self.font.render("Show 1st & 2nd Paths", True, (255, 255, 255)), (70, 672))
 
         pygame.draw.rect(env.screen, (255, 255, 255), env.cb2_rect, 2)
-        if env.show_path2: pygame.draw.rect(env.screen, (255, 200, 50), env.cb2_rect.inflate(-6, -6))
-        env.screen.blit(self.font.render("Show 2nd Path Set", True, (255, 255, 255)), (70, 712))
+        if getattr(env, 'show_candidates', True): pygame.draw.rect(env.screen, (160, 180, 255), env.cb2_rect.inflate(-6, -6))
+        env.screen.blit(self.font.render("Show Candidate WPs", True, (255, 255, 255)), (70, 712))
 
         pygame.draw.rect(env.screen, (255, 255, 255), env.cb3_rect, 2)
         if env.show_lidar: pygame.draw.rect(env.screen, (225, 220, 130), env.cb3_rect.inflate(-6, -6))

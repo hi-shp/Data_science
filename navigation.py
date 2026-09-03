@@ -160,8 +160,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     if not gaps:
         return None
         
-    best = None
-    best_sc = -1
+    valid_gaps = []
     ox = obstacles[:, 0]
     oy = obstacles[:, 1]
     
@@ -275,10 +274,21 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         
         sc = (heading_align**4.5) * (forward_proj**2.8) * (lateral_full**0.5) * (path_clear**2.0) * (width_w**0.2) * cluster_pen * depth_pen * near_clear_penalty
         
-        if sc > best_sc:
-            best_sc = sc
-            best = {"pos": mid, "c1": c1.copy(), "c2": c2.copy(), "pair": (id1, id2), "score": sc}
+        if sc > 0:
+            valid_gaps.append({
+                "pos": mid,
+                "c1": c1.copy(),
+                "c2": c2.copy(),
+                "pair": (id1, id2),
+                "score": sc
+            })
             
+    if not valid_gaps:
+        return None
+        
+    valid_gaps.sort(key=lambda x: x["score"], reverse=True)
+    best = valid_gaps[0]
+    best["candidates"] = valid_gaps[1:3]  # 순위 높은 2, 3위 차순위 후보
     return best
 
 def reactive_avoidance(dists, angles):
