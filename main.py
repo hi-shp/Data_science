@@ -19,19 +19,8 @@ def run():
             elif e.type == pygame.MOUSEBUTTONDOWN:
                 if e.button == 1:
                     env.handle_click(e.pos)
-            elif e.type == pygame.KEYDOWN:
-                if e.key == pygame.K_1: env.sim_speed = 1
-                elif e.key == pygame.K_2: env.sim_speed = 2
-                elif e.key == pygame.K_3: env.sim_speed = 4
-                elif e.key == pygame.K_4: env.sim_speed = 8
-                elif e.key == pygame.K_5: env.sim_speed = 16
-                elif e.key == pygame.K_6: env.sim_speed = 32
-                elif e.key in (pygame.K_UP, pygame.K_RIGHT):
-                    env.sim_speed = min(32, max(1, env.sim_speed * 2))
-                elif e.key in (pygame.K_DOWN, pygame.K_LEFT):
-                    env.sim_speed = max(1, env.sim_speed // 2)
 
-        # 실시간 배속 설정에 따른 서브스텝 반복 실행 (1x ~ 32x 즉시 반영)
+        # 실시간 배속 설정에 따른 서브스텝 반복 실행
         sub_steps = max(1, int(getattr(env, 'sim_speed', 1)))
         hits = None
         

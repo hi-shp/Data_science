@@ -199,19 +199,18 @@ class BoatEnv:
                     break
 
     def update_dynamic_obstacles(self):
-        self.dynamic_obstacles = self.obstacles.copy()
-        for i in range(len(self.obstacles)):
-            ox, oy, r = self.obstacles[i]
-            phase = self.frame * 0.04 + ox * 0.05 + oy * 0.05
-            sway_x = math.sin(phase) * (r * 0.2)
-            sway_y = math.cos(phase * 1.2) * (r * 0.2)
-            self.dynamic_obstacles[i, 0] = ox + sway_x
-            self.dynamic_obstacles[i, 1] = oy + sway_y
-            
-            # 부표 중앙을 기준으로 부드러운 백색 원형 구름 파도가 더 자주 잔잔하게 퍼져나감
-            if (self.frame + i * 19) % 36 == 0:
+        ox = self.obstacles[:, 0]
+        oy = self.obstacles[:, 1]
+        r = self.obstacles[:, 2]
+        phase = self.frame * 0.04 + ox * 0.05 + oy * 0.05
+        self.dynamic_obstacles[:, 0] = ox + np.sin(phase) * (r * 0.2)
+        self.dynamic_obstacles[:, 1] = oy + np.cos(phase * 1.2) * (r * 0.2)
+        
+        # 부표 중앙을 기준으로 부드러운 백색 원형 구름 파도가 주기적으로 퍼져나감
+        if self.frame % 36 == 0:
+            for i in range(len(self.obstacles)):
                 self.reflected_wakes.append([
-                    self.dynamic_obstacles[i, 0], self.dynamic_obstacles[i, 1], r + 1.0, 72
+                    self.dynamic_obstacles[i, 0], self.dynamic_obstacles[i, 1], r[i] + 1.0, 72
                 ])
 
     def pwm_to_thrust(self, p):
@@ -434,19 +433,14 @@ class BoatEnv:
     def validate_wp_obstacle_5x5(self):
         if self.current_wp is None: return
         wp = self.current_wp["pos"]
-        gx = int(wp[0] // GRID); gy = int(wp[1] // GRID)
-        xs = range(gx - 2, gx + 3); ys = range(gy - 2, gy + 3)
-        ox = self.dynamic_obstacles[:, 0]; oy = self.dynamic_obstacles[:, 1]; rr = self.dynamic_obstacles[:, 2]
-        for yy in ys:
-            for xx in xs:
-                if 0 <= xx < GRID_W and 0 <= yy < GRID_H:
-                    cx = xx * GRID + GRID * 0.5; cy = yy * GRID + GRID * 0.5
-                    dx = ox - cx; dy = oy - cy
-                    hit = np.any(dx*dx + dy*dy <= rr*rr)
-                    if hit:
-                        p = self.current_wp["pair"]
-                        self.visited.add(p); self.visited.add((p[1], p[0]))
-                        self.current_wp = None; return
+        dx = self.dynamic_obstacles[:, 0] - wp[0]
+        dy = self.dynamic_obstacles[:, 1] - wp[1]
+        dist_sq = dx * dx + dy * dy
+        r_thresh = self.dynamic_obstacles[:, 2] + 2.5 * GRID
+        if np.any(dist_sq <= r_thresh * r_thresh):
+            p = self.current_wp["pair"]
+            self.visited.add(p); self.visited.add((p[1], p[0]))
+            self.current_wp = None
 
     def update_steering(self, dists):
         self.steer_timer += self.dt

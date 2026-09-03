@@ -1,11 +1,16 @@
+import math
 import numpy as np
 from scipy.ndimage import label
 from config import GRID, GRID_W, GRID_H
 
-# 고속 연산을 위한 그리드 인덱스 배열 사전 생성
+# 고속 연산을 위한 그리드 인덱스 배열 및 라이다 각도 테이블 사전 생성
 _Y_INDICES, _X_INDICES = np.indices((GRID_H, GRID_W), dtype=np.float32)
 _Y_FLAT = _Y_INDICES.ravel()
 _X_FLAT = _X_INDICES.ravel()
+
+_REL_ANGLES = np.linspace(-np.pi, np.pi, 180, endpoint=False, dtype=np.float32)
+_COS_REL = np.cos(_REL_ANGLES)[:, None]
+_SIN_REL = np.sin(_REL_ANGLES)[:, None]
 
 def lidar_hits_np(boat_pos, boat_heading, rel_angles, obstacles, lidar_range):
     if len(obstacles) == 0:
@@ -16,9 +21,10 @@ def lidar_hits_np(boat_pos, boat_heading, rel_angles, obstacles, lidar_range):
     oy = obstacles[:, 1:2].T
     orad = obstacles[:, 2:3].T
 
-    angs = (boat_heading + rel_angles)[:, None]
-    vx = np.cos(angs)
-    vy = np.sin(angs)
+    ch = math.cos(boat_heading)
+    sh = math.sin(boat_heading)
+    vx = ch * _COS_REL - sh * _SIN_REL
+    vy = sh * _COS_REL + ch * _SIN_REL
 
     x0, y0 = boat_pos
     px = ox - x0
