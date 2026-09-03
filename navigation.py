@@ -107,7 +107,7 @@ def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obs
                     
     return True
 
-def is_front_blocked(boat_pos, boat_heading, obstacles, boat_radius=25, block_dist=115.0, fov_deg=45.0):
+def is_front_blocked(boat_pos, boat_heading, obstacles, boat_radius=25, block_dist=130.0, fov_deg=110.0):
     if obstacles is None or len(obstacles) == 0:
         return False
     bx, by = boat_pos
@@ -273,7 +273,10 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         gap_w = np.linalg.norm(c2 - c1)
         width_w = min(gap_w / 90, 1)
         
-        sc = (heading_align**4.5) * (forward_proj**2.8) * (lateral_full**0.5) * (path_clear**2.0) * (width_w**0.2) * cluster_pen * depth_pen * near_clear_penalty
+        # 전방 근접 갭 우선 선택 가중치 (너무 먼 갭을 건너뛰어 잡지 않고 코앞 유효 갭을 우선 선정)
+        prox_w = math.exp(-0.7 * max(0.0, (distm - 120.0) / 100.0))
+        
+        sc = (heading_align**4.5) * (forward_proj**2.8) * (lateral_full**0.5) * (path_clear**2.0) * (width_w**0.2) * cluster_pen * depth_pen * near_clear_penalty * prox_w
         
         if sc > best_sc:
             best_sc = sc
