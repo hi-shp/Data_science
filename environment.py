@@ -121,13 +121,15 @@ class BoatEnv:
         self.cb3_rect = pygame.Rect(40, 750, 20, 20)
         self.cb4_rect = pygame.Rect(40, 790, 20, 20)
         
+        self.paused = False
+        self.pause_btn = pygame.Rect(40, 835, 48, 28)
         self.sim_speed = 1
         self.speed_btns = {
-            1: pygame.Rect(40, 835, 45, 28),
-            2: pygame.Rect(92, 835, 45, 28),
-            4: pygame.Rect(144, 835, 45, 28),
-            8: pygame.Rect(196, 835, 45, 28),
-            16: pygame.Rect(248, 835, 52, 28)
+            1: pygame.Rect(94, 835, 38, 28),
+            2: pygame.Rect(138, 835, 38, 28),
+            4: pygame.Rect(182, 835, 38, 28),
+            8: pygame.Rect(226, 835, 38, 28),
+            16: pygame.Rect(270, 835, 46, 28)
         }
         
         self.renderer = EnvRenderer(self)
@@ -194,6 +196,8 @@ class BoatEnv:
             self.show_lidar = not self.show_lidar
         elif self.cb4_rect.collidepoint(pos):
             self.show_lidar_range = not self.show_lidar_range
+        elif self.pause_btn.collidepoint(pos):
+            self.paused = not self.paused
         else:
             for spd, rect in self.speed_btns.items():
                 if rect.collidepoint(pos):

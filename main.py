@@ -16,9 +16,22 @@ def run():
             if e.type == pygame.QUIT:
                 pygame.quit()
                 return
+            elif e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_SPACE:
+                    env.paused = not env.paused
             elif e.type == pygame.MOUSEBUTTONDOWN:
                 if e.button == 1:
                     env.handle_click(e.pos)
+
+        if getattr(env, 'paused', False):
+            dists, hits = lidar_hits_np(
+                env.boat_pos, env.boat_heading,
+                env.rel_angles, env.dynamic_obstacles,
+                env.lidar_range
+            )
+            env.render(hits)
+            env.clock.tick(60)
+            continue
 
         # 실시간 배속 설정에 따른 서브스텝 반복 실행
         sub_steps = max(1, int(getattr(env, 'sim_speed', 1)))

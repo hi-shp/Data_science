@@ -355,11 +355,24 @@ class EnvRenderer:
         if env.show_lidar_range: pygame.draw.rect(env.screen, (80, 175, 140), env.cb4_rect.inflate(-6, -6))
         env.screen.blit(self.font.render("Show LiDAR Range", True, (255, 255, 255)), (70, 792))
 
-        # 시뮬레이션 배속 제어 버튼 (1x, 2x, 4x, 8x, 16x)
-        env.screen.blit(self.small_font.render("SIMULATION SPEED", True, (160, 200, 240)), (40, 818))
+        # 시뮬레이션 제어 버튼 (PAUSE, 1x, 2x, 4x, 8x, 16x)
+        env.screen.blit(self.small_font.render("SIMULATION CONTROL", True, (160, 200, 240)), (40, 818))
+        
+        # 일시정지(PAUSE) 버튼
+        is_paused = getattr(env, 'paused', False)
+        p_bg = (240, 140, 30) if is_paused else (25, 45, 70)
+        p_border = (255, 255, 255) if is_paused else (80, 120, 160)
+        p_col = (10, 25, 45) if is_paused else (220, 230, 240)
+        
+        pygame.draw.rect(env.screen, p_bg, env.pause_btn, border_radius=4)
+        pygame.draw.rect(env.screen, p_border, env.pause_btn, 2, border_radius=4)
+        lbl_p = self.bold_font.render("||", True, p_col) if is_paused else self.font.render("||", True, p_col)
+        env.screen.blit(lbl_p, (env.pause_btn.centerx - lbl_p.get_width()//2, env.pause_btn.centery - lbl_p.get_height()//2))
+
+        # 배속 버튼
         cur_spd = getattr(env, 'sim_speed', 1)
         for spd, btn_rect in env.speed_btns.items():
-            is_active = (cur_spd == spd)
+            is_active = (cur_spd == spd and not is_paused)
             btn_bg = (0, 180, 240) if is_active else (25, 45, 70)
             btn_border = (255, 255, 255) if is_active else (80, 120, 160)
             text_color = (10, 25, 45) if is_active else (220, 230, 240)
