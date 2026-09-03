@@ -475,10 +475,97 @@ class BoatEnv:
         avoid = reactive_avoidance(dists, self.rel_angles)
         
         # 반발력 정상 작동: 웨이포인트 선회 방향과 반대로 충돌할 때만 상쇄 방지를 위해 소프트 감쇠(0.25) 적용
-        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.15:
-            avoid *= 0.25
+        cand_steer = np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
+        safe_steer = self.find_safe_steer_limit(cand_steer)
+        return safe_steer
+
+    def predict_steer_clearance(self, steer_val, nearby_obs):
+        # 6개 선체 기하 원형 바운딩 포인트 (좌현/우현 선수/중앙/선미)
+        HULL_CIRCLES = (
+            (34.0, 11.0, 10.0),   # Front Left
+            (34.0, -11.0, 10.0),  # Front Right
+            (0.0, 11.0, 10.0),    # Mid Left
+            (0.0, -11.0, 10.0),   # Mid Right
+            (-34.0, 11.0, 10.0),  # Rear Left
+            (-34.0, -11.0, 10.0), # Rear Right
+        )
+        pos = self.boat_pos.copy()
+        vel = self.boat_vel.copy()
+        heading = float(self.boat_heading)
+        ang_vel = float(getattr(self, 'boat_ang_vel', 0.0))
+        current_fwd = float(getattr(self, 'current_fwd', 100.0))
+        
+        L, R = self.get_pwm(steer_val)
+        tL = self.pwm_to_thrust(L)
+        tR = self.pwm_to_thrust(R)
+        mom = (tR - tL) * self.params['mom_coeff']
+        
+        min_clear = 999.0
+        
+        # 향후 5스텝(약 0.2초) 동안의 선체 궤적 상 최소 간격 시뮬레이션
+        for _ in range(5):
+            ang_acc = (mom - self.rot_drag * ang_vel) / self.inertia
+            ang_vel = (ang_vel + ang_acc * self.dt) * 0.84
+            heading += ang_vel * self.dt
             
-        return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
+            fwd_acc = current_fwd / self.mass
+            hv = np.array([math.cos(heading), math.sin(heading)])
+            lat_vec = np.array([-math.sin(heading), math.cos(heading)])
+            
+            vel += (fwd_acc * hv - self.drag * vel * (np.linalg.norm(vel) + 1e-6)) * self.dt
+            pos += vel * self.dt + lat_vec * (ang_vel * 4.0 * self.dt)
+            
+            ch = math.cos(heading)
+            sh = math.sin(heading)
+            
+            for lx, ly, cr in HULL_CIRCLES:
+                wx = pos[0] + lx * ch - ly * sh
+                wy = pos[1] + lx * sh + ly * ch
+                
+                dx = nearby_obs[:, 0] - wx
+                dy = nearby_obs[:, 1] - wy
+                dists = np.sqrt(dx * dx + dy * dy) - (nearby_obs[:, 2] + cr)
+                step_min = float(np.min(dists))
+                if step_min < min_clear:
+                    min_clear = step_min
+                    
+        return min_clear
+
+    def find_safe_steer_limit(self, cand_steer):
+        if len(self.dynamic_obstacles) == 0:
+            return cand_steer
+            
+        bx, by = self.boat_pos
+        dx = self.dynamic_obstacles[:, 0] - bx
+        dy = self.dynamic_obstacles[:, 1] - by
+        nearby_mask = dx * dx + dy * dy < 135.0 * 135.0
+        if not np.any(nearby_mask):
+            return cand_steer
+            
+        nearby_obs = self.dynamic_obstacles[nearby_mask]
+        
+        # 1. 목표 조향값으로 회전했을 때의 최소 여유 간격 예측
+        clearance = self.predict_steer_clearance(cand_steer, nearby_obs)
+        SAFE_MARGIN = 4.0  # 안전 여유 간격 (px)
+        
+        if clearance >= SAFE_MARGIN:
+            return cand_steer  # 이미 안전하면 그대로 회전
+            
+        # 2. 회전 시 장애물과 충돌/근접 위험이 있는 경우: 안 부딪힐 때까지만 회전각을 제한
+        scale_factors = [0.85, 0.70, 0.55, 0.40, 0.25, 0.10, 0.0, -0.25, -0.50, -0.80]
+        best_steer = 0.0
+        best_clear = -999.0
+        
+        for factor in scale_factors:
+            test_s = cand_steer * factor if factor >= 0 else factor * np.sign(cand_steer)
+            test_clear = self.predict_steer_clearance(test_s, nearby_obs)
+            if test_clear >= SAFE_MARGIN:
+                return test_s  # 목표 방향 쪽으로 돌 수 있는 최대 안전 회전값 반환
+            if test_clear > best_clear:
+                best_clear = test_clear
+                best_steer = test_s
+                
+        return best_steer
 
     def render(self, hits):
         self.renderer.render(hits)
