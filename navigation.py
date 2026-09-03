@@ -107,6 +107,24 @@ def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obs
                     
     return True
 
+def is_front_blocked(boat_pos, boat_heading, obstacles, boat_radius=25, block_dist=115.0, fov_deg=45.0):
+    if obstacles is None or len(obstacles) == 0:
+        return False
+    bx, by = boat_pos
+    fov_rad = np.deg2rad(fov_deg)  # 좌우 45도 = 총 90도 전방 부채꼴
+    
+    for ox, oy, orad in obstacles:
+        dx = ox - bx
+        dy = oy - by
+        dist = math.hypot(dx, dy)
+        clear_dist = dist - orad
+        if clear_dist < block_dist:
+            ang_to_obs = math.atan2(dy, dx)
+            rel_ang = abs(wrap(ang_to_obs - boat_heading))
+            if rel_ang <= fov_rad:
+                return True
+    return False
+
 def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, obstacles):
     bx, by = boat_pos
     tx, ty = target_pos

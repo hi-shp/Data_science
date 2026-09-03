@@ -5,7 +5,7 @@ import datetime
 import os
 from environment import BoatEnv
 from perception import lidar_hits_np, update_grid, extract_clusters_from_grid, match_clusters
-from navigation import find_gap, target_is_clear, is_direct_target_safe, is_waypoint_switch_safe
+from navigation import find_gap, target_is_clear, is_direct_target_safe, is_waypoint_switch_safe, is_front_blocked
 from utils import wrap, make_bezier_path, pure_pursuit
 
 def run():
@@ -106,7 +106,9 @@ def run():
                     env.current_wp = new_wp
                 else:
                     dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                    if dist_to_curr > 80:
+                    # 전방 90도(좌우 45도) 내 특정 거리(115px) 이하에 장애물이 있으면 웨이포인트 전환 보류
+                    front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=115.0, fov_deg=45.0)
+                    if not front_blocked and dist_to_curr > 80:
                         threshold = 1.1
                         if new_wp["score"] > env.current_wp["score"] * threshold:
                             # 새 웨이포인트로 선회하는 부채꼴 및 베지어 궤적 상에 정면 장애물이 없을 때만 안전하게 스위칭
