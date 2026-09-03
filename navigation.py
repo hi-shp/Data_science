@@ -107,7 +107,7 @@ def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obs
                     
     return True
 
-def is_front_blocked(boat_pos, boat_heading, obstacles, boat_radius=25, block_dist=130.0, fov_deg=110.0):
+def is_front_blocked(boat_pos, boat_heading, obstacles, boat_radius=25, block_dist=190.0, fov_deg=110.0):
     if obstacles is None or len(obstacles) == 0:
         return False
     bx, by = boat_pos
@@ -139,6 +139,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     width_exp = params.get('width_exp', 0.2) if params else 0.2
     cluster_pen_w = params.get('cluster_pen_w', 0.5) if params else 0.5
     perp_exp = params.get('perp_exp', 1.5) if params else 1.5
+    prox_exp = params.get('prox_exp', 0.5) if params else 0.5
 
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])
     
@@ -284,9 +285,13 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         perp_score = abs(gps_vec[0] * u_gap[1] - gps_vec[1] * u_gap[0])
         perp_factor = max(perp_score, 0.05) ** perp_exp
         
+        # 선박과의 근접도 (Proximity to Boat): 배와 가까울수록 높은 점수 부여
+        prox_score = min(1.0, 140.0 / max(distm, 140.0))
+        prox_factor = max(prox_score, 0.05) ** prox_exp
+        
         width_w = min(gap_w / 90, 1)
         
-        sc = (heading_align**align_exp) * (forward_proj**fwd_exp) * (lateral_full**0.5) * (path_clear**clear_exp) * (width_w**width_exp) * (cluster_pen**cluster_pen_w) * depth_pen * near_clear_penalty * perp_factor
+        sc = (heading_align**align_exp) * (forward_proj**fwd_exp) * (lateral_full**0.5) * (path_clear**clear_exp) * (width_w**width_exp) * (cluster_pen**cluster_pen_w) * depth_pen * near_clear_penalty * perp_factor * prox_factor
         
         if sc > 0:
             valid_gaps.append({
