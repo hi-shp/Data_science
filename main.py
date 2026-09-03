@@ -111,23 +111,29 @@ def run():
                             env.current_wp = new_wp
                             
             if env.current_wp is not None and not clear_to_target:
-                # 현재 웨이포인트에서 목적지까지 장애물이 없으면 다음 웨이포인트를 찾지 않고 목적지 방향 직결
-                if target_is_clear(env.current_wp["pos"], env.target, env.dynamic_obstacles):
-                    env.next_wp = None
-                else:
-                    temp_visited = env.visited.copy()
-                    temp_visited.add(env.current_wp["pair"])
-                    temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
-                    
-                    vec = env.current_wp["pos"] - env.boat_pos
-                    next_head = math.atan2(vec[1], vec[0])
-                    
-                    env.next_wp = find_gap(
-                        env.clusters, env.cluster_ids,
-                        env.current_wp["pos"], next_head,
-                        env.target, temp_visited,
-                        env.grid, env.dynamic_obstacles
-                    )
+                temp_visited = env.visited.copy()
+                temp_visited.add(env.current_wp["pair"])
+                temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
+                
+                vec = env.current_wp["pos"] - env.boat_pos
+                next_head = math.atan2(vec[1], vec[0])
+                
+                # 2차 갭 탐색
+                env.next_wp = find_gap(
+                    env.clusters, env.cluster_ids,
+                    env.current_wp["pos"], next_head,
+                    env.target, temp_visited,
+                    env.grid, env.dynamic_obstacles
+                )
+                # 2차 장애물이 없더라도 목적지를 2차 웨이포인트로 지정하여 주황색 2차 경로가 항상 생성되도록 연결
+                if env.next_wp is None:
+                    env.next_wp = {
+                        "pos": env.target.copy(),
+                        "c1": env.target + np.array([0.0, -15.0]),
+                        "c2": env.target + np.array([0.0, 15.0]),
+                        "score": 999.0,
+                        "pair": (-1, -1)
+                    }
             else:
                 env.next_wp = None
 
