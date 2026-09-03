@@ -294,12 +294,27 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         sc = (heading_align**align_exp) * (forward_proj**fwd_exp) * (lateral_full**0.5) * (path_clear**clear_exp) * (width_w**width_exp) * (cluster_pen**cluster_pen_w) * depth_pen * near_clear_penalty * perp_factor * prox_factor
         
         if sc > 0:
+            term_align = float(heading_align**align_exp)
+            term_fwd = float(forward_proj**fwd_exp)
+            term_clear = float(path_clear**clear_exp)
+            term_perp = float(perp_factor)
+            term_prox = float(prox_factor)
+            term_cluster = float(cluster_pen**cluster_pen_w)
+            
             valid_gaps.append({
                 "pos": mid,
                 "c1": c1.copy(),
                 "c2": c2.copy(),
                 "pair": (id1, id2),
-                "score": sc
+                "score": sc,
+                "factors": {
+                    "Align": term_align,
+                    "Forward": term_fwd,
+                    "Clear": term_clear,
+                    "Perpend": term_perp,
+                    "Proxim": term_prox,
+                    "Cluster": term_cluster
+                }
             })
             
     if not valid_gaps:

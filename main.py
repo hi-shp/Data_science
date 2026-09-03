@@ -106,9 +106,11 @@ def run():
                     env.current_wp["c1"] = c1_now
                     env.current_wp["c2"] = c2_now
                     env.current_wp["pos"] = (c1_now + c2_now) / 2.0
-                    # 동일한 웨이포인트가 계속 감지되면 최신 점수로 실시간 갱신
+                    # 동일한 웨이포인트가 계속 감지되면 최신 점수 및 가중치 분포 실시간 갱신
                     if new_wp is not None and (new_wp["pair"] == env.current_wp["pair"] or new_wp["pair"] == (id2, id1)):
                         env.current_wp["score"] = new_wp["score"]
+                        if "factors" in new_wp:
+                            env.current_wp["factors"] = new_wp["factors"]
                 elif new_wp is not None:
                     # 기존 웨이포인트 부표가 시야에서 사라진 경우에만 새 웨이포인트로 안전하게 인계
                     if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd):

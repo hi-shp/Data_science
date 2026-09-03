@@ -10,6 +10,8 @@ class EnvRenderer:
         self.real_cam_surf = pygame.Surface((320, 220), pygame.SRCALPHA)
         self.safety_surf = pygame.Surface((120, 120), pygame.SRCALPHA)
         self.hud_surf = pygame.Surface((210, 110), pygame.SRCALPHA)
+        self.bezier_surf = pygame.Surface((190, 220), pygame.SRCALPHA)
+        self.weights_surf = pygame.Surface((190, 220), pygame.SRCALPHA)
         self.font = pygame.font.SysFont(None, 24)
         self.bold_font = pygame.font.SysFont(None, 26, bold=True)
         self.small_font = pygame.font.SysFont(None, 18)
@@ -642,6 +644,157 @@ class EnvRenderer:
         pygame.draw.rect(self.real_cam_surf, (130, 180, 220), (0, 0, real_w, real_h), 2)
         self.real_cam_surf.blit(self.font.render("LiDAR 1st View", True, (255, 255, 255)), (10, 10))
         env.screen.blit(self.real_cam_surf, (1050, env.sim_h + 35))
+
+        # --- 4. 실시간 베지어 곡선 & 곡률 프로파일 그래프 ---
+        self._draw_bezier_profile()
+
+        # --- 5. 웨이포인트 우선순위 가중치 비율 막대 게이지 ---
+        self._draw_weight_breakdown()
+
+    def _draw_bezier_profile(self):
+        """우측 하단: 실시간 베지어 곡선 & 곡률 프로파일 그래프"""
+        env = self.env
+        bw, bh = 190, 220
+        surf = self.bezier_surf
+        surf.fill((10, 22, 38, 240))
+        pygame.draw.rect(surf, (0, 180, 255), (0, 0, bw, bh), 2)
+        
+        # 타이틀
+        surf.blit(self.bold_font.render("Bezier Profile", True, (255, 255, 255)), (10, 8))
+        surf.blit(self.small_font.render("Curvature & Trajectory", True, (120, 180, 230)), (10, 28))
+        
+        # 그래프 영역
+        gx, gy, gw, gh = 12, 50, 166, 95
+        pygame.draw.rect(surf, (15, 30, 50), (gx, gy, gw, gh))
+        pygame.draw.rect(surf, (40, 80, 120), (gx, gy, gw, gh), 1)
+        
+        # 배경 그리드선
+        for y_step in [0.25, 0.5, 0.75]:
+            grid_y = int(gy + gh * y_step)
+            pygame.draw.line(surf, (25, 50, 75), (gx, grid_y), (gx + gw, grid_y), 1)
+        for x_step in [0.25, 0.5, 0.75]:
+            grid_x = int(gx + gw * x_step)
+            pygame.draw.line(surf, (25, 50, 75), (grid_x, gy), (grid_x, gy + gh), 1)
+            
+        path = getattr(env, 'bezier_path', None)
+        max_curv = 0.0
+        path_len = 0.0
+        
+        if path is not None and len(path) >= 4:
+            pts = np.array(path)
+            diffs = np.diff(pts, axis=0)
+            seg_lens = np.hypot(diffs[:, 0], diffs[:, 1])
+            path_len = float(np.sum(seg_lens))
+            
+            headings = np.arctan2(diffs[:, 1], diffs[:, 0])
+            d_headings = np.diff(headings)
+            d_headings = np.arctan2(np.sin(d_headings), np.cos(d_headings))
+            
+            curvs = np.abs(d_headings) / np.maximum(seg_lens[:-1], 1.0)
+            if len(curvs) > 0:
+                max_curv = float(np.max(curvs))
+                n_pts = len(curvs)
+                plot_pts = []
+                poly_pts = [(gx, gy + gh)]
+                
+                scale_curv = min(1.0 / max(max_curv, 0.008), 120.0)
+                
+                for i, c_val in enumerate(curvs):
+                    px = int(gx + (i / max(1, n_pts - 1)) * gw)
+                    norm_h = min(gh - 4, int(c_val * scale_curv * (gh - 10)))
+                    py = gy + gh - norm_h
+                    plot_pts.append((px, py))
+                    poly_pts.append((px, py))
+                    
+                poly_pts.append((gx + gw, gy + gh))
+                
+                if len(poly_pts) >= 3:
+                    fill_surf = pygame.Surface((bw, bh), pygame.SRCALPHA)
+                    pygame.draw.polygon(fill_surf, (0, 200, 255, 60), poly_pts)
+                    surf.blit(fill_surf, (0, 0))
+                    
+                if len(plot_pts) >= 2:
+                    pygame.draw.lines(surf, (50, 220, 255), False, plot_pts, 2)
+                    
+                max_idx = int(np.argmax(curvs))
+                mx, my = plot_pts[max_idx]
+                pygame.draw.circle(surf, (255, 80, 80), (mx, my), 4)
+                pygame.draw.circle(surf, (255, 255, 255), (mx, my), 2)
+        else:
+            txt_direct = self.small_font.render("Direct Line / Clear", True, (0, 200, 140))
+            surf.blit(txt_direct, (gx + gw//2 - txt_direct.get_width()//2, gy + gh//2 - 6))
+            
+        # 하단 수치 스탯 표시
+        path_m = path_len / 50.0
+        surf.blit(self.small_font.render(f"Length: {path_m:.1f} m", True, (220, 235, 255)), (12, 154))
+        
+        if max_curv > 1e-4:
+            min_r_px = 1.0 / max_curv
+            surf.blit(self.small_font.render(f"Min R: {min_r_px:.0f} px", True, (255, 200, 80)), (12, 174))
+        else:
+            surf.blit(self.small_font.render("Min R: Straight", True, (50, 230, 120)), (12, 174))
+            
+        surf.blit(self.small_font.render("Lookahead: 70 px", True, (150, 200, 240)), (12, 194))
+        env.screen.blit(surf, (1385, env.sim_h + 35))
+
+    def _draw_weight_breakdown(self):
+        """우측 하단: 웨이포인트 우선순위 가중치 비율 분포 막대 게이지"""
+        env = self.env
+        ww, wh = 190, 220
+        surf = self.weights_surf
+        surf.fill((10, 22, 38, 240))
+        pygame.draw.rect(surf, (0, 180, 255), (0, 0, ww, wh), 2)
+        
+        surf.blit(self.bold_font.render("WP Score Weights", True, (255, 255, 255)), (10, 8))
+        surf.blit(self.small_font.render("Factor Contribution", True, (120, 180, 230)), (10, 28))
+        
+        wp = getattr(env, 'current_wp', None)
+        factors = wp.get('factors', None) if wp is not None else None
+        
+        FACTOR_ITEMS = [
+            ("Align", (0, 230, 255)),      # Heading Alignment
+            ("Forward", (40, 225, 120)),   # Progress toward GPS
+            ("Clear", (255, 215, 40)),     # Obstacle Clearance
+            ("Perpend", (255, 140, 40)),   # 90° Orthogonality
+            ("Proxim", (255, 90, 190)),    # Proximity to Boat
+            ("Cluster", (170, 130, 255))   # Cluster Density
+        ]
+        
+        if wp is not None and factors is not None:
+            vals = [max(0.01, float(factors.get(k, 0.5))) for k, _ in FACTOR_ITEMS]
+            tot = sum(vals) if sum(vals) > 1e-6 else 1.0
+            ratios = [v / tot for v in vals]
+            
+            bar_x = 65
+            bar_w = 78
+            bar_h = 8
+            
+            for i, (name, col) in enumerate(FACTOR_ITEMS):
+                y_pos = 50 + i * 27
+                lbl = self.small_font.render(name, True, (210, 225, 240))
+                surf.blit(lbl, (10, y_pos - 2))
+                
+                pygame.draw.rect(surf, (20, 40, 65), (bar_x, y_pos, bar_w, bar_h), border_radius=3)
+                
+                fill_w = max(2, int(ratios[i] * bar_w * 2.2))
+                fill_w = min(bar_w, fill_w)
+                pygame.draw.rect(surf, col, (bar_x, y_pos, fill_w, bar_h), border_radius=3)
+                
+                pct = int(ratios[i] * 100)
+                txt_pct = self.small_font.render(f"{pct}%", True, col)
+                surf.blit(txt_pct, (bar_x + bar_w + 6, y_pos - 2))
+        else:
+            gy_c = 100
+            txt1 = self.small_font.render("Direct Target Cruise", True, (0, 230, 140))
+            txt2 = self.small_font.render("No Obstacle Gaps", True, (140, 180, 220))
+            surf.blit(txt1, (ww//2 - txt1.get_width()//2, gy_c - 10))
+            surf.blit(txt2, (ww//2 - txt2.get_width()//2, gy_c + 12))
+            
+            pygame.draw.rect(surf, (20, 40, 65), (20, 140, 150, 10), border_radius=4)
+            pygame.draw.rect(surf, (0, 230, 140), (20, 140, 150, 10), border_radius=4)
+            surf.blit(self.small_font.render("Direct Target: 100%", True, (255, 255, 255)), (28, 160))
+            
+        env.screen.blit(surf, (1590, env.sim_h + 35))
 
     def _draw_telemetry(self):
         """우상단 실시간 텔레메트리 HUD"""
