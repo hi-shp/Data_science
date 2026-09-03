@@ -655,128 +655,115 @@ class EnvRenderer:
         self._draw_weight_breakdown()
 
     def _draw_bezier_profile(self):
-        """우측 하단: 실시간 베지어 곡선 & 곡률 프로파일 그래프 (시공간 스무딩 및 X/Y축 표기)"""
+        """우측 하단: 실시간 3차 베지어 곡선(Cubic S-Curve) 2D 궤적 그래프 (X: 전진거리, Y: 좌우편차)"""
         env = self.env
         bw, bh = 190, 220
         surf = self.bezier_surf
         surf.fill((10, 22, 38, 240))
         pygame.draw.rect(surf, (0, 180, 255), (0, 0, bw, bh), 2)
         
-        # 타이틀 (보조 텍스트 없이 깔끔하게 배치)
-        surf.blit(self.bold_font.render("Bezier Profile", True, (255, 255, 255)), (10, 8))
+        # 타이틀
+        surf.blit(self.bold_font.render("Bezier Curve 2D", True, (255, 255, 255)), (10, 8))
         
         # Y축 단위 표기
-        surf.blit(self.small_font.render("k(1/m)", True, (140, 190, 240)), (4, 20))
+        surf.blit(self.small_font.render("Y(m)", True, (140, 190, 240)), (4, 20))
         
-        # 그래프 영역 (넓은 가독성 영역 확보)
+        # 그래프 영역
         gx, gy, gw, gh = 36, 34, 144, 94
         pygame.draw.rect(surf, (15, 30, 50), (gx, gy, gw, gh))
         pygame.draw.rect(surf, (40, 80, 120), (gx, gy, gw, gh), 1)
         
+        y_center = gy + gh // 2
+        
         path = getattr(env, 'bezier_path', None)
-        max_curv = 0.0
+        bx, by = env.boat_pos
+        h = env.boat_heading
+        ch, sh = math.cos(h), math.sin(h)
+        
+        if not hasattr(self, 'scale_x_max'): self.scale_x_max = 4.0; self.scale_y_max = 2.0
         
         if path is not None and len(path) >= 4:
             pts = np.array(path)
-            diffs = np.diff(pts, axis=0)
-            seg_lens = np.hypot(diffs[:, 0], diffs[:, 1])
-            raw_path_len = float(np.sum(seg_lens))
+            diffs = pts - env.boat_pos
+            # 선박 기준 로컬 좌표계 변환 (X: 전방 거리, Y: 좌/우 편차 거리)
+            x_loc = diffs[:, 0] * ch + diffs[:, 1] * sh
+            y_loc = -diffs[:, 0] * sh + diffs[:, 1] * ch
             
-            # 경로 길이 시간축 스무딩
-            target_path_m = raw_path_len / 50.0
-            self.smooth_path_m = self.smooth_path_m * 0.85 + target_path_m * 0.15
+            xm = x_loc / 50.0  # 미터 단위
+            ym = y_loc / 50.0  # 미터 단위
             
-            # 세그먼트 방향각
-            headings = np.arctan2(diffs[:, 1], diffs[:, 0])
-            d_headings = np.diff(headings)
-            d_headings = np.arctan2(np.sin(d_headings), np.cos(d_headings))
+            target_x_max = max(2.0, float(np.max(xm)) * 1.15)
+            target_y_max = max(1.2, float(np.max(np.abs(ym))) * 1.35)
             
-            # 미터 단위 곡률 (1/m)
-            curvs_px = np.abs(d_headings) / np.maximum(seg_lens[:-1], 1.0)
-            curvs_m = curvs_px * 50.0
+            self.scale_x_max = self.scale_x_max * 0.90 + target_x_max * 0.10
+            self.scale_y_max = self.scale_y_max * 0.90 + target_y_max * 0.10
             
-            # 35개 균일 샘플링 포인트로 보간
-            n_samples = 35
-            orig_t = np.linspace(0, 1, len(curvs_m))
-            sample_t = np.linspace(0, 1, n_samples)
-            sampled_curvs = np.interp(sample_t, orig_t, curvs_m)
+            sx_max = self.scale_x_max
+            sy_max = self.scale_y_max
             
-            # 3점 공간 필터링 (Spatial Smoothing)
-            smoothed_curvs = np.convolve(sampled_curvs, [0.2, 0.6, 0.2], mode='same')
+            # Y축 눈금선 및 수치 표기 (+Y_max, 0, -Y_max)
+            surf.blit(self.small_font.render(f"+{sy_max:.1f}", True, (160, 200, 230)), (2, gy - 2))
+            surf.blit(self.small_font.render(" 0.0", True, (0, 200, 255)), (2, y_center - 6))
+            surf.blit(self.small_font.render(f"-{sy_max:.1f}", True, (160, 200, 230)), (4, gy + gh - 8))
             
-            # 프레임 간 시간축 EMA 스무딩 (Temporal EMA Smoothing)
-            if self.curv_buffer is None or len(self.curv_buffer) != n_samples:
-                self.curv_buffer = smoothed_curvs.copy()
-            else:
-                self.curv_buffer = self.curv_buffer * 0.70 + smoothed_curvs * 0.30
-                
-            curvs_render = self.curv_buffer
-            max_curv = float(np.max(curvs_render))
-            
-            # Y축 최대 스케일 시간축 스무딩 (급격한 높이 진동 방지)
-            target_y_max = max(0.06, math.ceil(max_curv * 10.0) / 10.0)
-            self.curv_y_max = self.curv_y_max * 0.88 + target_y_max * 0.12
-            y_scale = self.curv_y_max
-            
-            # Y축 눈금 및 수치
-            surf.blit(self.small_font.render(f"{y_scale:.2f}", True, (160, 200, 230)), (4, gy - 2))
-            surf.blit(self.small_font.render(f"{y_scale*0.5:.2f}", True, (130, 170, 200)), (4, gy + gh//2 - 6))
-            surf.blit(self.small_font.render("0.00", True, (100, 140, 170)), (8, gy + gh - 8))
-            
-            # 그리드선
-            pygame.draw.line(surf, (25, 55, 80), (gx, gy + gh//2), (gx + gw, gy + gh//2), 1)
+            # 배경 중심 기준선 (Y = 0: 전방 직진선)
+            pygame.draw.line(surf, (0, 140, 180), (gx, y_center), (gx + gw, y_center), 1)
             pygame.draw.line(surf, (25, 55, 80), (gx + gw//2, gy), (gx + gw//2, gy + gh), 1)
             
+            # 3차 베지어 곡선 궤적 포인트 생성
             plot_pts = []
-            poly_pts = [(gx, gy + gh)]
-            
-            for i, c_val in enumerate(curvs_render):
-                px = int(gx + (i / max(1, n_samples - 1)) * gw)
-                norm_h = min(gh - 2, int((c_val / max(y_scale, 0.01)) * (gh - 4)))
-                py = int(gy + gh - norm_h)
+            for x_val, y_val in zip(xm, ym):
+                px = int(gx + (x_val / max(0.1, sx_max)) * (gw - 12))
+                py = int(y_center - (y_val / max(0.1, sy_max)) * (gh * 0.44))
+                px = max(gx, min(gx + gw, px))
+                py = max(gy, min(gy + gh, py))
                 plot_pts.append((px, py))
-                poly_pts.append((px, py))
-                
-            poly_pts.append((gx + gw, gy + gh))
-            
-            if len(poly_pts) >= 3:
-                fill_surf = pygame.Surface((bw, bh), pygame.SRCALPHA)
-                pygame.draw.polygon(fill_surf, (0, 200, 255, 45), poly_pts)
-                surf.blit(fill_surf, (0, 0))
                 
             if len(plot_pts) >= 2:
-                pygame.draw.lines(surf, (50, 225, 255), False, plot_pts, 2)
+                # 3차 함수 곡선 본체 (빛나는 시안색)
+                pygame.draw.lines(surf, (50, 225, 255), False, plot_pts, 3)
                 
-            max_idx = int(np.argmax(curvs_render))
-            mx, my = plot_pts[max_idx]
-            pygame.draw.circle(surf, (255, 80, 80), (mx, my), 4)
-            pygame.draw.circle(surf, (255, 255, 255), (mx, my), 2)
-        else:
-            surf.blit(self.small_font.render(f"{self.curv_y_max:.2f}", True, (160, 200, 230)), (4, gy - 2))
-            surf.blit(self.small_font.render(f"{self.curv_y_max*0.5:.2f}", True, (130, 170, 200)), (4, gy + gh//2 - 6))
-            surf.blit(self.small_font.render("0.00", True, (100, 140, 170)), (8, gy + gh - 8))
-            pygame.draw.line(surf, (25, 55, 80), (gx, gy + gh//2), (gx + gw, gy + gh//2), 1)
-            txt_direct = self.small_font.render("Direct Line", True, (0, 200, 140))
-            surf.blit(txt_direct, (gx + gw//2 - txt_direct.get_width()//2, gy + gh//2 - 6))
+            # 시작점 P0 (선박 원점)
+            p0_x, p0_y = plot_pts[0]
+            pygame.draw.circle(surf, (0, 255, 200), (p0_x, p0_y), 4)
+            pygame.draw.circle(surf, (255, 255, 255), (p0_x, p0_y), 2)
             
-        # X축 거리(s) 눈금 및 수치 표기 (단위: m)
+            # 목표점 P3 (골/웨이포인트)
+            p3_x, p3_y = plot_pts[-1]
+            pygame.draw.circle(surf, (255, 160, 40), (p3_x, p3_y), 5)
+            pygame.draw.circle(surf, (255, 255, 255), (p3_x, p3_y), 2)
+            
+            # Pure Pursuit Lookahead 지점 마커
+            if len(plot_pts) > 15:
+                la_idx = min(len(plot_pts) - 1, 20)
+                lx, ly = plot_pts[la_idx]
+                pygame.draw.circle(surf, (255, 80, 180), (lx, ly), 4, 1)
+                
+            path_len_m = float(np.sum(np.hypot(np.diff(pts[:, 0]), np.diff(pts[:, 1])))) / 50.0
+            end_ym = ym[-1]
+        else:
+            sy_max = self.scale_y_max
+            sx_max = self.scale_x_max
+            surf.blit(self.small_font.render(f"+{sy_max:.1f}", True, (160, 200, 230)), (2, gy - 2))
+            surf.blit(self.small_font.render(" 0.0", True, (0, 200, 255)), (2, y_center - 6))
+            surf.blit(self.small_font.render(f"-{sy_max:.1f}", True, (160, 200, 230)), (4, gy + gh - 8))
+            pygame.draw.line(surf, (0, 140, 180), (gx, y_center), (gx + gw, y_center), 1)
+            pygame.draw.line(surf, (50, 225, 255), (gx, y_center), (gx + gw - 20, y_center), 3)
+            path_len_m = 0.0
+            end_ym = 0.0
+            
+        # X축 거리 눈금 및 수치 표기 (단위: m)
         surf.blit(self.small_font.render("0m", True, (140, 180, 220)), (gx, gy + gh + 2))
-        mid_m_txt = f"{self.smooth_path_m * 0.5:.1f}m"
+        mid_m_txt = f"{sx_max * 0.5:.1f}m"
         surf.blit(self.small_font.render(mid_m_txt, True, (140, 180, 220)), (gx + gw//2 - 10, gy + gh + 2))
-        end_m_txt = f"{self.smooth_path_m:.1f}m"
+        end_m_txt = f"{sx_max:.1f}m"
         surf.blit(self.small_font.render(end_m_txt, True, (140, 180, 220)), (gx + gw - len(end_m_txt)*7, gy + gh + 2))
         
         # 하단 수치 스탯 표시
-        surf.blit(self.small_font.render(f"Length: {self.smooth_path_m:.1f} m", True, (220, 235, 255)), (10, 150))
+        surf.blit(self.small_font.render(f"Path Length: {path_len_m:.1f} m", True, (220, 235, 255)), (10, 150))
+        surf.blit(self.small_font.render(f"Lateral Dev: {end_ym:+.1f} m", True, (255, 200, 80)), (10, 170))
+        surf.blit(self.small_font.render("Lookahead: 1.4 m (70px)", True, (255, 100, 200)), (10, 190))
         
-        if max_curv > 1e-4:
-            min_r_m = 1.0 / max_curv
-            surf.blit(self.small_font.render(f"Min R: {min_r_m:.1f} m ({min_r_m * 50:.0f}px)", True, (255, 200, 80)), (10, 170))
-            surf.blit(self.small_font.render(f"Max k: {max_curv:.2f} /m", True, (50, 220, 255)), (10, 190))
-        else:
-            surf.blit(self.small_font.render("Min R: Straight", True, (50, 230, 120)), (10, 170))
-            surf.blit(self.small_font.render("Max k: 0.00 /m", True, (50, 220, 255)), (10, 190))
-            
         env.screen.blit(surf, (1385, env.sim_h + 35))
 
     def _draw_weight_breakdown(self):
