@@ -215,11 +215,28 @@ Estimated ETA:   {eta_str}
             # 에피소드 종료 판정
             if env.collide() or np.linalg.norm(env.target - env.boat_pos) < 70:
                 is_success = (np.linalg.norm(env.target - env.boat_pos) < 70 and not env.collide())
+                tag = "SUCCESS" if is_success else "FAIL"
                 if is_success:
                     success_count += 1
                 else:
                     collision_count += 1
                 completed_episodes += 1
+                
+                # 에피소드 종료 순간 스크린샷 캡처 및 저장
+                ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                outdir = r"screenshot"
+                if not os.path.exists(outdir):
+                    try:
+                        os.makedirs(outdir)
+                    except:
+                        pass
+                p = os.path.join(outdir, f"{ts}_ep{completed_episodes:05d}_{tag}.png")
+                try:
+                    if hits is not None:
+                        env.render(hits)
+                    pygame.image.save(env.screen, p)
+                except Exception:
+                    pass
                 
                 # 결과 파일 실시간 업데이트
                 save_report(is_final=(completed_episodes >= total_episodes))
