@@ -136,6 +136,7 @@ class BoatEnv:
         self.reset()
 
     def reset(self):
+        self.frame = 0
         self.boat_pos = np.array([65, self.sim_h/2], dtype=np.float32)
         self.boat_vel = np.zeros(2)
         self.boat_ang_vel = 0
