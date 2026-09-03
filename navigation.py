@@ -273,10 +273,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         gap_w = np.linalg.norm(c2 - c1)
         width_w = min(gap_w / 90, 1)
         
-        # 전방 근접 갭 우선 선택 가중치 (너무 먼 갭을 건너뛰어 잡지 않고 코앞 유효 갭을 우선 선정)
-        prox_w = math.exp(-0.7 * max(0.0, (distm - 120.0) / 100.0))
-        
-        sc = (heading_align**4.5) * (forward_proj**2.8) * (lateral_full**0.5) * (path_clear**2.0) * (width_w**0.2) * cluster_pen * depth_pen * near_clear_penalty * prox_w
+        sc = (heading_align**4.5) * (forward_proj**2.8) * (lateral_full**0.5) * (path_clear**2.0) * (width_w**0.2) * cluster_pen * depth_pen * near_clear_penalty
         
         if sc > best_sc:
             best_sc = sc
