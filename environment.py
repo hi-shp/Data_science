@@ -120,10 +120,12 @@ class BoatEnv:
         
         self.sim_speed = 1
         self.speed_btns = {
-            1: pygame.Rect(40, 835, 52, 28),
-            2: pygame.Rect(100, 835, 52, 28),
-            3: pygame.Rect(160, 835, 52, 28),
-            4: pygame.Rect(220, 835, 52, 28)
+            1: pygame.Rect(40, 835, 38, 28),
+            2: pygame.Rect(82, 835, 38, 28),
+            4: pygame.Rect(124, 835, 38, 28),
+            8: pygame.Rect(166, 835, 38, 28),
+            16: pygame.Rect(208, 835, 46, 28),
+            32: pygame.Rect(258, 835, 46, 28)
         }
         
         self.renderer = EnvRenderer(self)

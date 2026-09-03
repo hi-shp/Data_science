@@ -19,8 +19,19 @@ def run():
             elif e.type == pygame.MOUSEBUTTONDOWN:
                 if e.button == 1:
                     env.handle_click(e.pos)
+            elif e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_1: env.sim_speed = 1
+                elif e.key == pygame.K_2: env.sim_speed = 2
+                elif e.key == pygame.K_3: env.sim_speed = 4
+                elif e.key == pygame.K_4: env.sim_speed = 8
+                elif e.key == pygame.K_5: env.sim_speed = 16
+                elif e.key == pygame.K_6: env.sim_speed = 32
+                elif e.key in (pygame.K_UP, pygame.K_RIGHT):
+                    env.sim_speed = min(32, max(1, env.sim_speed * 2))
+                elif e.key in (pygame.K_DOWN, pygame.K_LEFT):
+                    env.sim_speed = max(1, env.sim_speed // 2)
 
-        # 실시간 배속 설정에 따른 서브스텝 반복 실행 (1x, 2x, 3x, 4x 실시간 즉시 반영)
+        # 실시간 배속 설정에 따른 서브스텝 반복 실행 (1x ~ 32x 즉시 반영)
         sub_steps = max(1, int(getattr(env, 'sim_speed', 1)))
         hits = None
         
@@ -107,7 +118,7 @@ def run():
                 else:
                     dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
                     # 전방 90도(좌우 45도) 내 특정 거리(115px) 이하에 장애물이 있으면 웨이포인트 전환 보류
-                    front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=115.0, fov_deg=45.0)
+                    front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=5.0, fov_deg=65.0)
                     if not front_blocked and dist_to_curr > 80:
                         threshold = 1.1
                         if new_wp["score"] > env.current_wp["score"] * threshold:
