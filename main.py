@@ -58,7 +58,8 @@ def run():
                     env.clusters, env.cluster_ids,
                     env.boat_pos, env.boat_heading,
                     env.target, env.visited,
-                    env.grid, env.dynamic_obstacles
+                    env.grid, env.dynamic_obstacles,
+                    params=env.params
                 )
                 if new_wp is not None:
                     env.candidate_wps = new_wp.get("candidates", [])
@@ -136,7 +137,8 @@ def run():
                     env.clusters, env.cluster_ids,
                     env.current_wp["pos"], next_head,
                     env.target, temp_visited,
-                    env.grid, env.dynamic_obstacles
+                    env.grid, env.dynamic_obstacles,
+                    params=env.params
                 )
             else:
                 env.next_wp = None

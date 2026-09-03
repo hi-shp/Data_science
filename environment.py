@@ -38,7 +38,8 @@ class BoatEnv:
             'clear_exp': 1.5,
             'width_exp': 0.2,
             'cluster_pen_w': 0.5,
-            'wp_switch_thresh': 1.15
+            'wp_switch_thresh': 1.15,
+            'perp_exp': 1.5
         }
         json_path = "best_learned_params.json"
         if os.path.exists(json_path):

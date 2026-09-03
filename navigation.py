@@ -125,13 +125,20 @@ def is_front_blocked(boat_pos, boat_heading, obstacles, boat_radius=25, block_di
                 return True
     return False
 
-def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, obstacles):
+def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, obstacles, params=None):
     bx, by = boat_pos
     tx, ty = target_pos
     dx_t = tx - bx
     dy_t = ty - by
     dist_to_target = math.hypot(dx_t, dy_t)
     gps_heading = math.atan2(dy_t, dx_t)
+
+    align_exp = params.get('align_exp', 4.5) if params else 4.5
+    fwd_exp = params.get('fwd_exp', 2.8) if params else 2.8
+    clear_exp = params.get('clear_exp', 2.0) if params else 2.0
+    width_exp = params.get('width_exp', 0.2) if params else 0.2
+    cluster_pen_w = params.get('cluster_pen_w', 0.5) if params else 0.5
+    perp_exp = params.get('perp_exp', 1.5) if params else 1.5
 
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])
     
@@ -269,10 +276,18 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         min_clear = max(min_clear, 0)
         path_clear = min(min_clear / 160, 1)**2.2
         
-        gap_w = np.linalg.norm(c2 - c1)
+        # 갭 선분(c1->c2)과 진입 방향(rel) 간의 수직도(Orthogonality) 계산
+        # 2D 외적 크기 |u_app x u_gap| = |sin(theta)|: 직교(90도) 시 1.0, 사선/기울어질수록 감소
+        v_gap = c2 - c1
+        gap_w = np.linalg.norm(v_gap)
+        u_gap = v_gap / (gap_w + 1e-6)
+        u_app = rel / distm
+        perp_score = abs(u_app[0] * u_gap[1] - u_app[1] * u_gap[0])
+        perp_factor = max(perp_score, 0.05) ** perp_exp
+        
         width_w = min(gap_w / 90, 1)
         
-        sc = (heading_align**4.5) * (forward_proj**2.8) * (lateral_full**0.5) * (path_clear**2.0) * (width_w**0.2) * cluster_pen * depth_pen * near_clear_penalty
+        sc = (heading_align**align_exp) * (forward_proj**fwd_exp) * (lateral_full**0.5) * (path_clear**clear_exp) * (width_w**width_exp) * (cluster_pen**cluster_pen_w) * depth_pen * near_clear_penalty * perp_factor
         
         if sc > 0:
             valid_gaps.append({
