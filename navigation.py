@@ -276,13 +276,12 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         min_clear = max(min_clear, 0)
         path_clear = min(min_clear / 160, 1)**2.2
         
-        # 갭 선분(c1->c2)과 진입 방향(rel) 간의 수직도(Orthogonality) 계산
-        # 2D 외적 크기 |u_app x u_gap| = |sin(theta)|: 직교(90도) 시 1.0, 사선/기울어질수록 감소
+        # 갭 선분(c1->c2)과 현재 위치에서 목적지까지의 방향(gps_vec) 간의 수직도(Orthogonality) 계산
+        # 2D 외적 크기 |gps_vec x u_gap| = |sin(theta)|: 목적지 방향에 대해 직교(90도)할 때 1.0, 사선/기울어질수록 감소
         v_gap = c2 - c1
         gap_w = np.linalg.norm(v_gap)
         u_gap = v_gap / (gap_w + 1e-6)
-        u_app = rel / distm
-        perp_score = abs(u_app[0] * u_gap[1] - u_app[1] * u_gap[0])
+        perp_score = abs(gps_vec[0] * u_gap[1] - gps_vec[1] * u_gap[0])
         perp_factor = max(perp_score, 0.05) ** perp_exp
         
         width_w = min(gap_w / 90, 1)

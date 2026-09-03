@@ -15,5 +15,5 @@
   "width_exp": 0.2,
   "cluster_pen_w": 0.2,
   "wp_switch_thresh": 1.8,
-  "perp_exp": 1.5
+  "perp_exp": 5
 }
