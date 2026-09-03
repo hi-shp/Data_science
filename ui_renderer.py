@@ -655,21 +655,21 @@ class EnvRenderer:
         self._draw_weight_breakdown()
 
     def _draw_bezier_profile(self):
-        """우측 하단: 실시간 3차 베지어 곡선(Cubic S-Curve) 2D 궤적 그래프 (X: 전진거리, Y: 좌우편차)"""
+        """우측 하단: 실시간 3차 베지어 곡선(Cubic S-Curve) 2D 궤적 그래프 (X: 전진거리, Y: 좌우편차 - 상하반전 및 3차 수식 표기)"""
         env = self.env
         bw, bh = 190, 220
         surf = self.bezier_surf
         surf.fill((10, 22, 38, 240))
         pygame.draw.rect(surf, (0, 180, 255), (0, 0, bw, bh), 2)
         
-        # 타이틀 (상단 여유 공간 확보)
-        surf.blit(self.bold_font.render("Bezier Curve 2D", True, (255, 255, 255)), (10, 10))
+        # 타이틀
+        surf.blit(self.bold_font.render("Bezier Curve 2D", True, (255, 255, 255)), (10, 8))
         
         # Y축 단위 표기
-        surf.blit(self.small_font.render("Y(m)", True, (140, 190, 240)), (4, 34))
+        surf.blit(self.small_font.render("Y(m)", True, (140, 190, 240)), (4, 30))
         
-        # 그래프 영역 (타이틀과 겹치지 않도록 gy = 48로 하향 배치)
-        gx, gy, gw, gh = 36, 48, 144, 95
+        # 그래프 영역
+        gx, gy, gw, gh = 36, 42, 144, 94
         pygame.draw.rect(surf, (15, 30, 50), (gx, gy, gw, gh))
         pygame.draw.rect(surf, (40, 80, 120), (gx, gy, gw, gh), 1)
         
@@ -701,20 +701,20 @@ class EnvRenderer:
             sx_max = self.scale_x_max
             sy_max = self.scale_y_max
             
-            # Y축 눈금선 및 수치 표기 (+Y_max, 0, -Y_max)
-            surf.blit(self.small_font.render(f"+{sy_max:.1f}", True, (160, 200, 230)), (2, gy - 2))
+            # Y축 눈금선 및 수치 표기 (상하 반전 적용: 상단 -Y, 하단 +Y)
+            surf.blit(self.small_font.render(f"-{sy_max:.1f}", True, (160, 200, 230)), (4, gy - 2))
             surf.blit(self.small_font.render(" 0.0", True, (0, 200, 255)), (2, y_center - 6))
-            surf.blit(self.small_font.render(f"-{sy_max:.1f}", True, (160, 200, 230)), (4, gy + gh - 8))
+            surf.blit(self.small_font.render(f"+{sy_max:.1f}", True, (160, 200, 230)), (2, gy + gh - 8))
             
             # 배경 중심 기준선 (Y = 0: 전방 직진선)
             pygame.draw.line(surf, (0, 140, 180), (gx, y_center), (gx + gw, y_center), 1)
             pygame.draw.line(surf, (25, 55, 80), (gx + gw//2, gy), (gx + gw//2, gy + gh), 1)
             
-            # 3차 베지어 곡선 궤적 포인트 생성
+            # 3차 베지어 곡선 궤적 포인트 생성 (상하 반전: + y_val 방향으로 아래쪽 매핑)
             plot_pts = []
             for x_val, y_val in zip(xm, ym):
                 px = int(gx + (x_val / max(0.1, sx_max)) * (gw - 12))
-                py = int(y_center - (y_val / max(0.1, sy_max)) * (gh * 0.44))
+                py = int(y_center + (y_val / max(0.1, sy_max)) * (gh * 0.44))
                 px = max(gx, min(gx + gw, px))
                 py = max(gy, min(gy + gh, py))
                 plot_pts.append((px, py))
@@ -738,9 +738,9 @@ class EnvRenderer:
         else:
             sy_max = self.scale_y_max
             sx_max = self.scale_x_max
-            surf.blit(self.small_font.render(f"+{sy_max:.1f}", True, (160, 200, 230)), (2, gy - 2))
+            surf.blit(self.small_font.render(f"-{sy_max:.1f}", True, (160, 200, 230)), (4, gy - 2))
             surf.blit(self.small_font.render(" 0.0", True, (0, 200, 255)), (2, y_center - 6))
-            surf.blit(self.small_font.render(f"-{sy_max:.1f}", True, (160, 200, 230)), (4, gy + gh - 8))
+            surf.blit(self.small_font.render(f"+{sy_max:.1f}", True, (160, 200, 230)), (2, gy + gh - 8))
             pygame.draw.line(surf, (0, 140, 180), (gx, y_center), (gx + gw, y_center), 1)
             pygame.draw.line(surf, (50, 225, 255), (gx, y_center), (gx + gw - 20, y_center), 3)
             path_len_m = 0.0
@@ -753,9 +753,12 @@ class EnvRenderer:
         end_m_txt = f"{sx_max:.1f}m"
         surf.blit(self.small_font.render(end_m_txt, True, (140, 180, 220)), (gx + gw - len(end_m_txt)*7, gy + gh + 2))
         
-        # 하단 수치 스탯 표시 (룩어헤드 행 제거 후 여유 있게 배치)
-        surf.blit(self.small_font.render(f"Path Length: {path_len_m:.1f} m", True, (220, 235, 255)), (12, 168))
-        surf.blit(self.small_font.render(f"Lateral Dev: {end_ym:+.1f} m", True, (255, 200, 80)), (12, 190))
+        # 하단 3차 베지어 곡선 수식 표기
+        formula_txt = "B(t)=(1-t)^3 P0+3(1-t)^2 t P1+3(1-t)t^2 P2+t^3 P3"
+        surf.blit(self.small_font.render(formula_txt, True, (255, 215, 60)), (6, 162))
+        
+        # 하단 실시간 궤적 수치
+        surf.blit(self.small_font.render(f"Len: {path_len_m:.1f}m | Dev: {end_ym:+.1f}m", True, (220, 235, 255)), (6, 188))
         
         env.screen.blit(surf, (1385, env.sim_h + 35))
 
