@@ -95,7 +95,7 @@ def run():
                     env.current_wp = None
                     env.candidate_wps = []
 
-            # 1차 웨이포인트 양쪽 장애물의 실시간 위치 추종 갱신
+            # 1차 웨이포인트 양쪽 장애물의 실시간 위치 및 점수 갱신
             if env.current_wp is not None:
                 id1, id2 = env.current_wp["pair"]
                 if id1 in env.cluster_ids and id2 in env.cluster_ids:
@@ -106,19 +106,25 @@ def run():
                     env.current_wp["c1"] = c1_now
                     env.current_wp["c2"] = c2_now
                     env.current_wp["pos"] = (c1_now + c2_now) / 2.0
+                    # 동일한 웨이포인트가 계속 감지되면 최신 점수로 실시간 갱신
+                    if new_wp is not None and (new_wp["pair"] == env.current_wp["pair"] or new_wp["pair"] == (id2, id1)):
+                        env.current_wp["score"] = new_wp["score"]
                 elif new_wp is not None:
+                    # 기존 웨이포인트 부표가 시야에서 사라진 경우에만 새 웨이포인트로 안전하게 인계
                     if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd):
                         env.current_wp = new_wp
 
             if new_wp is not None:
                 if env.current_wp is None:
                     env.current_wp = new_wp
-                else:
+                elif new_wp["pair"] != env.current_wp["pair"] and new_wp["pair"] != (env.current_wp["pair"][1], env.current_wp["pair"][0]):
+                    # 다른 새로운 웨이포인트(갭)로 교체하려는 경우
                     dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                    # 전방 90도(좌우 45도) 내 특정 거리(115px) 이하에 장애물이 있으면 웨이포인트 전환 보류
-                    front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=5.0, fov_deg=65.0)
+                    # 전방 장애물 안전 거리 검사
+                    front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=120.0, fov_deg=65.0)
                     if not front_blocked and dist_to_curr > 80:
-                        threshold = 1.1
+                        # params에 설정된 wp_switch_thresh 실시간 적용 (기본: 1.15)
+                        threshold = float(env.params.get('wp_switch_thresh', 1.15))
                         if new_wp["score"] > env.current_wp["score"] * threshold:
                             # 새 웨이포인트로 선회하는 부채꼴 및 베지어 궤적 상에 정면 장애물이 없을 때만 안전하게 스위칭
                             if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd):
