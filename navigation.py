@@ -107,7 +107,7 @@ def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obs
                     
     return True
 
-def is_front_blocked(boat_pos, boat_heading, obstacles, boat_radius=25, block_dist=190.0, fov_deg=110.0):
+def is_front_blocked(boat_pos, boat_heading, obstacles, boat_radius=25, block_dist=190.0, fov_deg=130.0):
     if obstacles is None or len(obstacles) == 0:
         return False
     bx, by = boat_pos

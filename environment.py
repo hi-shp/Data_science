@@ -85,7 +85,7 @@ class BoatEnv:
         
         self.obs_n = 80
         self.obs_r = 17
-        self.min_obs = 110
+        self.min_obs = 120
         
         self.grid = init_grid()
         self.clusters = []
@@ -123,12 +123,11 @@ class BoatEnv:
         
         self.sim_speed = 1
         self.speed_btns = {
-            1: pygame.Rect(40, 835, 38, 28),
-            2: pygame.Rect(82, 835, 38, 28),
-            4: pygame.Rect(124, 835, 38, 28),
-            8: pygame.Rect(166, 835, 38, 28),
-            16: pygame.Rect(208, 835, 46, 28),
-            32: pygame.Rect(258, 835, 46, 28)
+            1: pygame.Rect(40, 835, 45, 28),
+            2: pygame.Rect(92, 835, 45, 28),
+            4: pygame.Rect(144, 835, 45, 28),
+            8: pygame.Rect(196, 835, 45, 28),
+            16: pygame.Rect(248, 835, 52, 28)
         }
         
         self.renderer = EnvRenderer(self)

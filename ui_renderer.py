@@ -350,7 +350,7 @@ class EnvRenderer:
         if env.show_lidar_range: pygame.draw.rect(env.screen, (80, 175, 140), env.cb4_rect.inflate(-6, -6))
         env.screen.blit(self.font.render("Show LiDAR Range", True, (255, 255, 255)), (70, 792))
 
-        # 시뮬레이션 배속 제어 버튼 (1x, 2x, 4x, 8x, 16x, 32x)
+        # 시뮬레이션 배속 제어 버튼 (1x, 2x, 4x, 8x, 16x)
         env.screen.blit(self.small_font.render("SIMULATION SPEED", True, (160, 200, 240)), (40, 818))
         cur_spd = getattr(env, 'sim_speed', 1)
         for spd, btn_rect in env.speed_btns.items():
