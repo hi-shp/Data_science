@@ -735,6 +735,22 @@ class EnvRenderer:
             
             path_len_m = float(np.sum(np.hypot(np.diff(pts[:, 0]), np.diff(pts[:, 1])))) / 50.0
             end_ym = ym[-1]
+            
+            # 실시간 3차 함수 계수 계산 (y(0) = 0 제약 최소자승법)
+            if len(xm) >= 4 and (np.max(xm) - np.min(xm)) > 0.3:
+                A = np.stack([xm**3, xm**2, xm], axis=1)
+                (a, b, c), _, _, _ = np.linalg.lstsq(A, ym, rcond=None)
+            else:
+                a, b, c = 0.0, 0.0, 0.0
+                
+            if not hasattr(self, 'poly_coeffs'): self.poly_coeffs = (0.0, 0.0, 0.0)
+            self.poly_coeffs = (
+                self.poly_coeffs[0] * 0.80 + a * 0.20,
+                self.poly_coeffs[1] * 0.80 + b * 0.20,
+                self.poly_coeffs[2] * 0.80 + c * 0.20
+            )
+            sa, sb, sc = self.poly_coeffs
+            formula_txt = f"y = {sa:+.3f}x³ {sb:+.2f}x² {sc:+.2f}x"
         else:
             sy_max = self.scale_y_max
             sx_max = self.scale_x_max
@@ -745,6 +761,7 @@ class EnvRenderer:
             pygame.draw.line(surf, (50, 225, 255), (gx, y_center), (gx + gw - 20, y_center), 3)
             path_len_m = 0.0
             end_ym = 0.0
+            formula_txt = "y = +0.000x³ +0.00x² +0.00x"
             
         # X축 거리 눈금 및 수치 표기 (단위: m)
         surf.blit(self.small_font.render("0m", True, (140, 180, 220)), (gx, gy + gh + 2))
@@ -753,12 +770,11 @@ class EnvRenderer:
         end_m_txt = f"{sx_max:.1f}m"
         surf.blit(self.small_font.render(end_m_txt, True, (140, 180, 220)), (gx + gw - len(end_m_txt)*7, gy + gh + 2))
         
-        # 하단 3차 베지어 곡선 수식 표기
-        formula_txt = "B(t)=(1-t)^3 P0+3(1-t)^2 t P1+3(1-t)t^2 P2+t^3 P3"
-        surf.blit(self.small_font.render(formula_txt, True, (255, 215, 60)), (6, 162))
+        # 하단 실시간 3차 다항식 수식 표기 (실시간 수치 적용)
+        surf.blit(self.small_font.render(formula_txt, True, (255, 220, 60)), (8, 164))
         
         # 하단 실시간 궤적 수치
-        surf.blit(self.small_font.render(f"Len: {path_len_m:.1f}m | Dev: {end_ym:+.1f}m", True, (220, 235, 255)), (6, 188))
+        surf.blit(self.small_font.render(f"Len: {path_len_m:.1f}m | Lat Dev: {end_ym:+.1f}m", True, (220, 235, 255)), (8, 188))
         
         env.screen.blit(surf, (1385, env.sim_h + 35))
 

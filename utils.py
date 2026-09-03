@@ -89,7 +89,7 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
                 side = np.dot(obs_pos - p0, n_dir)
                 push_dir = -n_dir if side >= 0 else n_dir
                 
-            push_mag = min(130.0, encroach * 1.4)
+            push_mag = min(125.0, encroach * 1.4)
             
             w1 = max(0.2, 1.0 - t_idx * 0.7)
             w2 = max(0.2, t_idx * 0.7 + 0.3)
