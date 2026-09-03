@@ -662,14 +662,14 @@ class EnvRenderer:
         surf.fill((10, 22, 38, 240))
         pygame.draw.rect(surf, (0, 180, 255), (0, 0, bw, bh), 2)
         
-        # 타이틀
-        surf.blit(self.bold_font.render("Bezier Curve 2D", True, (255, 255, 255)), (10, 8))
+        # 타이틀 (상단 여유 공간 확보)
+        surf.blit(self.bold_font.render("Bezier Curve 2D", True, (255, 255, 255)), (10, 10))
         
         # Y축 단위 표기
-        surf.blit(self.small_font.render("Y(m)", True, (140, 190, 240)), (4, 20))
+        surf.blit(self.small_font.render("Y(m)", True, (140, 190, 240)), (4, 34))
         
-        # 그래프 영역
-        gx, gy, gw, gh = 36, 34, 144, 94
+        # 그래프 영역 (타이틀과 겹치지 않도록 gy = 48로 하향 배치)
+        gx, gy, gw, gh = 36, 48, 144, 95
         pygame.draw.rect(surf, (15, 30, 50), (gx, gy, gw, gh))
         pygame.draw.rect(surf, (40, 80, 120), (gx, gy, gw, gh), 1)
         
@@ -733,12 +733,6 @@ class EnvRenderer:
             pygame.draw.circle(surf, (255, 160, 40), (p3_x, p3_y), 5)
             pygame.draw.circle(surf, (255, 255, 255), (p3_x, p3_y), 2)
             
-            # Pure Pursuit Lookahead 지점 마커
-            if len(plot_pts) > 15:
-                la_idx = min(len(plot_pts) - 1, 20)
-                lx, ly = plot_pts[la_idx]
-                pygame.draw.circle(surf, (255, 80, 180), (lx, ly), 4, 1)
-                
             path_len_m = float(np.sum(np.hypot(np.diff(pts[:, 0]), np.diff(pts[:, 1])))) / 50.0
             end_ym = ym[-1]
         else:
@@ -759,10 +753,9 @@ class EnvRenderer:
         end_m_txt = f"{sx_max:.1f}m"
         surf.blit(self.small_font.render(end_m_txt, True, (140, 180, 220)), (gx + gw - len(end_m_txt)*7, gy + gh + 2))
         
-        # 하단 수치 스탯 표시
-        surf.blit(self.small_font.render(f"Path Length: {path_len_m:.1f} m", True, (220, 235, 255)), (10, 150))
-        surf.blit(self.small_font.render(f"Lateral Dev: {end_ym:+.1f} m", True, (255, 200, 80)), (10, 170))
-        surf.blit(self.small_font.render("Lookahead: 1.4 m (70px)", True, (255, 100, 200)), (10, 190))
+        # 하단 수치 스탯 표시 (룩어헤드 행 제거 후 여유 있게 배치)
+        surf.blit(self.small_font.render(f"Path Length: {path_len_m:.1f} m", True, (220, 235, 255)), (12, 168))
+        surf.blit(self.small_font.render(f"Lateral Dev: {end_ym:+.1f} m", True, (255, 200, 80)), (12, 190))
         
         env.screen.blit(surf, (1385, env.sim_h + 35))
 
@@ -774,8 +767,8 @@ class EnvRenderer:
         surf.fill((10, 22, 38, 240))
         pygame.draw.rect(surf, (0, 180, 255), (0, 0, ww, wh), 2)
         
-        # 타이틀 (보조 텍스트 없이 깔끔하게 배치)
-        surf.blit(self.bold_font.render("WP Score Weights", True, (255, 255, 255)), (10, 8))
+        # 타이틀
+        surf.blit(self.bold_font.render("WP Score Weights", True, (255, 255, 255)), (10, 10))
         
         wp = getattr(env, 'current_wp', None)
         factors = wp.get('factors', None) if wp is not None else None
@@ -794,28 +787,41 @@ class EnvRenderer:
         bar_h = 8
         
         if wp is not None and factors is not None:
-            vals = [max(0.01, float(factors.get(k, 0.5))) for k, _ in FACTOR_ITEMS]
-            tot = sum(vals) if sum(vals) > 1e-6 else 1.0
-            ratios = [v / tot for v in vals]
+            # 가중치 w와 점수 raw를 곱하여 실제 기여 점수 산출 (w가 0이면 0% 표출)
+            weighted_vals = []
+            for k, _ in FACTOR_ITEMS:
+                item = factors.get(k, None)
+                if isinstance(item, dict):
+                    w = float(item.get("w", 0.0))
+                    raw = float(item.get("raw", 0.0))
+                    weighted_vals.append(w * raw)
+                elif isinstance(item, (int, float)):
+                    weighted_vals.append(float(item))
+                else:
+                    weighted_vals.append(0.0)
+                    
+            tot = sum(weighted_vals)
+            ratios = [v / tot if tot > 1e-6 else 0.0 for v in weighted_vals]
             
             for i, (name, col) in enumerate(FACTOR_ITEMS):
-                y_pos = 38 + i * 29
+                y_pos = 46 + i * 27
                 lbl = self.small_font.render(name, True, (210, 225, 240))
                 surf.blit(lbl, (10, y_pos - 2))
                 
                 pygame.draw.rect(surf, (20, 40, 65), (bar_x, y_pos, bar_w, bar_h), border_radius=3)
                 
-                fill_w = max(2, int(ratios[i] * bar_w * 2.2))
-                fill_w = min(bar_w, fill_w)
-                pygame.draw.rect(surf, col, (bar_x, y_pos, fill_w, bar_h), border_radius=3)
-                
-                pct = int(ratios[i] * 100)
-                txt_pct = self.small_font.render(f"{pct}%", True, col)
+                if ratios[i] > 0.001:
+                    fill_w = max(2, int(ratios[i] * bar_w * 2.2))
+                    fill_w = min(bar_w, fill_w)
+                    pygame.draw.rect(surf, col, (bar_x, y_pos, fill_w, bar_h), border_radius=3)
+                    
+                pct = int(round(ratios[i] * 100))
+                txt_pct = self.small_font.render(f"{pct}%", True, col if pct > 0 else (120, 140, 160))
                 surf.blit(txt_pct, (bar_x + bar_w + 6, y_pos - 2))
         else:
-            # 웨이포인트가 없을 때 (초록색 화면 없이 차분한 대기 상태 UI 유지)
+            # 웨이포인트가 없을 때 (대기 상태 UI 유지)
             for i, (name, col) in enumerate(FACTOR_ITEMS):
-                y_pos = 38 + i * 29
+                y_pos = 46 + i * 27
                 lbl = self.small_font.render(name, True, (120, 145, 170))
                 surf.blit(lbl, (10, y_pos - 2))
                 

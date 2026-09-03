@@ -308,12 +308,12 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
                 "pair": (id1, id2),
                 "score": sc,
                 "factors": {
-                    "Align": term_align,
-                    "Forward": term_fwd,
-                    "Clear": term_clear,
-                    "Perpend": term_perp,
-                    "Proxim": term_prox,
-                    "Cluster": term_cluster
+                    "Align": {"raw": float(heading_align), "w": float(align_exp)},
+                    "Forward": {"raw": float(forward_proj), "w": float(fwd_exp)},
+                    "Clear": {"raw": float(path_clear), "w": float(clear_exp)},
+                    "Perpend": {"raw": float(perp_score), "w": float(perp_exp)},
+                    "Proxim": {"raw": float(prox_score), "w": float(prox_exp)},
+                    "Cluster": {"raw": float(cluster_pen), "w": float(cluster_pen_w)}
                 }
             })
             
