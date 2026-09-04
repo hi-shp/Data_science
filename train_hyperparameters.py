@@ -158,7 +158,7 @@ def evaluate_case_worker(args):
                         env.current_wp["c2"] = c2_now
                         env.current_wp["pos"] = (c1_now + c2_now) / 2.0
                     elif new_wp is not None:
-                        if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd):
+                        if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params):
                             env.current_wp = new_wp
 
                 if new_wp is not None:
@@ -166,11 +166,16 @@ def evaluate_case_worker(args):
                         env.current_wp = new_wp
                     elif new_wp["pair"] != env.current_wp["pair"] and new_wp["pair"] != (env.current_wp["pair"][1], env.current_wp["pair"][0]):
                         dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                        front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=120.0, fov_deg=65.0)
-                        if not front_blocked and dist_to_curr > 80:
-                            thresh = float(env.params.get("wp_switch_thresh", 1.15))
-                            if new_wp["score"] > env.current_wp.get("score", 0.0) * thresh:
-                                if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd):
+                        wp_block_dist = float(env.params.get('wp_switch_block_dist', 120.0))
+                        wp_fov_deg = float(env.params.get('wp_switch_fov_deg', 65.0))
+                        front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=wp_block_dist, fov_deg=wp_fov_deg)
+                        
+                        wp_switch_dist = float(env.params.get('wp_switch_dist', 80.0))
+                        wp_switch_thresh = float(env.params.get('wp_switch_thresh', 1.1))
+                        
+                        if not front_blocked and dist_to_curr > wp_switch_dist:
+                            if new_wp["score"] > env.current_wp.get("score", 0.0) * wp_switch_thresh:
+                                if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params):
                                     env.current_wp = new_wp
 
                 if env.current_wp is not None and not clear_to_target:

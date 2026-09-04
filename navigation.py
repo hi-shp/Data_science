@@ -58,10 +58,16 @@ def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_ra
         return False
     return True
 
-def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obstacles, boat_radius=25, boat_speed=0.0):
+def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obstacles, boat_radius=25, boat_speed=0.0, params=None):
     if curr_wp_pos is None or new_wp_pos is None or len(obstacles) == 0:
         return True
         
+    p = params or {}
+    ang_thresh_deg = float(p.get('wp_switch_safe_ang_deg', 25.0))
+    sweep_radius = float(p.get('wp_switch_sweep_radius', 110.0))
+    margin = float(p.get('wp_switch_margin', 40.0))
+    bezier_margin = float(p.get('wp_switch_bezier_margin', 8.0))
+
     bx, by = boat_pos
     v_curr = curr_wp_pos - boat_pos
     v_new = new_wp_pos - boat_pos
@@ -71,18 +77,17 @@ def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obs
     
     # 각도 차이가 작으면 (동일 방향/미세 갱신) 안전
     switch_ang_diff = abs(wrap(ang_new - ang_curr))
-    if switch_ang_diff < np.deg2rad(25.0):
+    if switch_ang_diff < np.deg2rad(ang_thresh_deg):
         return True
         
     # 1. 현재 선박 헤딩에서 새 웨이포인트로 선회하는 베지어 곡선 검증
     from utils import make_bezier_path
     new_bezier = make_bezier_path(boat_pos, boat_heading, new_wp_pos, obstacles=obstacles, boat_radius=boat_radius, boat_speed=boat_speed)
-    if bezier_path_is_blocked(new_bezier, obstacles, boat_radius=boat_radius, margin=8.0):
+    if bezier_path_is_blocked(new_bezier, obstacles, boat_radius=boat_radius, margin=bezier_margin):
         return False
         
     # 2. 기존 방향과 새 방향 사이의 부채꼴(Turn Sector) 영역 장애물 검사
     ang_head_to_new = wrap(ang_new - boat_heading)
-    sweep_radius = 110.0
     
     for ox, oy, orad in obstacles:
         dx = ox - bx
@@ -102,7 +107,7 @@ def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obs
                     in_sector = True
                     
             if in_sector:
-                if obs_dist - orad < boat_radius + 40.0:
+                if obs_dist - orad < boat_radius + margin:
                     return False
                     
     return True

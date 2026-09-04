@@ -15,6 +15,9 @@
   "width_exp": 0.2,
   "cluster_pen_w": 2.0,
   "wp_switch_thresh": 1.1,
+  "wp_switch_dist": 80.0,
+  "wp_switch_block_dist": 120.0,
+  "wp_switch_fov_deg": 65.0,
   "perp_exp": 3,
   "prox_exp": 4
 }

@@ -38,17 +38,14 @@ class BoatEnv:
             'clear_exp': 1.5,
             'width_exp': 0.2,
             'cluster_pen_w': 0.5,
-            'wp_switch_thresh': 1.15,
+            'wp_switch_thresh': 1.1,
+            'wp_switch_dist': 80.0,
+            'wp_switch_block_dist': 120.0,
+            'wp_switch_fov_deg': 65.0,
             'perp_exp': 1.5,
             'prox_exp': 0.5
         }
-        json_path = "best_learned_params.json"
-        if os.path.exists(json_path):
-            try:
-                with open(json_path, "r") as f:
-                    self.params.update(json.load(f))
-            except Exception:
-                pass
+        self.load_params()
          
         self.lidar_beams = 180
         self.lidar_range = 320
@@ -135,7 +132,17 @@ class BoatEnv:
         self.renderer = EnvRenderer(self)
         self.reset()
 
+    def load_params(self):
+        json_path = "best_learned_params.json"
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, "r") as f:
+                    self.params.update(json.load(f))
+            except Exception:
+                pass
+
     def reset(self):
+        self.load_params()
         self.frame = 0
         self.boat_pos = np.array([65, self.sim_h/2], dtype=np.float32)
         self.boat_vel = np.zeros(2)

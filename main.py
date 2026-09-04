@@ -132,7 +132,7 @@ def run():
                             env.current_wp["factors"] = new_wp["factors"]
                 elif new_wp is not None:
                     # 기존 웨이포인트 부표가 시야에서 사라진 경우에만 새 웨이포인트로 안전하게 인계
-                    if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd):
+                    if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params):
                         env.current_wp = new_wp
 
             if new_wp is not None:
@@ -141,14 +141,18 @@ def run():
                 elif new_wp["pair"] != env.current_wp["pair"] and new_wp["pair"] != (env.current_wp["pair"][1], env.current_wp["pair"][0]):
                     # 다른 새로운 웨이포인트(갭)로 교체하려는 경우
                     dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                    # 전방 장애물 안전 거리 검사
-                    front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=120.0, fov_deg=65.0)
-                    if not front_blocked and dist_to_curr > 80:
-                        # params에 설정된 wp_switch_thresh 실시간 적용 (기본: 1.15)
-                        threshold = float(env.params.get('wp_switch_thresh', 1.15))
-                        if new_wp["score"] > env.current_wp["score"] * threshold:
+                    # JSON에서 WP_SWITCH 관련 파라미터 로드
+                    wp_block_dist = float(env.params.get('wp_switch_block_dist', 120.0))
+                    wp_fov_deg = float(env.params.get('wp_switch_fov_deg', 65.0))
+                    front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=wp_block_dist, fov_deg=wp_fov_deg)
+                    
+                    wp_switch_dist = float(env.params.get('wp_switch_dist', 80.0))
+                    wp_switch_thresh = float(env.params.get('wp_switch_thresh', 1.1))
+                    
+                    if not front_blocked and dist_to_curr > wp_switch_dist:
+                        if new_wp["score"] > env.current_wp["score"] * wp_switch_thresh:
                             # 새 웨이포인트로 선회하는 부채꼴 및 베지어 궤적 상에 정면 장애물이 없을 때만 안전하게 스위칭
-                            if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd):
+                            if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params):
                                 env.current_wp = new_wp
                             
             if env.current_wp is not None and not clear_to_target:
