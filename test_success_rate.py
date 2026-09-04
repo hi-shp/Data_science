@@ -21,7 +21,8 @@ def main():
     collision_count = 0
     
     start_time = time.time()
-    out_file = "success_rate_10000_20260903.txt"
+    date_str = datetime.datetime.now().strftime("%Y%m%d")
+    out_file = f"success_rate_{total_episodes}_{date_str}.txt"
     
     def save_report(is_final=False):
         elapsed = time.time() - start_time
