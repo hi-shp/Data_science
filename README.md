@@ -3,21 +3,21 @@
 
 라이다 센서 데이터에 DBSCAN 군집화를 적용하여 장애물 사이 빈 공간(Gap)의 중심점을 찾고, 3차 베지어 곡선과 순수추종(Pure Pursuit) 알고리즘으로 부드럽게 경로를 추종하도록 구현한 2D 자율운항 시뮬레이션 프로젝트입니다.
 
-![Simulation 4x Demo](images/simulation_demo.gif)
+<img src="images/simulation_demo.gif" width="100%" alt="4배속 주행 데모 (5회 연속 완주)" />
 
-4배속 주행 데모 (3회 연속 완주)
+4배속 주행 데모 (5회 연속 완주)
 
 ---
 
 ## 주행 화면
 
 ### 1배속 주행
-![Simulation 1x](images/simulation_1x.gif)
+<img src="images/simulation_1x.gif" width="100%" alt="1배속 주행 화면 (3회 연속 완주)" />
 
 1배속 주행 화면 (3회 연속 완주)
 
 ### 2배속 주행
-![Simulation 2x](images/simulation_2x.gif)
+<img src="images/simulation_2x.gif" width="100%" alt="2배속 주행 화면 (3회 연속 완주)" />
 
 2배속 주행 화면 (3회 연속 완주)
 
