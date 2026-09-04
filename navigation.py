@@ -3,7 +3,7 @@ import math
 from utils import wrap
 from config import GRID, GRID_W, GRID_H
 
-def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25):
+def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25, params=None):
     bx, by = boat_pos
     tx, ty = target_pos
     vx = tx - bx
@@ -19,7 +19,9 @@ def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25):
     
     ox = obstacles[:, 0]
     oy = obstacles[:, 1]
-    orad = obstacles[:, 2] + boat_radius + 4.0  # 안전 여유 4px
+    p = params or {}
+    margin = float(p.get('target_clear_margin', 4.0))
+    orad = obstacles[:, 2] + boat_radius + margin
     
     px = ox - bx
     py = oy - by
@@ -48,13 +50,15 @@ def bezier_path_is_blocked(path, obstacles, boat_radius=25, margin=10):
             return True
     return False
 
-def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_radius=25, boat_speed=0.0):
-    if not target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius):
+def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_radius=25, boat_speed=0.0, params=None):
+    if not target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius, params=params):
         return False
     from utils import make_bezier_path
+    p = params or {}
+    margin = float(p.get('clear_margin', 8.0))
     # 목적지까지 회전하는 실제 베지어 궤적이 장애물과 충돌하는지 검증
     test_path = make_bezier_path(boat_pos, boat_heading, target_pos, obstacles=obstacles, boat_radius=boat_radius, boat_speed=boat_speed)
-    if bezier_path_is_blocked(test_path, obstacles, boat_radius=boat_radius, margin=8.0):
+    if bezier_path_is_blocked(test_path, obstacles, boat_radius=boat_radius, margin=margin):
         return False
     return True
 
@@ -157,7 +161,8 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             continue
             
         ang = wrap(math.atan2(v[1], v[0]) - boat_heading)
-        if abs(ang) < np.deg2rad(65):
+        gap_fov_deg = float(params.get('gap_fov_deg', 65.0)) if params else 65.0
+        if abs(ang) < np.deg2rad(gap_fov_deg):
             items.append((ang, dist, c, ids[i]))
             
     if len(items) < 2:
@@ -327,9 +332,10 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     best["candidates"] = valid_gaps[1:3]  # 순위 높은 2, 3위 차순위 후보
     return best
 
-def reactive_avoidance(dists, angles):
-    SAFE = 450.0
-    sigma = 150.0
+def reactive_avoidance(dists, angles, params=None):
+    p = params or {}
+    SAFE = float(p.get('avoid_safe_dist', 450.0))
+    sigma = float(p.get('avoid_sigma', 150.0))
     mask = dists < SAFE
     if not np.any(mask):
         return 0.0

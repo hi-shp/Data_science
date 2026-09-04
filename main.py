@@ -50,7 +50,8 @@ def run():
             )
 
             update_grid(env.grid, hits)
-            env.grid *= 0.945
+            grid_decay = float(env.params.get('grid_decay', 0.945))
+            env.grid *= grid_decay
 
             # 연산 부하 절감을 위한 적응형 인지/탐색 주기
             if step_idx % plan_interval == 0 or step_idx == sub_steps - 1:
@@ -61,7 +62,7 @@ def run():
 
                 dist_to_target = np.linalg.norm(env.target - env.boat_pos)
                 boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
-                clear_to_target = is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd)
+                clear_to_target = is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params)
 
                 # 목적지까지 회전 궤적 및 직선 경로에 장애물이 전혀 없을 때만 목적지 직행
                 if clear_to_target:
@@ -92,19 +93,21 @@ def run():
                 vec_to_wp = env.current_wp["pos"] - env.boat_pos
                 dnow = np.linalg.norm(vec_to_wp)
                 
-                # 1. 웨이포인트 근접 시 해제 (25px 이내)
-                if dnow < 25:
+                # 1. 웨이포인트 근접 시 해제
+                wp_clear_dist = float(env.params.get('wp_clear_dist', 25.0))
+                if dnow < wp_clear_dist:
                     should_clear = True
                     
                 wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
                 angle_diff = abs(wrap(wp_angle - env.boat_heading))
                 
                 # 2. 웨이포인트를 지나쳐 측후방으로 넘어가면 즉시 해제하여 직진
-                if angle_diff > np.pi / 2:
+                wp_pass_angle = np.deg2rad(float(env.params.get('wp_pass_angle_deg', 90.0)))
+                if angle_diff > wp_pass_angle:
                     should_clear = True
                     
                 # 3. 선박 위치에서 목적지까지 장애물이 없으면 즉시 해제하여 목적지 직행
-                if target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
+                if target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles, params=env.params):
                     should_clear = True
                     
                 if should_clear:
@@ -190,14 +193,16 @@ def run():
                     env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     
                 if env.bezier_path is not None:
-                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)
+                    pursuit_lookahead = float(env.params.get('pursuit_lookahead', 70.0))
+                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=pursuit_lookahead)
                     
                 if env.current_wp is not None and env.next_wp is not None:
                     vec = env.current_wp["pos"] - env.boat_pos
                     next_start_head = math.atan2(vec[1], vec[0])
                     env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_start_head, env.next_wp["pos"], obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     if env.next_bezier_path is not None:
-                        env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=75)
+                        pursuit_lookahead_next = float(env.params.get('pursuit_lookahead_next', 75.0))
+                        env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=pursuit_lookahead_next)
                 else:
                     env.next_bezier_path = None
                     env.next_pursuit_target = None
@@ -206,7 +211,8 @@ def run():
 
             if env.current_wp is not None and env.next_pursuit_target is not None and env.pursuit_target is not None:
                 dist_to_wp = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                if dist_to_wp < 50:
+                next_wp_transition_dist = float(env.params.get('next_wp_transition_dist', 50.0))
+                if dist_to_wp < next_wp_transition_dist:
                     env.pursuit_target = env.next_pursuit_target
 
             steer = env.update_steering(dists)
@@ -221,8 +227,9 @@ def run():
             env.validate_wp_grid()
             env.validate_wp_obstacle_5x5()
 
-            if env.collide() or np.linalg.norm(env.target - env.boat_pos) < 70:
-                is_success = (np.linalg.norm(env.target - env.boat_pos) < 70 and not env.collide())
+            goal_reach_dist = float(env.params.get('goal_reach_dist', 70.0))
+            if env.collide() or np.linalg.norm(env.target - env.boat_pos) < goal_reach_dist:
+                is_success = (np.linalg.norm(env.target - env.boat_pos) < goal_reach_dist and not env.collide())
                 tag = "SUCCESS" if is_success else "FAIL"
                 ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 outdir = r"screenshot"

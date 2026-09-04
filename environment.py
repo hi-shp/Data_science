@@ -43,7 +43,17 @@ class BoatEnv:
             'wp_switch_block_dist': 120.0,
             'wp_switch_fov_deg': 65.0,
             'perp_exp': 1.5,
-            'prox_exp': 0.5
+            'prox_exp': 0.5,
+            'wp_clear_dist': 25.0,
+            'wp_pass_angle_deg': 90.0,
+            'pursuit_lookahead': 70.0,
+            'pursuit_lookahead_next': 75.0,
+            'next_wp_transition_dist': 50.0,
+            'goal_reach_dist': 70.0,
+            'grid_decay': 0.945,
+            'gap_fov_deg': 65.0,
+            'speed_divisor': 6.0,
+            'damping_coeff': 0.32
         }
         self.load_params()
          
@@ -236,7 +246,8 @@ class BoatEnv:
         # 220도 범위 내 최소 장애물 거리에 따른 순수 연속 함수 속도 제어 (장애물 근접 시 최소 속도를 더욱 낮추어 서행)
         em_dist = float(getattr(self, 'min_wide_dist', 999.0))
         speed_factor = (math.tanh(em_dist / 100.0)) ** 1.35
-        target_fwd = ((tL + tR) / 6.0) * speed_factor
+        speed_divisor = float(self.params.get('speed_divisor', 6.0))
+        target_fwd = ((tL + tR) / speed_divisor) * speed_factor
             
         if not hasattr(self, 'current_fwd'):
             self.current_fwd = 0.0
@@ -478,13 +489,14 @@ class BoatEnv:
         avoid_multiplier = self.params['avoid_normal'] + (1.0 - clear_ratio) * (self.params['avoid_em'] * 0.25)
             
         # 각속도 댐핑을 강화하여 관성 오버슈트 및 휙휙 도는 회전 억제
-        d_term = -0.32 * getattr(self, 'boat_ang_vel', 0.0)
+        damping_coeff = float(self.params.get('damping_coeff', 0.32))
+        d_term = -damping_coeff * getattr(self, 'boat_ang_vel', 0.0)
         steer_raw = heading_error * steer_gain + d_term
         alpha = self.params['steer_alpha']
         steer_f = alpha * steer_raw + (1.0 - alpha) * self.prev_steer
         self.prev_steer = steer_f
         
-        avoid = reactive_avoidance(dists, self.rel_angles)
+        avoid = reactive_avoidance(dists, self.rel_angles, params=self.params)
         
         # 반발력 정상 작동: 웨이포인트 선회 방향과 반대로 충돌할 때만 상쇄 방지를 위해 소프트 감쇠(0.25) 적용
         if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.15:

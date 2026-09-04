@@ -101,7 +101,8 @@ def evaluate_case_worker(args):
                 )
 
                 update_grid(env.grid, hits)
-                env.grid *= 0.945
+                grid_decay = float(env.params.get('grid_decay', 0.945))
+                env.grid *= grid_decay
 
                 new_c = extract_clusters_from_grid(env.grid)
                 env.clusters, env.cluster_ids = match_clusters(
@@ -111,7 +112,8 @@ def evaluate_case_worker(args):
                 boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
                 clear_to_target = is_direct_target_safe(
                     env.boat_pos, env.boat_heading, env.target,
-                    env.dynamic_obstacles, env.boat_radius, boat_spd
+                    env.dynamic_obstacles, env.boat_radius, boat_spd,
+                    params=env.params
                 )
 
                 if clear_to_target:
@@ -140,7 +142,9 @@ def evaluate_case_worker(args):
                     wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
                     angle_diff = abs(wrap(wp_angle - env.boat_heading))
                     
-                    if dnow < 25 or angle_diff > np.pi / 2 or target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
+                    wp_clear_dist = float(env.params.get('wp_clear_dist', 25.0))
+                    wp_pass_angle = np.deg2rad(float(env.params.get('wp_pass_angle_deg', 90.0)))
+                    if dnow < wp_clear_dist or angle_diff > wp_pass_angle or target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles, params=env.params):
                         p = env.current_wp["pair"]
                         env.visited.add(p)
                         env.visited.add((p[1], p[0]))
@@ -200,7 +204,8 @@ def evaluate_case_worker(args):
                     env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, env.current_wp["pos"], obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                 
                 if env.bezier_path is not None:
-                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)
+                    pursuit_lookahead = float(env.params.get('pursuit_lookahead', 70.0))
+                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=pursuit_lookahead)
 
                 steer = env.update_steering(dists)
                 if steer is None:
@@ -215,7 +220,8 @@ def evaluate_case_worker(args):
                 # 종료 판정
                 is_collide = env.collide()
                 dist_to_goal = np.linalg.norm(env.target - env.boat_pos)
-                reached_goal = (dist_to_goal < 70)
+                goal_reach_dist = float(env.params.get('goal_reach_dist', 70.0))
+                reached_goal = (dist_to_goal < goal_reach_dist)
                 timed_out = (ep_frames > 2500)
 
                 if is_collide or reached_goal or timed_out:
