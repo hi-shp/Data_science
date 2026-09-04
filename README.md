@@ -9,13 +9,19 @@
 
 ---
 
-## 주행 영상 (Simulation Videos)
+## 주행 화면 (Simulation)
 
-다양한 주행 속도에서의 선박 거동과 경로 계획 과정을 담은 주행 영상입니다.
+선박의 정밀한 선회 거동과 연속 장애물 회피 과정을 배속별로 직접 확인할 수 있는 주행 화면입니다.
 
-- **1배속 정밀 주행 영상**: [images/simulation_1x.mp4](images/simulation_1x.mp4) (실시간 센서 반응 및 완만한 선회 거동)
-- **2배속 연속 주행 영상**: [images/simulation_2x.mp4](images/simulation_2x.mp4) (동적 장애물 사이 연속 우회 통과)
-- **4배속 5바퀴 연속 주행 영상**: [images/simulation_5_laps.mp4](images/simulation_5_laps.mp4) (랜덤 배치 환경 5회 연속 완주)
+### 1배속 정밀 주행
+![Simulation 1x](images/simulation_1x.gif)
+
+1배속 정밀 주행 화면: 실시간 센서 인지 반응 및 장애물 회피 시 완만한 선회 거동
+
+### 2배속 연속 우회 주행
+![Simulation 2x](images/simulation_2x.gif)
+
+2배속 연속 우회 주행 화면: 동적 장애물 사이 빈 공간(Gap)을 연속 탐색하여 유연하게 우회 통과
 
 ---
 
