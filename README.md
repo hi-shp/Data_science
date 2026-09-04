@@ -5,23 +5,21 @@
 
 ![Simulation 8x Demo](images/simulation_demo.gif)
 
-8배속 주행 데모: 하단 8x 버튼을 클릭하여 3회 연속 무충돌 완주하는 모습입니다.
+8배속 주행 데모 (3회 연속 완주)
 
 ---
 
 ## 주행 화면
 
-배속별 3회 연속 완주 주행 모습입니다. 인터페이스 하단의 배속 버튼(2x, 4x)을 클릭하여 주행합니다.
+### 1배속 주행
+![Simulation 1x](images/simulation_1x.gif)
+
+1배속 주행 화면 (3회 연속 완주)
 
 ### 2배속 주행
 ![Simulation 2x](images/simulation_2x.gif)
 
-2배속 주행 화면: 하단 2x 버튼을 클릭하여 움직이는 장애물 사이를 3회 연속 안정적으로 통과하는 모습입니다.
-
-### 4배속 주행
-![Simulation 4x](images/simulation_4x.gif)
-
-4배속 주행 화면: 하단 4x 버튼을 클릭하여 빠른 속도로 3회 연속 완주하는 모습입니다.
+2배속 주행 화면 (3회 연속 완주)
 
 ---
 
