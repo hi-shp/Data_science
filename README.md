@@ -1,6 +1,7 @@
-# 자율운항보트 장애물 회피 알고리즘
+# DBSCAN과 베지어 곡선, 순수추종 알고리즘을 이용한 자율운항 시뮬레이션
+**Autonomous Navigation Simulation using DBSCAN, Bézier Curve, and Pure Pursuit**
 
-라이다 센서의 거리 데이터를 바탕으로 장애물 사이의 빈 공간(Gap) 중심점을 찾아 웨이포인트로 삼고, 베지어 곡선으로 부드럽게 주행하도록 구현한 2D 시뮬레이터 프로젝트입니다.
+라이다 센서 데이터에 DBSCAN 군집화를 적용하여 장애물 사이 빈 공간(Gap)의 중심점을 찾고, 3차 베지어 곡선과 순수추종(Pure Pursuit) 알고리즘으로 부드럽게 경로를 추종하도록 구현한 2D 자율운항 시뮬레이션 프로젝트입니다.
 
 ![Simulation 8x Demo](images/simulation_demo.gif)
 
