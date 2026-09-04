@@ -50,8 +50,7 @@ def run():
             )
 
             update_grid(env.grid, hits)
-            grid_decay = float(env.params.get('grid_decay', 0.945))
-            env.grid *= grid_decay
+            env.grid *= 0.945
 
             # 연산 부하 절감을 위한 적응형 인지/탐색 주기
             if step_idx % plan_interval == 0 or step_idx == sub_steps - 1:
@@ -93,21 +92,19 @@ def run():
                 vec_to_wp = env.current_wp["pos"] - env.boat_pos
                 dnow = np.linalg.norm(vec_to_wp)
                 
-                # 1. 웨이포인트 근접 시 해제
-                wp_clear_dist = float(env.params.get('wp_clear_dist', 25.0))
-                if dnow < wp_clear_dist:
+                # 1. 웨이포인트 근접 시 해제 (25px 이내)
+                if dnow < 25:
                     should_clear = True
                     
                 wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
                 angle_diff = abs(wrap(wp_angle - env.boat_heading))
                 
                 # 2. 웨이포인트를 지나쳐 측후방으로 넘어가면 즉시 해제하여 직진
-                wp_pass_angle = np.deg2rad(float(env.params.get('wp_pass_angle_deg', 90.0)))
-                if angle_diff > wp_pass_angle:
+                if angle_diff > np.pi / 2:
                     should_clear = True
                     
                 # 3. 선박 위치에서 목적지까지 장애물이 없으면 즉시 해제하여 목적지 직행
-                if target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles, params=env.params):
+                if target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
                     should_clear = True
                     
                 if should_clear:
@@ -144,16 +141,12 @@ def run():
                 elif new_wp["pair"] != env.current_wp["pair"] and new_wp["pair"] != (env.current_wp["pair"][1], env.current_wp["pair"][0]):
                     # 다른 새로운 웨이포인트(갭)로 교체하려는 경우
                     dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                    # JSON에서 WP_SWITCH 관련 파라미터 로드
-                    wp_block_dist = float(env.params.get('wp_switch_block_dist', 120.0))
-                    wp_fov_deg = float(env.params.get('wp_switch_fov_deg', 65.0))
-                    front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=wp_block_dist, fov_deg=wp_fov_deg)
-                    
-                    wp_switch_dist = float(env.params.get('wp_switch_dist', 80.0))
-                    wp_switch_thresh = float(env.params.get('wp_switch_thresh', 1.1))
-                    
-                    if not front_blocked and dist_to_curr > wp_switch_dist:
-                        if new_wp["score"] > env.current_wp["score"] * wp_switch_thresh:
+                    # 전방 장애물 안전 거리 검사
+                    front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=120.0, fov_deg=65.0)
+                    if not front_blocked and dist_to_curr > 80:
+                        # params에 설정된 wp_switch_thresh 실시간 적용 (JSON: 1.1)
+                        threshold = float(env.params.get('wp_switch_thresh', 1.1))
+                        if new_wp["score"] > env.current_wp["score"] * threshold:
                             # 새 웨이포인트로 선회하는 부채꼴 및 베지어 궤적 상에 정면 장애물이 없을 때만 안전하게 스위칭
                             if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params):
                                 env.current_wp = new_wp
@@ -193,16 +186,14 @@ def run():
                     env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     
                 if env.bezier_path is not None:
-                    pursuit_lookahead = float(env.params.get('pursuit_lookahead', 70.0))
-                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=pursuit_lookahead)
+                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)
                     
                 if env.current_wp is not None and env.next_wp is not None:
                     vec = env.current_wp["pos"] - env.boat_pos
                     next_start_head = math.atan2(vec[1], vec[0])
                     env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_start_head, env.next_wp["pos"], obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     if env.next_bezier_path is not None:
-                        pursuit_lookahead_next = float(env.params.get('pursuit_lookahead_next', 75.0))
-                        env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=pursuit_lookahead_next)
+                        env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=75)
                 else:
                     env.next_bezier_path = None
                     env.next_pursuit_target = None
@@ -211,8 +202,7 @@ def run():
 
             if env.current_wp is not None and env.next_pursuit_target is not None and env.pursuit_target is not None:
                 dist_to_wp = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                next_wp_transition_dist = float(env.params.get('next_wp_transition_dist', 50.0))
-                if dist_to_wp < next_wp_transition_dist:
+                if dist_to_wp < 50:
                     env.pursuit_target = env.next_pursuit_target
 
             steer = env.update_steering(dists)
@@ -227,9 +217,8 @@ def run():
             env.validate_wp_grid()
             env.validate_wp_obstacle_5x5()
 
-            goal_reach_dist = float(env.params.get('goal_reach_dist', 70.0))
-            if env.collide() or np.linalg.norm(env.target - env.boat_pos) < goal_reach_dist:
-                is_success = (np.linalg.norm(env.target - env.boat_pos) < goal_reach_dist and not env.collide())
+            if env.collide() or np.linalg.norm(env.target - env.boat_pos) < 70:
+                is_success = (np.linalg.norm(env.target - env.boat_pos) < 70 and not env.collide())
                 tag = "SUCCESS" if is_success else "FAIL"
                 ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 outdir = r"screenshot"

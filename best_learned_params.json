@@ -15,19 +15,6 @@
   "width_exp": 0.2,
   "cluster_pen_w": 2.0,
   "wp_switch_thresh": 1.1,
-  "wp_switch_dist": 80.0,
-  "wp_switch_block_dist": 120.0,
-  "wp_switch_fov_deg": 65.0,
   "perp_exp": 3,
-  "prox_exp": 4,
-  "wp_clear_dist": 25.0,
-  "wp_pass_angle_deg": 90.0,
-  "pursuit_lookahead": 70.0,
-  "pursuit_lookahead_next": 75.0,
-  "next_wp_transition_dist": 50.0,
-  "goal_reach_dist": 70.0,
-  "grid_decay": 0.945,
-  "gap_fov_deg": 65.0,
-  "speed_divisor": 6.0,
-  "damping_coeff": 0.32
+  "prox_exp": 4
 }

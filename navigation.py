@@ -3,7 +3,7 @@ import math
 from utils import wrap
 from config import GRID, GRID_W, GRID_H
 
-def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25, params=None):
+def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25):
     bx, by = boat_pos
     tx, ty = target_pos
     vx = tx - bx
@@ -19,9 +19,7 @@ def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25, params=None
     
     ox = obstacles[:, 0]
     oy = obstacles[:, 1]
-    p = params or {}
-    margin = float(p.get('target_clear_margin', 4.0))
-    orad = obstacles[:, 2] + boat_radius + margin
+    orad = obstacles[:, 2] + boat_radius + 4.0  # 안전 여유 4px
     
     px = ox - bx
     py = oy - by
@@ -51,11 +49,11 @@ def bezier_path_is_blocked(path, obstacles, boat_radius=25, margin=10):
     return False
 
 def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_radius=25, boat_speed=0.0, params=None):
-    if not target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius, params=params):
+    if not target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius):
         return False
     from utils import make_bezier_path
     p = params or {}
-    margin = float(p.get('clear_margin', 8.0))
+    margin = float(p.get('clear_margin', 10.0))
     # 목적지까지 회전하는 실제 베지어 궤적이 장애물과 충돌하는지 검증
     test_path = make_bezier_path(boat_pos, boat_heading, target_pos, obstacles=obstacles, boat_radius=boat_radius, boat_speed=boat_speed)
     if bezier_path_is_blocked(test_path, obstacles, boat_radius=boat_radius, margin=margin):
@@ -66,12 +64,6 @@ def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obs
     if curr_wp_pos is None or new_wp_pos is None or len(obstacles) == 0:
         return True
         
-    p = params or {}
-    ang_thresh_deg = float(p.get('wp_switch_safe_ang_deg', 25.0))
-    sweep_radius = float(p.get('wp_switch_sweep_radius', 110.0))
-    margin = float(p.get('wp_switch_margin', 40.0))
-    bezier_margin = float(p.get('wp_switch_bezier_margin', 8.0))
-
     bx, by = boat_pos
     v_curr = curr_wp_pos - boat_pos
     v_new = new_wp_pos - boat_pos
@@ -81,17 +73,20 @@ def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obs
     
     # 각도 차이가 작으면 (동일 방향/미세 갱신) 안전
     switch_ang_diff = abs(wrap(ang_new - ang_curr))
-    if switch_ang_diff < np.deg2rad(ang_thresh_deg):
+    if switch_ang_diff < np.deg2rad(25.0):
         return True
         
     # 1. 현재 선박 헤딩에서 새 웨이포인트로 선회하는 베지어 곡선 검증
     from utils import make_bezier_path
+    p = params or {}
+    margin = float(p.get('clear_margin', 10.0))
     new_bezier = make_bezier_path(boat_pos, boat_heading, new_wp_pos, obstacles=obstacles, boat_radius=boat_radius, boat_speed=boat_speed)
-    if bezier_path_is_blocked(new_bezier, obstacles, boat_radius=boat_radius, margin=bezier_margin):
+    if bezier_path_is_blocked(new_bezier, obstacles, boat_radius=boat_radius, margin=margin):
         return False
         
     # 2. 기존 방향과 새 방향 사이의 부채꼴(Turn Sector) 영역 장애물 검사
     ang_head_to_new = wrap(ang_new - boat_heading)
+    sweep_radius = 110.0
     
     for ox, oy, orad in obstacles:
         dx = ox - bx
@@ -111,7 +106,7 @@ def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obs
                     in_sector = True
                     
             if in_sector:
-                if obs_dist - orad < boat_radius + margin:
+                if obs_dist - orad < boat_radius + 40.0:
                     return False
                     
     return True
@@ -142,13 +137,13 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     dist_to_target = math.hypot(dx_t, dy_t)
     gps_heading = math.atan2(dy_t, dx_t)
 
-    align_exp = params.get('align_exp', 4.5) if params else 4.5
-    fwd_exp = params.get('fwd_exp', 2.8) if params else 2.8
-    clear_exp = params.get('clear_exp', 2.0) if params else 2.0
+    align_exp = params.get('align_exp', 6.0) if params else 6.0
+    fwd_exp = params.get('fwd_exp', 6.6) if params else 6.6
+    clear_exp = params.get('clear_exp', 5.0) if params else 5.0
     width_exp = params.get('width_exp', 0.2) if params else 0.2
-    cluster_pen_w = params.get('cluster_pen_w', 0.5) if params else 0.5
-    perp_exp = params.get('perp_exp', 1.5) if params else 1.5
-    prox_exp = params.get('prox_exp', 0.5) if params else 0.5
+    cluster_pen_w = params.get('cluster_pen_w', 2.0) if params else 2.0
+    perp_exp = params.get('perp_exp', 3.0) if params else 3.0
+    prox_exp = params.get('prox_exp', 4.0) if params else 4.0
 
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])
     
@@ -161,8 +156,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             continue
             
         ang = wrap(math.atan2(v[1], v[0]) - boat_heading)
-        gap_fov_deg = float(params.get('gap_fov_deg', 65.0)) if params else 65.0
-        if abs(ang) < np.deg2rad(gap_fov_deg):
+        if abs(ang) < np.deg2rad(65):
             items.append((ang, dist, c, ids[i]))
             
     if len(items) < 2:
@@ -332,10 +326,9 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     best["candidates"] = valid_gaps[1:3]  # 순위 높은 2, 3위 차순위 후보
     return best
 
-def reactive_avoidance(dists, angles, params=None):
-    p = params or {}
-    SAFE = float(p.get('avoid_safe_dist', 450.0))
-    sigma = float(p.get('avoid_sigma', 150.0))
+def reactive_avoidance(dists, angles):
+    SAFE = 450.0
+    sigma = 150.0
     mask = dists < SAFE
     if not np.any(mask):
         return 0.0

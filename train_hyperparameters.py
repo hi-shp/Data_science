@@ -101,8 +101,7 @@ def evaluate_case_worker(args):
                 )
 
                 update_grid(env.grid, hits)
-                grid_decay = float(env.params.get('grid_decay', 0.945))
-                env.grid *= grid_decay
+                env.grid *= 0.945
 
                 new_c = extract_clusters_from_grid(env.grid)
                 env.clusters, env.cluster_ids = match_clusters(
@@ -142,9 +141,7 @@ def evaluate_case_worker(args):
                     wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
                     angle_diff = abs(wrap(wp_angle - env.boat_heading))
                     
-                    wp_clear_dist = float(env.params.get('wp_clear_dist', 25.0))
-                    wp_pass_angle = np.deg2rad(float(env.params.get('wp_pass_angle_deg', 90.0)))
-                    if dnow < wp_clear_dist or angle_diff > wp_pass_angle or target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles, params=env.params):
+                    if dnow < 25 or angle_diff > np.pi / 2 or target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
                         p = env.current_wp["pair"]
                         env.visited.add(p)
                         env.visited.add((p[1], p[0]))
@@ -170,15 +167,10 @@ def evaluate_case_worker(args):
                         env.current_wp = new_wp
                     elif new_wp["pair"] != env.current_wp["pair"] and new_wp["pair"] != (env.current_wp["pair"][1], env.current_wp["pair"][0]):
                         dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                        wp_block_dist = float(env.params.get('wp_switch_block_dist', 120.0))
-                        wp_fov_deg = float(env.params.get('wp_switch_fov_deg', 65.0))
-                        front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=wp_block_dist, fov_deg=wp_fov_deg)
-                        
-                        wp_switch_dist = float(env.params.get('wp_switch_dist', 80.0))
-                        wp_switch_thresh = float(env.params.get('wp_switch_thresh', 1.1))
-                        
-                        if not front_blocked and dist_to_curr > wp_switch_dist:
-                            if new_wp["score"] > env.current_wp.get("score", 0.0) * wp_switch_thresh:
+                        front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=120.0, fov_deg=65.0)
+                        if not front_blocked and dist_to_curr > 80:
+                            threshold = float(env.params.get('wp_switch_thresh', 1.1))
+                            if new_wp["score"] > env.current_wp.get("score", 0.0) * threshold:
                                 if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params):
                                     env.current_wp = new_wp
 
@@ -204,8 +196,7 @@ def evaluate_case_worker(args):
                     env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, env.current_wp["pos"], obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                 
                 if env.bezier_path is not None:
-                    pursuit_lookahead = float(env.params.get('pursuit_lookahead', 70.0))
-                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=pursuit_lookahead)
+                    env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)
 
                 steer = env.update_steering(dists)
                 if steer is None:
@@ -220,8 +211,7 @@ def evaluate_case_worker(args):
                 # 종료 판정
                 is_collide = env.collide()
                 dist_to_goal = np.linalg.norm(env.target - env.boat_pos)
-                goal_reach_dist = float(env.params.get('goal_reach_dist', 70.0))
-                reached_goal = (dist_to_goal < goal_reach_dist)
+                reached_goal = (dist_to_goal < 70)
                 timed_out = (ep_frames > 2500)
 
                 if is_collide or reached_goal or timed_out:
