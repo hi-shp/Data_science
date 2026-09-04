@@ -372,12 +372,13 @@ class EnvRenderer:
         cur_spd = getattr(env, 'sim_speed', 1)
         for spd, btn_rect in env.speed_btns.items():
             is_active = (cur_spd == spd and not is_paused)
-            btn_bg = (0, 180, 240) if is_active else (25, 45, 70)
-            btn_border = (255, 255, 255) if is_active else (80, 120, 160)
-            text_color = (10, 25, 45) if is_active else (220, 230, 240)
+            btn_bg = (0, 235, 255) if is_active else (25, 45, 70)
+            btn_border = (255, 255, 255) if is_active else (70, 105, 145)
+            border_w = 3 if is_active else 1
+            text_color = (0, 15, 35) if is_active else (210, 225, 240)
             
             pygame.draw.rect(env.screen, btn_bg, btn_rect, border_radius=4)
-            pygame.draw.rect(env.screen, btn_border, btn_rect, 2, border_radius=4)
+            pygame.draw.rect(env.screen, btn_border, btn_rect, border_w, border_radius=4)
             
             lbl = self.bold_font.render(f"{spd}x", True, text_color) if is_active else self.font.render(f"{spd}x", True, text_color)
             env.screen.blit(lbl, (btn_rect.centerx - lbl.get_width()//2, btn_rect.centery - lbl.get_height()//2))
