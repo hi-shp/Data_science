@@ -83,7 +83,7 @@ DBSCAN 적용 화면: 흩어진 점들을 장애물 단위로 묶어 위치와 �
 
 #### 하단 1번째 패널 — LiDAR View (2D 평면 뷰)
 
-<img src="images/panel_lidar_view.gif" width="100%" alt="LiDAR View 패널 주행 화면" />
+![LiDAR View](images/panel_lidar_view.gif)
 
 보트를 중심으로 전방 180도 부채꼴 영역을 위에서 내려다본 2D 평면도입니다.
 - 동심원 스케일(2m, 4m, 6m)과 방위각 가이드라인(30도 단위)이 표시되어, 장애물이 어느 방향에 얼마나 가까이 있는지 직관적으로 파악할 수 있습니다.
@@ -91,7 +91,7 @@ DBSCAN 적용 화면: 흩어진 점들을 장애물 단위로 묶어 위치와 �
 
 #### 하단 2번째 패널 — LiDAR Gauge View (핵심 화면)
 
-<img src="images/panel_gauge_view.gif" width="100%" alt="LiDAR Gauge View 패널 주행 화면" />
+![LiDAR Gauge View](images/panel_gauge_view.gif)
 
 **이 프로젝트에서 가장 중요하게 보는 화면입니다.**
 - 전방 180도를 1도 단위(총 180개)로 나누어, 각 각도별 장애물까지의 거리(중간값/평균값)를 색상 막대로 옆으로 펼쳐 놓은 것입니다.
@@ -101,7 +101,7 @@ DBSCAN 적용 화면: 흩어진 점들을 장애물 단위로 묶어 위치와 �
 
 #### 하단 3번째 패널 — LiDAR 1st View (1인칭 뷰)
 
-<img src="images/panel_1st_view.gif" width="100%" alt="LiDAR 1st View 패널 주행 화면" />
+![LiDAR 1st View](images/panel_1st_view.gif)
 
 운전석 시점에서 정면을 바라보는 1인칭 화면입니다.
 - 수평선을 기준으로 위에는 하늘, 아래에는 해수면 그라데이션이 깔리고, 장애물이 감지된 방향에 거리 반비례 높이의 색상 기둥이 솟아오릅니다.
