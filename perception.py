@@ -83,22 +83,29 @@ def extract_clusters_from_grid(grid):
     world_y = cy * GRID + GRID / 2.0
     return [np.array([wx, wy], dtype=np.float32) for wx, wy in zip(world_x, world_y)]
 
-def match_clusters(prev_clusters, prev_ids, new_clusters):
-    if len(prev_clusters) == 0:
+def match_clusters(prev_clusters, prev_ids, new_clusters, max_dist=28.0):
+    if len(prev_clusters) == 0 or len(prev_ids) == 0:
         return new_clusters, list(range(len(new_clusters)))
     
-    cell_prev = {}
-    for cid, c in zip(prev_ids, prev_clusters):
-        key = (int(c[0] // GRID), int(c[1] // GRID))
-        cell_prev[key] = cid
-        
     new_ids = []
+    used_prev = set()
     maxid = max(prev_ids) + 1 if prev_ids else 0
     
     for c in new_clusters:
-        key = (int(c[0] // GRID), int(c[1] // GRID))
-        if key in cell_prev:
-            new_ids.append(cell_prev[key])
+        best_d = max_dist
+        best_id = None
+        best_idx = None
+        for i, (prev_c, pid) in enumerate(zip(prev_clusters, prev_ids)):
+            if i in used_prev:
+                continue
+            d = np.linalg.norm(c - prev_c)
+            if d < best_d:
+                best_d = d
+                best_id = pid
+                best_idx = i
+        if best_id is not None:
+            new_ids.append(best_id)
+            used_prev.add(best_idx)
         else:
             new_ids.append(maxid)
             maxid += 1

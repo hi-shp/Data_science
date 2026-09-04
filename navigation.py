@@ -129,7 +129,7 @@ def is_front_blocked(boat_pos, boat_heading, obstacles, boat_radius=25, block_di
                 return True
     return False
 
-def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, obstacles, params=None):
+def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, obstacles, params=None, is_next_wp=False):
     bx, by = boat_pos
     tx, ty = target_pos
     dx_t = tx - bx
@@ -147,16 +147,19 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
 
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])
     
+    max_ang = np.deg2rad(85) if is_next_wp else np.deg2rad(65)
+    max_dist_cut = (dist_to_target + 15) if is_next_wp else (dist_to_target - 20)
+
     items = []
     for i, c in enumerate(clusters):
         v = c - boat_pos
         dist = np.linalg.norm(v)
-        # 목적지보다 멀거나 전방 탐색각(65도)을 벗어난 측방/후방 장애물 엄격 제외
-        if dist > dist_to_target - 20:
+        # 목적지보다 멀거나 전방 탐색각을 벗어난 측방/후방 장애물 엄격 제외
+        if dist > max_dist_cut:
             continue
             
         ang = wrap(math.atan2(v[1], v[0]) - boat_heading)
-        if abs(ang) < np.deg2rad(65):
+        if abs(ang) < max_ang:
             items.append((ang, dist, c, ids[i]))
             
     if len(items) < 2:
@@ -190,13 +193,15 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         dist_mid_to_target = np.linalg.norm(target_pos - mid)
         
         # 1. 갭(mid)이 현재 탐색 기준 위치보다 목적지에 유의미하게 가까워져야 함
-        if dist_mid_to_target >= dist_to_target - 15.0:
+        req_progress_dist = -5.0 if is_next_wp else -15.0
+        if dist_mid_to_target >= dist_to_target + req_progress_dist:
             continue
             
         forward_progress = np.dot(rel / distm, gps_vec)
         # 목적지 방향 전진 성분이 부족하거나(측면/후방 회피) 목적지보다 멀면 제외
-        min_progress = 0.55 if dist_to_target < 300 else 0.40
-        if forward_progress < min_progress or distm > dist_to_target - 25:
+        min_progress = 0.25 if is_next_wp else (0.55 if dist_to_target < 300 else 0.40)
+        max_allowed_distm = (dist_to_target + 10) if is_next_wp else (dist_to_target - 25)
+        if forward_progress < min_progress or distm > max_allowed_distm:
             continue
             
             

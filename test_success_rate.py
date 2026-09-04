@@ -130,25 +130,55 @@ Estimated ETA:   {eta_str}
 
                 if env.current_wp is not None:
                     should_clear = False
-                    vec_to_wp = env.current_wp["pos"] - env.boat_pos
+                    c1 = env.current_wp.get("c1")
+                    c2 = env.current_wp.get("c2")
+                    mid = env.current_wp["pos"]
+                    vec_to_wp = mid - env.boat_pos
                     dnow = np.linalg.norm(vec_to_wp)
-                    if dnow < 25:
+                    
+                    # 1. 웨이포인트 중심점 근접 시 즉시 해제 (28px 이내)
+                    if dnow < 28:
                         should_clear = True
-                    wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
-                    angle_diff = abs(wrap(wp_angle - env.boat_heading))
-                    if angle_diff > np.pi / 2:
-                        should_clear = True
-                    if target_is_clear(env.boat_pos, env.target, env.dynamic_obstacles):
-                        should_clear = True
+                        
+                    # 2. 웨이포인트 게이트 선 통과 판정 (c1, c2 사이 게이트 선을 전방으로 통과 시 즉시 해제)
+                    if not should_clear and c1 is not None and c2 is not None:
+                        v_gate = c2 - c1
+                        gate_len = np.linalg.norm(v_gate)
+                        if gate_len > 1e-3:
+                            u_gate = v_gate / gate_len
+                            n_gate = np.array([-u_gate[1], u_gate[0]])
+                            h_vec = np.array([math.cos(env.boat_heading), math.sin(env.boat_heading)])
+                            if np.dot(n_gate, h_vec) < 0:
+                                n_gate = -n_gate
+                            rel_boat = env.boat_pos - mid
+                            d_normal = np.dot(rel_boat, n_gate)
+                            d_lateral = abs(np.dot(rel_boat, u_gate))
+                            if 0.0 <= d_normal < 40.0 and d_lateral < (gate_len / 2.0 + 20.0):
+                                should_clear = True
+                                
+                    # 3. 웨이포인트를 이미 지나쳐 측후방으로 넘어간 경우 (95도 이상 & 75px 이내)
+                    if not should_clear:
+                        wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
+                        angle_diff = abs(wrap(wp_angle - env.boat_heading))
+                        if angle_diff > np.deg2rad(95) and dnow < 75:
+                            should_clear = True
+                        
                     if should_clear:
                         p = env.current_wp["pair"]
                         env.visited.add(p)
                         env.visited.add((p[1], p[0]))
-                        env.current_wp = None
+                        # 1차 웨이포인트 통과 시 2차 웨이포인트가 미리 감지되어 있으면 부드럽게 1차로 승격
+                        if env.next_wp is not None:
+                            env.current_wp = env.next_wp
+                            env.next_wp = None
+                        else:
+                            env.current_wp = None
                         env.candidate_wps = []
 
+                # 1차 웨이포인트 양쪽 장애물의 실시간 위치 및 점수 갱신
                 if env.current_wp is not None:
                     id1, id2 = env.current_wp["pair"]
+                    matched = False
                     if id1 in env.cluster_ids and id2 in env.cluster_ids:
                         idx1 = env.cluster_ids.index(id1)
                         idx2 = env.cluster_ids.index(id2)
@@ -157,38 +187,46 @@ Estimated ETA:   {eta_str}
                         env.current_wp["c1"] = c1_now
                         env.current_wp["c2"] = c2_now
                         env.current_wp["pos"] = (c1_now + c2_now) / 2.0
+                        matched = True
                         if new_wp is not None and (new_wp["pair"] == env.current_wp["pair"] or new_wp["pair"] == (id2, id1)):
                             env.current_wp["score"] = new_wp["score"]
                             if "factors" in new_wp:
                                 env.current_wp["factors"] = new_wp["factors"]
-                    elif new_wp is not None:
-                        if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params):
-                            env.current_wp = new_wp
+                    
+                    # ID가 변경되었더라도 기존 부표 물리 좌표(c1, c2)와 가까운 클러스터(35px 이내)로 안정적 추종
+                    if not matched:
+                        c1_old = env.current_wp.get("c1")
+                        c2_old = env.current_wp.get("c2")
+                        if c1_old is not None and c2_old is not None and len(env.clusters) >= 2:
+                            d1 = [np.linalg.norm(c - c1_old) for c in env.clusters]
+                            d2 = [np.linalg.norm(c - c2_old) for c in env.clusters]
+                            i1, i2 = int(np.argmin(d1)), int(np.argmin(d2))
+                            if d1[i1] < 35.0 and d2[i2] < 35.0 and i1 != i2:
+                                env.current_wp["c1"] = env.clusters[i1]
+                                env.current_wp["c2"] = env.clusters[i2]
+                                env.current_wp["pos"] = (env.clusters[i1] + env.clusters[i2]) / 2.0
+                                env.current_wp["pair"] = (env.cluster_ids[i1], env.cluster_ids[i2])
 
-                if new_wp is not None:
-                    if env.current_wp is None:
-                        env.current_wp = new_wp
-                    elif new_wp["pair"] != env.current_wp["pair"] and new_wp["pair"] != (env.current_wp["pair"][1], env.current_wp["pair"][0]):
-                        dist_to_curr = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                        front_blocked = is_front_blocked(env.boat_pos, env.boat_heading, env.dynamic_obstacles, env.boat_radius, block_dist=120.0, fov_deg=65.0)
-                        if not front_blocked and dist_to_curr > 80:
-                            threshold = float(env.params.get('wp_switch_thresh', 1.1))
-                            if new_wp["score"] > env.current_wp["score"] * threshold:
-                                if is_waypoint_switch_safe(env.boat_pos, env.boat_heading, env.current_wp["pos"], new_wp["pos"], env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params):
-                                    env.current_wp = new_wp
+                # 1차 웨이포인트가 비어있을 때만 새로운 웨이포인트 최초 지정 (접근 중인 1차 WP를 전방 2차 WP로 덮어쓰지 않음)
+                if new_wp is not None and env.current_wp is None:
+                    env.current_wp = new_wp
 
                 if env.current_wp is not None and not clear_to_target:
                     temp_visited = env.visited.copy()
                     temp_visited.add(env.current_wp["pair"])
                     temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
+                    
                     vec = env.current_wp["pos"] - env.boat_pos
                     next_head = math.atan2(vec[1], vec[0])
+                    
+                    # 2차 갭 탐색 (1차 웨이포인트 이후 전방에 장애물 갭이 존재하면 주황색 2차 웨이포인트로 표출)
                     env.next_wp = find_gap(
                         env.clusters, env.cluster_ids,
                         env.current_wp["pos"], next_head,
                         env.target, temp_visited,
                         env.grid, env.dynamic_obstacles,
-                        params=env.params
+                        params=env.params,
+                        is_next_wp=True
                     )
                 else:
                     env.next_wp = None
@@ -196,12 +234,14 @@ Estimated ETA:   {eta_str}
                 env.path_timer += env.dt
                 if env.path_timer >= 0.01:
                     env.path_timer = 0
-                    env.path_surf.fill((0, 0, 0, 0))
+                    
                     boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
                     if env.current_wp is None:
+                        # 목적지 직행 상황에서도 회전 궤적 주변 장애물을 넉넉히 우회할 수 있도록 obstacles 전달
                         goal = env.target
                         env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     else:
+                        # 웨이포인트(갭) 우회 통과 구간: 속도 기반 선행 회전 및 장애물 외측 굴곡 곡률 부여
                         goal = env.current_wp["pos"]
                         env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                         
@@ -210,25 +250,18 @@ Estimated ETA:   {eta_str}
                         
                     if env.current_wp is not None and env.next_wp is not None:
                         vec = env.current_wp["pos"] - env.boat_pos
-                        next_head = math.atan2(vec[1], vec[0])
-                        env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_head, env.next_wp["pos"], obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
+                        next_start_head = math.atan2(vec[1], vec[0])
+                        env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_start_head, env.next_wp["pos"], obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                         if env.next_bezier_path is not None:
                             env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=75)
                     else:
                         env.next_bezier_path = None
                         env.next_pursuit_target = None
 
-                visual_target = env.pursuit_target
-                if env.current_wp is not None and env.next_pursuit_target is not None and env.pursuit_target is not None:
-                    dist_to_wp = np.linalg.norm(env.current_wp["pos"] - env.boat_pos)
-                    if dist_to_wp < 50:
-                        env.pursuit_target = env.next_pursuit_target
-
                 steer = env.update_steering(dists)
                 if steer is None:
                     steer = 0
 
-                env.pursuit_target = visual_target
                 L, R = env.get_pwm(steer)
                 env.step(L, R)
 

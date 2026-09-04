@@ -48,7 +48,7 @@ class BoatEnv:
         self.lidar_range = 320
         self.rel_angles = np.linspace(-np.pi, np.pi, self.lidar_beams, endpoint=False)
         
-        self.mass = 14
+        self.mass = 12
         self.inertia = 4.2
         self.drag = 0.2
         self.rot_drag = 0.8
@@ -104,26 +104,36 @@ class BoatEnv:
         self.obstacles = np.array([])
         self.dynamic_obstacles = np.array([])
         
+        self.show_1st_path = True
+        self.show_2nd_path = True
         self.show_paths = True
         self.show_candidates = True
         self.show_lidar = True
         self.show_lidar_range = True
         self.candidate_wps = []
         
-        self.cb1_rect = pygame.Rect(40, 670, 20, 20)
-        self.cb2_rect = pygame.Rect(40, 710, 20, 20)
-        self.cb3_rect = pygame.Rect(40, 750, 20, 20)
-        self.cb4_rect = pygame.Rect(40, 790, 20, 20)
+        self.cb1_rect = pygame.Rect(40, 668, 20, 20)
+        self.cb2_rect = pygame.Rect(40, 704, 20, 20)
+        self.cb3_rect = pygame.Rect(40, 740, 20, 20)
+        self.cb4_rect = pygame.Rect(40, 776, 20, 20)
+        self.cb5_rect = pygame.Rect(40, 812, 20, 20)
+        
+        # 체크박스 및 텍스트 라벨 전체 클릭 영역 (가로 275px)
+        self.cb1_row_rect = pygame.Rect(35, 663, 275, 30)
+        self.cb2_row_rect = pygame.Rect(35, 699, 275, 30)
+        self.cb3_row_rect = pygame.Rect(35, 735, 275, 30)
+        self.cb4_row_rect = pygame.Rect(35, 771, 275, 30)
+        self.cb5_row_rect = pygame.Rect(35, 807, 275, 30)
         
         self.paused = False
-        self.pause_btn = pygame.Rect(40, 835, 48, 28)
+        self.pause_btn = pygame.Rect(40, 852, 48, 30)
         self.sim_speed = 1
         self.speed_btns = {
-            1: pygame.Rect(94, 835, 38, 28),
-            2: pygame.Rect(138, 835, 38, 28),
-            4: pygame.Rect(182, 835, 38, 28),
-            8: pygame.Rect(226, 835, 38, 28),
-            16: pygame.Rect(270, 835, 46, 28)
+            1: pygame.Rect(94, 852, 38, 30),
+            2: pygame.Rect(138, 852, 38, 30),
+            4: pygame.Rect(182, 852, 38, 30),
+            8: pygame.Rect(226, 852, 38, 30),
+            16: pygame.Rect(270, 852, 46, 30)
         }
         
         self.renderer = EnvRenderer(self)
@@ -193,13 +203,17 @@ class BoatEnv:
         self.emergency_mode = False
 
     def handle_click(self, pos):
-        if self.cb1_rect.collidepoint(pos):
-            self.show_paths = not self.show_paths
-        elif self.cb2_rect.collidepoint(pos):
+        if getattr(self, 'cb1_row_rect', self.cb1_rect).collidepoint(pos) or self.cb1_rect.collidepoint(pos):
+            self.show_1st_path = not getattr(self, 'show_1st_path', True)
+            self.show_paths = self.show_1st_path or getattr(self, 'show_2nd_path', True)
+        elif getattr(self, 'cb2_row_rect', self.cb2_rect).collidepoint(pos) or self.cb2_rect.collidepoint(pos):
+            self.show_2nd_path = not getattr(self, 'show_2nd_path', True)
+            self.show_paths = getattr(self, 'show_1st_path', True) or self.show_2nd_path
+        elif getattr(self, 'cb3_row_rect', self.cb3_rect).collidepoint(pos) or self.cb3_rect.collidepoint(pos):
             self.show_candidates = not self.show_candidates
-        elif self.cb3_rect.collidepoint(pos):
+        elif getattr(self, 'cb4_row_rect', self.cb4_rect).collidepoint(pos) or self.cb4_rect.collidepoint(pos):
             self.show_lidar = not self.show_lidar
-        elif self.cb4_rect.collidepoint(pos):
+        elif getattr(self, 'cb5_row_rect', self.cb5_rect).collidepoint(pos) or self.cb5_rect.collidepoint(pos):
             self.show_lidar_range = not self.show_lidar_range
         elif self.pause_btn.collidepoint(pos):
             self.paused = not self.paused

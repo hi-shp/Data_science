@@ -138,12 +138,16 @@ class EnvRenderer:
         env.screen.blit(env.path_surf, (0, 0))
         
         # 5. 경로 및 타겟 점
-        # 5. 1차 및 2차 통합 경로 및 타겟 점 렌더링
-        show_paths = getattr(env, 'show_paths', True)
-        if show_paths:
+        # 5. 경로 및 타겟 점
+        # 5. 1차 및 2차 경로 및 타겟 점 렌더링
+        show_1st = getattr(env, 'show_1st_path', getattr(env, 'show_paths', True))
+        show_2nd = getattr(env, 'show_2nd_path', getattr(env, 'show_paths', True))
+
+        if show_2nd:
             if env.next_wp is not None:
                 nwp = env.next_wp
-                pygame.draw.line(env.screen, (255, 140, 0), (int(nwp["c1"][0]), int(nwp["c1"][1])), (int(nwp["c2"][0]), int(nwp["c2"][1])), 3)
+                if nwp.get("pair") != (-1, -1):
+                    pygame.draw.line(env.screen, (255, 140, 0), (int(nwp["c1"][0]), int(nwp["c1"][1])), (int(nwp["c2"][0]), int(nwp["c2"][1])), 3)
                 pygame.draw.circle(env.screen, (200, 100, 255, 100), (int(nwp["pos"][0]), int(nwp["pos"][1])), 8)
                 pygame.draw.circle(env.screen, (200, 100, 255), (int(nwp["pos"][0]), int(nwp["pos"][1])), 3)
 
@@ -157,6 +161,7 @@ class EnvRenderer:
                 pygame.draw.circle(env.screen, (255, 255, 255), (int(px_nt), int(py_nt)), 8, 2)
                 pygame.draw.circle(env.screen, (255, 150, 50), (int(px_nt), int(py_nt)), 4)
 
+        if show_1st:
             if env.current_wp is not None:
                 wp = env.current_wp
                 pygame.draw.line(env.screen, (0, 255, 200), (int(wp["c1"][0]), int(wp["c1"][1])), (int(wp["c2"][0]), int(wp["c2"][1])), 4)
@@ -337,25 +342,59 @@ class EnvRenderer:
         pygame.draw.rect(env.screen, (15, 35, 60), (0, env.sim_h, env.w, env.h - env.sim_h))
         pygame.draw.line(env.screen, (0, 180, 255), (0, env.sim_h), (env.w, env.sim_h), 3)
 
+        # 마우스 커서 위치 확인 (호버 인터랙션)
+        mpos = pygame.mouse.get_pos()
+
         # 체크박스 렌더링
+        # 1. Show 1st Path (시안)
+        cb1_row = getattr(env, 'cb1_row_rect', env.cb1_rect)
+        cb1_hover = cb1_row.collidepoint(mpos)
+        if cb1_hover:
+            pygame.draw.rect(env.screen, (28, 56, 88), cb1_row, border_radius=4)
         pygame.draw.rect(env.screen, (255, 255, 255), env.cb1_rect, 2)
-        if getattr(env, 'show_paths', True): pygame.draw.rect(env.screen, (0, 255, 200), env.cb1_rect.inflate(-6, -6))
-        env.screen.blit(self.font.render("Show 1st & 2nd Paths", True, (255, 255, 255)), (70, 672))
+        if getattr(env, 'show_1st_path', True): pygame.draw.rect(env.screen, (0, 255, 200), env.cb1_rect.inflate(-6, -6))
+        txt_col1 = (120, 255, 230) if cb1_hover else (255, 255, 255)
+        env.screen.blit(self.font.render("Show 1st Path", True, txt_col1), (70, 670))
 
+        # 2. Show 2nd Path (오렌지)
+        cb2_row = getattr(env, 'cb2_row_rect', env.cb2_rect)
+        cb2_hover = cb2_row.collidepoint(mpos)
+        if cb2_hover:
+            pygame.draw.rect(env.screen, (28, 56, 88), cb2_row, border_radius=4)
         pygame.draw.rect(env.screen, (255, 255, 255), env.cb2_rect, 2)
-        if getattr(env, 'show_candidates', True): pygame.draw.rect(env.screen, (160, 180, 255), env.cb2_rect.inflate(-6, -6))
-        env.screen.blit(self.font.render("Show Candidate WPs", True, (255, 255, 255)), (70, 712))
+        if getattr(env, 'show_2nd_path', True): pygame.draw.rect(env.screen, (255, 140, 0), env.cb2_rect.inflate(-6, -6))
+        txt_col2 = (255, 185, 95) if cb2_hover else (255, 255, 255)
+        env.screen.blit(self.font.render("Show 2nd Path", True, txt_col2), (70, 706))
 
+        # 3. Show Candidate WPs (연보라)
+        cb3_row = getattr(env, 'cb3_row_rect', env.cb3_rect)
+        cb3_hover = cb3_row.collidepoint(mpos)
+        if cb3_hover:
+            pygame.draw.rect(env.screen, (28, 56, 88), cb3_row, border_radius=4)
         pygame.draw.rect(env.screen, (255, 255, 255), env.cb3_rect, 2)
-        if env.show_lidar: pygame.draw.rect(env.screen, (225, 220, 130), env.cb3_rect.inflate(-6, -6))
-        env.screen.blit(self.font.render("Show LiDAR Hits", True, (255, 255, 255)), (70, 752))
+        if getattr(env, 'show_candidates', True): pygame.draw.rect(env.screen, (160, 180, 255), env.cb3_rect.inflate(-6, -6))
+        txt_col3 = (195, 215, 255) if cb3_hover else (255, 255, 255)
+        env.screen.blit(self.font.render("Show Candidate WPs", True, txt_col3), (70, 742))
 
+        # 4. Show LiDAR Hits (소프트 옐로우)
+        cb4_row = getattr(env, 'cb4_row_rect', env.cb4_rect)
+        cb4_hover = cb4_row.collidepoint(mpos)
+        if cb4_hover:
+            pygame.draw.rect(env.screen, (28, 56, 88), cb4_row, border_radius=4)
         pygame.draw.rect(env.screen, (255, 255, 255), env.cb4_rect, 2)
-        if env.show_lidar_range: pygame.draw.rect(env.screen, (80, 175, 140), env.cb4_rect.inflate(-6, -6))
-        env.screen.blit(self.font.render("Show LiDAR Range", True, (255, 255, 255)), (70, 792))
+        if env.show_lidar: pygame.draw.rect(env.screen, (225, 220, 130), env.cb4_rect.inflate(-6, -6))
+        txt_col4 = (250, 245, 175) if cb4_hover else (255, 255, 255)
+        env.screen.blit(self.font.render("Show LiDAR Hits", True, txt_col4), (70, 778))
 
-        # 시뮬레이션 제어 버튼 (PAUSE, 1x, 2x, 4x, 8x, 16x)
-        env.screen.blit(self.small_font.render("SIMULATION CONTROL", True, (160, 200, 240)), (40, 818))
+        # 5. Show LiDAR Range (세이지 그린)
+        cb5_row = getattr(env, 'cb5_row_rect', env.cb5_rect)
+        cb5_hover = cb5_row.collidepoint(mpos)
+        if cb5_hover:
+            pygame.draw.rect(env.screen, (28, 56, 88), cb5_row, border_radius=4)
+        pygame.draw.rect(env.screen, (255, 255, 255), env.cb5_rect, 2)
+        if env.show_lidar_range: pygame.draw.rect(env.screen, (80, 175, 140), env.cb5_rect.inflate(-6, -6))
+        txt_col5 = (130, 225, 180) if cb5_hover else (255, 255, 255)
+        env.screen.blit(self.font.render("Show LiDAR Range", True, txt_col5), (70, 814))
         
         # 일시정지(PAUSE) 버튼
         is_paused = getattr(env, 'paused', False)
@@ -527,13 +566,14 @@ class EnvRenderer:
 
         # 웨이포인트 및 최종 목표 지점 수직 오버레이 신호선
         marker_objs = []
-        show_paths = getattr(env, 'show_paths', True)
-        if show_paths and env.current_wp is not None:
+        show_1st = getattr(env, 'show_1st_path', getattr(env, 'show_paths', True))
+        show_2nd = getattr(env, 'show_2nd_path', getattr(env, 'show_paths', True))
+        if show_1st and env.current_wp is not None:
             dx_w = env.current_wp["pos"][0] - bx; dy_w = env.current_wp["pos"][1] - by
             lf_w = dx_w * f_vec[0] + dy_w * f_vec[1]; lr_w = dx_w * r_vec[0] + dy_w * r_vec[1]
             marker_objs.append(('wp1', lf_w, lr_w))
 
-        if show_paths and env.next_wp is not None:
+        if show_2nd and env.next_wp is not None:
             dx_w2 = env.next_wp["pos"][0] - bx; dy_w2 = env.next_wp["pos"][1] - by
             lf_w2 = dx_w2 * f_vec[0] + dy_w2 * f_vec[1]; lr_w2 = dx_w2 * r_vec[0] + dy_w2 * r_vec[1]
             marker_objs.append(('wp2', lf_w2, lr_w2))
@@ -618,12 +658,14 @@ class EnvRenderer:
 
         # 라이다 거릿값 막대 위에 오버레이되는 웨이포인트 및 최종 목표 지점 핀 마커
         overlay_objs = []
-        if show_paths and env.current_wp is not None:
+        show_1st = getattr(env, 'show_1st_path', getattr(env, 'show_paths', True))
+        show_2nd = getattr(env, 'show_2nd_path', getattr(env, 'show_paths', True))
+        if show_1st and env.current_wp is not None:
             dx_w = env.current_wp["pos"][0] - bx; dy_w = env.current_wp["pos"][1] - by
             lf_w = dx_w * f_vec[0] + dy_w * f_vec[1]; lr_w = dx_w * r_vec[0] + dy_w * r_vec[1]
             if lf_w > 2.0: overlay_objs.append(('wp1', lf_w, lr_w))
 
-        if show_paths and env.next_wp is not None:
+        if show_2nd and env.next_wp is not None:
             dx_w2 = env.next_wp["pos"][0] - bx; dy_w2 = env.next_wp["pos"][1] - by
             lf_w2 = dx_w2 * f_vec[0] + dy_w2 * f_vec[1]; lr_w2 = dx_w2 * r_vec[0] + dy_w2 * r_vec[1]
             if lf_w2 > 2.0: overlay_objs.append(('wp2', lf_w2, lr_w2))
@@ -811,7 +853,7 @@ class EnvRenderer:
             ("Align", (0, 230, 255)),      # Heading Alignment
             ("Forward", (40, 225, 120)),   # Progress toward GPS
             ("Clear", (255, 215, 40)),     # Obstacle Clearance
-            ("Perpend", (255, 140, 40)),   # 90° Orthogonality
+            ("Perpend", (255, 140, 40)),   # Orthogonality to GPS (perp_exp)
             ("Proxim", (255, 90, 190)),    # Proximity to Boat
             ("Cluster", (170, 130, 255))   # Cluster Density
         ]
@@ -824,7 +866,7 @@ class EnvRenderer:
             # 가중치 w와 점수 raw를 곱하여 실제 기여 점수 산출 (w가 0이면 0% 표출)
             weighted_vals = []
             for k, _ in FACTOR_ITEMS:
-                item = factors.get(k, None)
+                item = factors.get(k, factors.get('Perpend' if k == 'EffWidth' else None))
                 if isinstance(item, dict):
                     w = float(item.get("w", 0.0))
                     raw = float(item.get("raw", 0.0))
