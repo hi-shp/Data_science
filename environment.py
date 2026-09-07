@@ -114,6 +114,9 @@ class BoatEnv:
         self.show_lidar_range = True
         self.candidate_wps = []
         self.total_gaps_count = 0
+        self.show_all_gaps = False
+        self.all_gaps = []
+        self.gaps_btn_rect = None
         
         self.cb1_rect = pygame.Rect(40, 668, 20, 20)
         self.cb2_rect = pygame.Rect(40, 704, 20, 20)
@@ -196,6 +199,7 @@ class BoatEnv:
         self.next_wp = None
         self.visited = set()
         self.total_gaps_count = 0
+        self.all_gaps = []
         
         self.wp_check_timer = 0
         self.steer_timer = 0
@@ -222,6 +226,8 @@ class BoatEnv:
             self.show_lidar_range = not self.show_lidar_range
         elif self.pause_btn.collidepoint(pos):
             self.paused = not self.paused
+        elif getattr(self, 'gaps_btn_rect', None) and self.gaps_btn_rect.collidepoint(pos):
+            self.show_all_gaps = not getattr(self, 'show_all_gaps', False)
         else:
             for spd, rect in self.speed_btns.items():
                 if rect.collidepoint(pos):

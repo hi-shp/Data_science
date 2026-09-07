@@ -442,6 +442,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             
     best["candidates"] = candidates
     best["total_gaps_count"] = len(valid_gaps)
+    best["all_gaps"] = [{"pos": g["pos"].copy(), "c1": g["c1"].copy(), "c2": g["c2"].copy()} for g in valid_gaps]
     return best
 
 def reactive_avoidance(dists, angles):
