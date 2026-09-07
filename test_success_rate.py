@@ -113,7 +113,7 @@ Estimated ETA:   {eta_str}
                     boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
                     clear_to_target = is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params)
 
-                    # 목적지까지 회전 궤적 및 직선 경로에 장애물이 전혀 없을 때만 목적지 직행
+                    # 목적지 방향 직선 시야(경로)에 장애물이 없으면 즉시 목적지 직행
                     if clear_to_target:
                         new_wp = None
                         env.current_wp = None

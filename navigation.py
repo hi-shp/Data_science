@@ -49,16 +49,8 @@ def bezier_path_is_blocked(path, obstacles, boat_radius=25, margin=10):
     return bool(np.any(d2 <= orad2[None, :]))
 
 def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_radius=25, boat_speed=0.0, params=None):
-    if not target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius):
-        return False
-    from utils import make_bezier_path
-    p = params or {}
-    margin = float(p.get('clear_margin', 10.0))
-    # 목적지까지 회전하는 실제 베지어 궤적이 장애물과 충돌하는지 검증
-    test_path = make_bezier_path(boat_pos, boat_heading, target_pos, obstacles=obstacles, boat_radius=boat_radius, boat_speed=boat_speed)
-    if bezier_path_is_blocked(test_path, obstacles, boat_radius=boat_radius, margin=margin):
-        return False
-    return True
+    # 목적지 방향 직선 경로(시야)가 확보되면 즉시 직행 허용 (선회 궤적 차단 검사 제거)
+    return target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius)
 
 def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obstacles, boat_radius=25, boat_speed=0.0, params=None):
     if curr_wp_pos is None or new_wp_pos is None or len(obstacles) == 0:
