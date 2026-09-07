@@ -83,9 +83,11 @@ Estimated ETA:   {eta_str}
                         env.handle_click(e.pos)
 
             sub_steps = max(1, int(getattr(env, 'sim_speed', 4)))
+            plan_interval = 1 if sub_steps <= 2 else (2 if sub_steps <= 4 else 3)
             hits = None
+            new_wp = None
             
-            for _ in range(sub_steps):
+            for step_idx in range(sub_steps):
                 env.frame += 1
                 ep_steps += 1
                 env.update_dynamic_obstacles()
@@ -99,34 +101,41 @@ Estimated ETA:   {eta_str}
                 update_grid(env.grid, hits)
                 env.grid *= 0.945
 
-                new_c = extract_clusters_from_grid(env.grid)
-                env.clusters, env.cluster_ids = match_clusters(
-                    env.clusters, env.cluster_ids, new_c
-                )
-
-                dist_to_target = np.linalg.norm(env.target - env.boat_pos)
-                boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
-                clear_to_target = is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params)
-
-                if clear_to_target:
-                    new_wp = None
-                    env.current_wp = None
-                    env.next_wp = None
-                    env.candidate_wps = []
-                else:
-                    new_wp = find_gap(
-                        env.clusters, env.cluster_ids,
-                        env.boat_pos, env.boat_heading,
-                        env.target, env.visited,
-                        env.grid, env.dynamic_obstacles,
-                        params=env.params
+                # 연산 부하 절감을 위한 적응형 인지/탐색 주기
+                should_plan = (step_idx % plan_interval == 0 or step_idx == sub_steps - 1)
+                if should_plan:
+                    new_c = extract_clusters_from_grid(env.grid)
+                    env.clusters, env.cluster_ids = match_clusters(
+                        env.clusters, env.cluster_ids, new_c
                     )
-                    if new_wp is not None:
-                        env.candidate_wps = new_wp.get("candidates", [])
-                    elif env.current_wp is not None:
-                        env.candidate_wps = env.current_wp.get("candidates", [])
-                    else:
+
+                    dist_to_target = math.hypot(env.target[0] - env.boat_pos[0], env.target[1] - env.boat_pos[1])
+                    boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
+                    clear_to_target = is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params)
+
+                    # 목적지까지 회전 궤적 및 직선 경로에 장애물이 전혀 없을 때만 목적지 직행
+                    if clear_to_target:
+                        new_wp = None
+                        env.current_wp = None
+                        env.next_wp = None
                         env.candidate_wps = []
+                    else:
+                        # 경로 상에 장애물이 있으면 장애물 사이 갭(웨이포인트)을 찾아 안전하게 우회
+                        new_wp = find_gap(
+                            env.clusters, env.cluster_ids,
+                            env.boat_pos, env.boat_heading,
+                            env.target, env.visited,
+                            env.grid, env.dynamic_obstacles,
+                            params=env.params
+                        )
+                        if new_wp is not None:
+                            env.candidate_wps = new_wp.get("candidates", [])
+                        elif env.current_wp is not None:
+                            env.candidate_wps = env.current_wp.get("candidates", [])
+                        else:
+                            env.candidate_wps = []
+                else:
+                    boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
 
                 if env.current_wp is not None:
                     should_clear = False
@@ -134,33 +143,33 @@ Estimated ETA:   {eta_str}
                     c2 = env.current_wp.get("c2")
                     mid = env.current_wp["pos"]
                     vec_to_wp = mid - env.boat_pos
-                    dnow = np.linalg.norm(vec_to_wp)
+                    dnow = math.hypot(vec_to_wp[0], vec_to_wp[1])
                     
-                    # 1. 웨이포인트 중심점 근접 시 즉시 해제 (28px 이내)
-                    if dnow < 28:
+                    # 1. 웨이포인트 중심점 근접 시 즉시 해제 (60px 이내)
+                    if dnow < 60:
                         should_clear = True
                         
                     # 2. 웨이포인트 게이트 선 통과 판정 (c1, c2 사이 게이트 선을 전방으로 통과 시 즉시 해제)
                     if not should_clear and c1 is not None and c2 is not None:
-                        v_gate = c2 - c1
-                        gate_len = np.linalg.norm(v_gate)
+                        vgx = c2[0] - c1[0]; vgy = c2[1] - c1[1]
+                        gate_len = math.hypot(vgx, vgy)
                         if gate_len > 1e-3:
-                            u_gate = v_gate / gate_len
-                            n_gate = np.array([-u_gate[1], u_gate[0]])
-                            h_vec = np.array([math.cos(env.boat_heading), math.sin(env.boat_heading)])
-                            if np.dot(n_gate, h_vec) < 0:
-                                n_gate = -n_gate
-                            rel_boat = env.boat_pos - mid
-                            d_normal = np.dot(rel_boat, n_gate)
-                            d_lateral = abs(np.dot(rel_boat, u_gate))
-                            if 0.0 <= d_normal < 40.0 and d_lateral < (gate_len / 2.0 + 20.0):
+                            ugx = vgx / gate_len; ugy = vgy / gate_len
+                            ngx = -ugy; ngy = ugx
+                            hx = math.cos(env.boat_heading); hy = math.sin(env.boat_heading)
+                            if ngx * hx + ngy * hy < 0:
+                                ngx = -ngx; ngy = -ngy
+                            rbx = env.boat_pos[0] - mid[0]; rby = env.boat_pos[1] - mid[1]
+                            d_normal = rbx * ngx + rby * ngy
+                            d_lateral = abs(rbx * ugx + rby * ugy)
+                            if 0.0 <= d_normal < 60.0 and d_lateral < (gate_len / 2.0 + 20.0):
                                 should_clear = True
                                 
                     # 3. 웨이포인트를 이미 지나쳐 측후방으로 넘어간 경우 (95도 이상 & 75px 이내)
                     if not should_clear:
                         wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
                         angle_diff = abs(wrap(wp_angle - env.boat_heading))
-                        if angle_diff > np.deg2rad(95) and dnow < 75:
+                        if angle_diff > 1.6580627893946132 and dnow < 75:  # np.deg2rad(95)
                             should_clear = True
                         
                     if should_clear:
@@ -198,8 +207,9 @@ Estimated ETA:   {eta_str}
                         c1_old = env.current_wp.get("c1")
                         c2_old = env.current_wp.get("c2")
                         if c1_old is not None and c2_old is not None and len(env.clusters) >= 2:
-                            d1 = [np.linalg.norm(c - c1_old) for c in env.clusters]
-                            d2 = [np.linalg.norm(c - c2_old) for c in env.clusters]
+                            cl_arr = np.array(env.clusters)
+                            d1 = np.sqrt(np.sum((cl_arr - c1_old)**2, axis=1))
+                            d2 = np.sqrt(np.sum((cl_arr - c2_old)**2, axis=1))
                             i1, i2 = int(np.argmin(d1)), int(np.argmin(d2))
                             if d1[i1] < 35.0 and d2[i2] < 35.0 and i1 != i2:
                                 env.current_wp["c1"] = env.clusters[i1]
@@ -211,25 +221,26 @@ Estimated ETA:   {eta_str}
                 if new_wp is not None and env.current_wp is None:
                     env.current_wp = new_wp
 
-                if env.current_wp is not None and not clear_to_target:
-                    temp_visited = env.visited.copy()
-                    temp_visited.add(env.current_wp["pair"])
-                    temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
-                    
-                    vec = env.current_wp["pos"] - env.boat_pos
-                    next_head = math.atan2(vec[1], vec[0])
-                    
-                    # 2차 갭 탐색 (1차 웨이포인트 이후 전방에 장애물 갭이 존재하면 주황색 2차 웨이포인트로 표출)
-                    env.next_wp = find_gap(
-                        env.clusters, env.cluster_ids,
-                        env.current_wp["pos"], next_head,
-                        env.target, temp_visited,
-                        env.grid, env.dynamic_obstacles,
-                        params=env.params,
-                        is_next_wp=True
-                    )
-                else:
-                    env.next_wp = None
+                if should_plan:
+                    if env.current_wp is not None and not clear_to_target:
+                        temp_visited = env.visited.copy()
+                        temp_visited.add(env.current_wp["pair"])
+                        temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
+                        
+                        vec = env.current_wp["pos"] - env.boat_pos
+                        next_head = math.atan2(vec[1], vec[0])
+                        
+                        # 2차 갭 탐색 (1차 웨이포인트 이후 전방에 장애물 갭이 존재하면 주황색 2차 웨이포인트로 표출)
+                        env.next_wp = find_gap(
+                            env.clusters, env.cluster_ids,
+                            env.current_wp["pos"], next_head,
+                            env.target, temp_visited,
+                            env.grid, env.dynamic_obstacles,
+                            params=env.params,
+                            is_next_wp=True
+                        )
+                    else:
+                        env.next_wp = None
 
                 env.path_timer += env.dt
                 if env.path_timer >= 0.01:
@@ -281,9 +292,10 @@ Estimated ETA:   {eta_str}
                 env.validate_wp_grid()
                 env.validate_wp_obstacle_5x5()
 
+                dist_tgt_end = math.hypot(env.target[0] - env.boat_pos[0], env.target[1] - env.boat_pos[1])
                 is_col = env.collide()
-                is_goal = (np.linalg.norm(env.target - env.boat_pos) < 70)
-                is_timeout = (ep_steps > 2500)
+                is_goal = (dist_tgt_end < 70)
+                is_timeout = (ep_steps > 3500)
 
                 if is_col or is_goal or is_timeout:
                     is_success = (is_goal and not is_col)
