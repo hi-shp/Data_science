@@ -311,12 +311,22 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             depth_pen = 1.0
                 
         min_clear = max(min_clear, 0)
-        path_clear = min(min_clear / 160, 1)**2.2
-        
-        # 갭 선분(c1->c2)과 현재 위치에서 목적지까지의 방향(gps_vec) 간의 수직도(Orthogonality) 계산
+        if min_clear < 15.0:
+            continue
+            
+        # 갭 선분(c1->c2)의 폭 및 단위 벡터
         v_gap = c2 - c1
         gap_w = np.linalg.norm(v_gap)
         u_gap = v_gap / (gap_w + 1e-6)
+        
+        # 선박 진행방향(boat_heading) 기준으로 체감되는 갭 통과 난이도/유효 너비 (Apparent Opening Clearance)
+        # 선박 진행방향에 수직인 평면에 투영된 체감 너비: 남북방향(수직)일수록 넓고, 평행할수록 0에 수렴
+        apparent_width = abs(v_gap[1] * math.cos(boat_heading) - v_gap[0] * math.sin(boat_heading))
+        net_clear_width = max(apparent_width - 34.0, 0.0)  # 장애물 직경(17*2=34) 제외 순수 통과 폭
+        clear_score = max(min(net_clear_width / 120.0, 1.0), 0.05)
+        clear_factor = clear_score ** clear_exp
+        
+        # 갭 선분(c1->c2)과 현재 위치에서 목적지까지의 방향(gps_vec) 간의 수직도(Orthogonality) 계산
         perp_score = abs(gps_vec[0] * u_gap[1] - gps_vec[1] * u_gap[0])
         perp_factor = max(perp_score, 0.05) ** perp_exp
         
@@ -335,13 +345,13 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         
         width_w = min(gap_w / 90, 1)
         
-        sc = (heading_align**align_exp) * head_factor * (forward_proj**fwd_exp) * (lateral_full**0.5) * (path_clear**clear_exp) * (width_w**width_exp) * depth_pen * near_clear_penalty * perp_factor * prox_factor * center_factor
+        sc = (heading_align**align_exp) * head_factor * (forward_proj**fwd_exp) * (lateral_full**0.5) * clear_factor * (width_w**width_exp) * depth_pen * near_clear_penalty * perp_factor * prox_factor * center_factor
         
         if sc > 0:
             term_align = float(heading_align**align_exp)
             term_head = float(head_factor)
             term_fwd = float(forward_proj**fwd_exp)
-            term_clear = float(path_clear**clear_exp)
+            term_clear = float(clear_factor)
             term_perp = float(perp_factor)
             term_prox = float(prox_factor)
             term_center = float(center_factor)
@@ -356,7 +366,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
                     "Align": {"raw": float(heading_align), "w": float(align_exp)},
                     "Heading": {"raw": float(head_score), "w": float(heading_exp)},
                     "Forward": {"raw": float(forward_proj), "w": float(fwd_exp)},
-                    "Clear": {"raw": float(path_clear), "w": float(clear_exp)},
+                    "Clear": {"raw": float(clear_score), "w": float(clear_exp)},
                     "Perpend": {"raw": float(perp_score), "w": float(perp_exp)},
                     "Proxim": {"raw": float(prox_score), "w": float(prox_exp)},
                     "Center": {"raw": float(center_closeness), "w": float(eff_center_exp)}
