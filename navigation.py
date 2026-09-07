@@ -141,7 +141,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     fwd_exp = params.get('fwd_exp', 6.6) if params else 6.6
     clear_exp = params.get('clear_exp', 5.0) if params else 5.0
     width_exp = params.get('width_exp', 0.2) if params else 0.2
-    cluster_pen_w = params.get('cluster_pen_w', 2.0) if params else 2.0
+    heading_exp = params.get('heading_exp', params.get('boat_align_exp', params.get('head_exp', 2.0))) if params else 2.0
     perp_exp = params.get('perp_exp', 3.0) if params else 3.0
     prox_exp = params.get('prox_exp', 4.0) if params else 4.0
     center_exp = params.get('center_exp', 1.5) if params else 1.5
@@ -218,6 +218,9 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             
         ang_mid = math.atan2(rel[1], rel[0])
         ang_err = wrap(ang_mid - gps_heading)
+        ang_boat_err = wrap(ang_mid - boat_heading)
+        head_score = math.exp(-(ang_boat_err / 0.8)**2)
+        head_factor = max(head_score, 0.05) ** heading_exp
         
         gx = int(mx // GRID)
         gy = int(my // GRID)
@@ -272,13 +275,11 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             else:
                 min_clear = 9999.0
             
-            cluster_pen = 1.0
             near_clear_penalty = 1.0
             depth_pen = 1.0
         else:
             min_clear = 9999.0
             near_clear_penalty = 1.0
-            cluster_pen = 1.0
             depth_pen = 1.0
                 
         min_clear = max(min_clear, 0)
@@ -306,16 +307,16 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         
         width_w = min(gap_w / 90, 1)
         
-        sc = (heading_align**align_exp) * (forward_proj**fwd_exp) * (lateral_full**0.5) * (path_clear**clear_exp) * (width_w**width_exp) * (cluster_pen**cluster_pen_w) * depth_pen * near_clear_penalty * perp_factor * prox_factor * center_factor
+        sc = (heading_align**align_exp) * head_factor * (forward_proj**fwd_exp) * (lateral_full**0.5) * (path_clear**clear_exp) * (width_w**width_exp) * depth_pen * near_clear_penalty * perp_factor * prox_factor * center_factor
         
         if sc > 0:
             term_align = float(heading_align**align_exp)
+            term_head = float(head_factor)
             term_fwd = float(forward_proj**fwd_exp)
             term_clear = float(path_clear**clear_exp)
             term_perp = float(perp_factor)
             term_prox = float(prox_factor)
             term_center = float(center_factor)
-            term_cluster = float(cluster_pen**cluster_pen_w)
             
             valid_gaps.append({
                 "pos": mid,
@@ -325,12 +326,12 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
                 "score": sc,
                 "factors": {
                     "Align": {"raw": float(heading_align), "w": float(align_exp)},
+                    "Heading": {"raw": float(head_score), "w": float(heading_exp)},
                     "Forward": {"raw": float(forward_proj), "w": float(fwd_exp)},
                     "Clear": {"raw": float(path_clear), "w": float(clear_exp)},
                     "Perpend": {"raw": float(perp_score), "w": float(perp_exp)},
                     "Proxim": {"raw": float(prox_score), "w": float(prox_exp)},
-                    "Center": {"raw": float(center_closeness), "w": float(eff_center_exp)},
-                    "Cluster": {"raw": float(cluster_pen), "w": float(cluster_pen_w)}
+                    "Center": {"raw": float(center_closeness), "w": float(eff_center_exp)}
                 }
             })
             

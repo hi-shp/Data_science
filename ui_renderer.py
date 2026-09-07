@@ -893,13 +893,13 @@ class EnvRenderer:
         factors = wp.get('factors', None) if wp is not None else None
         
         FACTOR_ITEMS = [
-            ("Align", (0, 230, 255)),      # Heading Alignment
-            ("Forward", (40, 225, 120)),   # Progress toward GPS
-            ("Clear", (255, 215, 40)),     # Obstacle Clearance
+            ("Align", (0, 230, 255)),      # GPS Alignment (align_exp)
+            ("Heading", (170, 130, 255)),  # Boat Heading Alignment (heading_exp)
+            ("Forward", (40, 225, 120)),   # Progress toward GPS (fwd_exp)
+            ("Clear", (255, 215, 40)),     # Obstacle Clearance (clear_exp)
             ("Perpend", (255, 140, 40)),   # Orthogonality to GPS (perp_exp)
-            ("Proxim", (255, 90, 190)),    # Proximity to Boat
-            ("Center", (100, 220, 255)),   # Baseline Restoring Tendency (center_exp)
-            ("Cluster", (170, 130, 255))   # Cluster Density
+            ("Proxim", (255, 90, 190)),    # Proximity to Boat (prox_exp)
+            ("Center", (100, 220, 255))    # Baseline Restoring Tendency (center_exp)
         ]
         
         bar_x = 64
