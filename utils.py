@@ -35,12 +35,12 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     # 1. 장애물이 없는 목적지 직행 상황: 곡률을 대폭 줄여 목적지를 향해 직선에 가깝게 직행
     if obstacles is None or len(obstacles) == 0:
         if start_tangent_fixed:
-            forward_dist = min(80.0, d * 0.38)
+            forward_dist = min(93.0, d * 0.40)
             p1 = boat_pos + forward * forward_dist
             v_goal = p3 - p1
             norm_v_goal = np.linalg.norm(v_goal)
             v_goal_n = np.zeros(2) if norm_v_goal < 1e-6 else v_goal / norm_v_goal
-            p2 = p3 - v_goal_n * min(75.0, d * 0.36)
+            p2 = p3 - v_goal_n * min(85.0, d * 0.38)
             return cubic_bezier(p0, p1, p2, p3, n=90)
         else:
             speed_ratio = np.clip(boat_speed / 80.0, 0.0, 1.0)
@@ -55,13 +55,9 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
 
     # 2. 웨이포인트 추종 및 장애물 통과 구간: 선박 속도 및 각도 편차에 따른 선행 회전(Inward Lead) 및 관성 보정
     if start_tangent_fixed:
-        # C1 연속성 유지를 위해 시작 접선 방향(forward)을 엄격히 고정하고 이상적 곡률(0.38) 유지
-        forward_dist = min(80.0, d * 0.38)
+        # C1 연속성 유지를 위해 시작 접선 방향(forward)을 엄격히 고정
+        forward_dist = min(93.0, d * 0.40)
         p1 = boat_pos + forward * forward_dist
-        v_goal = p3 - p1
-        norm_v_goal = np.linalg.norm(v_goal)
-        v_goal_n = np.zeros(2) if norm_v_goal < 1e-6 else v_goal / norm_v_goal
-        p2 = p3 - v_goal_n * min(75.0, d * 0.36)
     else:
         speed_ratio = np.clip(boat_speed / 80.0, 0.0, 1.0)
         lead_shrink = max(0.4, 1.0 - 0.50 * speed_ratio * math.sin(ang_diff * 0.5))
@@ -74,10 +70,11 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
         lead_dir = forward if norm_lead < 1e-6 else lead_dir / norm_lead
 
         p1 = boat_pos + lead_dir * forward_dist
-        v_goal = p3 - p1
-        norm_v_goal = np.linalg.norm(v_goal)
-        v_goal_n = np.zeros(2) if norm_v_goal < 1e-6 else v_goal / norm_v_goal
-        p2 = p3 - v_goal_n * min(85.0, d * 0.38)
+
+    v_goal = p3 - p1
+    norm_v_goal = np.linalg.norm(v_goal)
+    v_goal_n = np.zeros(2) if norm_v_goal < 1e-6 else v_goal / norm_v_goal
+    p2 = p3 - v_goal_n * min(85.0, d * 0.38)
 
     nominal_pts = cubic_bezier(p0, p1, p2, p3, n=30)
     u_dir = (p3 - p0) / d
@@ -106,8 +103,7 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
             for k in active_idx:
                 min_idx = min_idx_all[k]
                 t_idx = min_idx / 29.0
-                # 시작 게이트(t < 0.18) 및 도착 게이트(t > 0.82) 부표는 밀림 방지하여 경로 끝단의 비틀림/꼬불거림 억제
-                if t_idx < 0.18 or t_idx > 0.82:
+                if start_tangent_fixed and t_idx < 0.2:
                     continue
                 encroach = encroach_all[k]
                 
@@ -121,13 +117,13 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
                     side = (obs_pos[0] - p0[0]) * n_dir[0] + (obs_pos[1] - p0[1]) * n_dir[1]
                     push_dir = -n_dir if side >= 0 else n_dir
                     
-                # 부드러운 정현파 가중치: 중간(t=0.5)에서 최대 1.0, 양 끝에서 0으로 자연스럽게 수렴
-                w_mid = math.sin(math.pi * t_idx)
-                push_mag = min(60.0, encroach * 0.7)
+                push_mag = min(160.0, encroach * 1.4)
+                w1 = max(0.2, 1.0 - t_idx * 0.7)
+                w2 = max(0.2, t_idx * 0.7 + 0.3)
                 
                 if not start_tangent_fixed:
-                    shift_p1 += push_dir * (push_mag * w_mid * (1.0 - t_idx))
-                shift_p2 += push_dir * (push_mag * w_mid * t_idx)
+                    shift_p1 += push_dir * (push_mag * w1)
+                shift_p2 += push_dir * (push_mag * w2)
             
     p1 = p1 + shift_p1
     p2 = p2 + shift_p2
