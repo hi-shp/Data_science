@@ -168,27 +168,55 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         
     items.sort(key=lambda x: x[0])
     
+    ox = obstacles[:, 0]
+    oy = obstacles[:, 1]
+    
     gaps_set = set()
     # 1) 라이다 각도 상 분리된 인접 쌍 (라이다 상 검은색 빈 공간)
     for i in range(len(items) - 1):
         if (items[i+1][0] - items[i][0]) > np.deg2rad(2.0):
             gaps_set.add((i, i+1))
             
-    # 2) 라이다 상에 바로 붙어있어도(각도차가 작아 검은 빈틈 없이 색깔만 달라도 = 거리/깊이 차이 발생),
-    #    2차원 실제 물리 거리가 선박 통과 가능 폭(45~160px)인 모든 장애물 쌍을 틈으로 인정
+    # 2) 3개 이상의 장애물 조합(1-2, 2-3뿐만 아니라 1-3, 1-4 등) 및 깊이 단차가 있는 모든 가능한 틈새 조합 탐색
     for i in range(len(items)):
         for j in range(i + 1, len(items)):
-            d_buoys = np.linalg.norm(items[i][2] - items[j][2])
-            if 45.0 <= d_buoys <= 160.0:
-                gaps_set.add((i, j))
+            c1 = items[i][2]
+            c2 = items[j][2]
+            v_gap = c2 - c1
+            gap_w = np.linalg.norm(v_gap)
+            
+            # 최소 통과 폭 (45px) ~ 전방 게이트 유효 최대 폭 (280px)
+            if not (45.0 <= gap_w <= 280.0):
+                continue
+                
+            # c1과 c2 사이 게이트 선분을 가로막는 다른 장애물(예: 1과 3 사이의 2번 장애물)이 있는지 정밀 검사
+            d2_c1 = (ox - c1[0])**2 + (oy - c1[1])**2
+            d2_c2 = (ox - c2[0])**2 + (oy - c2[1])**2
+            mask_obs = (d2_c1 > 28.0**2) & (d2_c2 > 28.0**2)
+            near_obs = obstacles[mask_obs]
+            
+            if len(near_obs) > 0:
+                px = near_obs[:, 0] - c1[0]
+                py = near_obs[:, 1] - c1[1]
+                t = (px * v_gap[0] + py * v_gap[1]) / (gap_w * gap_w + 1e-6)
+                in_span = (t > 0.05) & (t < 0.95)
+                if np.any(in_span):
+                    cand_obs = near_obs[in_span]
+                    cand_t = t[in_span]
+                    cx = c1[0] + cand_t * v_gap[0]
+                    cy = c1[1] + cand_t * v_gap[1]
+                    dist_to_gate = np.sqrt((cand_obs[:, 0] - cx)**2 + (cand_obs[:, 1] - cy)**2) - cand_obs[:, 2]
+                    if np.any(dist_to_gate < 15.0):
+                        # 게이트 사이가 제3의 장애물로 가로막혀 있으므로 단일 갭으로 취급하지 않음
+                        continue
+                        
+            gaps_set.add((i, j))
                 
     gaps = sorted(list(gaps_set))
     if not gaps:
         return None
         
     valid_gaps = []
-    ox = obstacles[:, 0]
-    oy = obstacles[:, 1]
     
     for gi, gj in gaps:
         ang1, d1, c1, id1 = items[gi]
