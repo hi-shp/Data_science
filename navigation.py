@@ -171,67 +171,47 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     ox = obstacles[:, 0]
     oy = obstacles[:, 1]
     
-    gaps_set = set()
-    # 1) 라이다 각도 상 분리된 인접 쌍 (라이다 상 검은색 빈 공간)
-    for i in range(len(items) - 1):
-        if (items[i+1][0] - items[i][0]) > 0.03490658503988659:  # deg2rad(2.0)
-            gaps_set.add((i, i+1))
-            
-    # 2) 3개 이상의 장애물 조합(1-2, 2-3뿐만 아니라 1-3, 1-4 등) 및 깊이 단차가 있는 모든 가능한 틈새 조합 탐색
-    # O(N)으로 각 클러스터와 장애물 간 거리 제곱을 사전 계산하여 O(N^2) 중복 연산 제거
-    d2_items = [(ox - it[2][0])**2 + (oy - it[2][1])**2 for it in items]
+    ox = obstacles[:, 0]
+    oy = obstacles[:, 1]
+    
+    # 탐지된 N개 장애물(빨간 부표) 사이의 모든 고유 쌍 조합 (N C 2)
+    # 두 장애물 사이엔 정확히 단 하나의 갭(중간점)만 생성 (2개->1갭, 3개->3갭, 4개->6갭)
+    all_gaps = []
     
     for i in range(len(items)):
         c1 = items[i][2]
-        d2_c1 = d2_items[i]
+        id1 = items[i][3]
         for j in range(i + 1, len(items)):
             c2 = items[j][2]
-            v_gap = c2 - c1
-            gap_w = math.hypot(v_gap[0], v_gap[1])
+            id2 = items[j][3]
+            mid = (c1 + c2) / 2.0
+            gap_w = math.hypot(c2[0] - c1[0], c2[1] - c1[1])
+            all_gaps.append({
+                "pos": mid.copy(),
+                "c1": c1.copy(),
+                "c2": c2.copy(),
+                "pair": (id1, id2),
+                "gi": i,
+                "gj": j,
+                "gap_w": gap_w
+            })
             
-            # 최소 통과 폭 (45px) ~ 전방 게이트 유효 최대 폭 (280px)
-            if not (45.0 <= gap_w <= 280.0):
-                continue
-                
-            # 바운딩 박스 빠른 필터링: c1과 c2 영역 바깥에 있는 장애물은 검사 대상에서 즉시 배제
-            min_x = (c1[0] if c1[0] < c2[0] else c2[0]) - 25.0
-            max_x = (c1[0] if c1[0] > c2[0] else c2[0]) + 25.0
-            min_y = (c1[1] if c1[1] < c2[1] else c2[1]) - 25.0
-            max_y = (c1[1] if c1[1] > c2[1] else c2[1]) + 25.0
-            
-            mask_obs = (d2_c1 > 784.0) & (d2_items[j] > 784.0) & (ox >= min_x) & (ox <= max_x) & (oy >= min_y) & (oy <= max_y)
-            if np.any(mask_obs):
-                near_obs = obstacles[mask_obs]
-                px = near_obs[:, 0] - c1[0]
-                py = near_obs[:, 1] - c1[1]
-                t = (px * v_gap[0] + py * v_gap[1]) / (gap_w * gap_w + 1e-6)
-                in_span = (t > 0.05) & (t < 0.95)
-                if np.any(in_span):
-                    cand_obs = near_obs[in_span]
-                    cand_t = t[in_span]
-                    cx = c1[0] + cand_t * v_gap[0]
-                    cy = c1[1] + cand_t * v_gap[1]
-                    dist_to_gate = np.sqrt((cand_obs[:, 0] - cx)**2 + (cand_obs[:, 1] - cy)**2) - cand_obs[:, 2]
-                    if np.any(dist_to_gate < 15.0):
-                        # 게이트 사이가 제3의 장애물로 가로막혀 있으므로 단일 갭으로 취급하지 않음
-                        continue
-                        
-            gaps_set.add((i, j))
-                
-    gaps = sorted(list(gaps_set))
-    if not gaps:
+    if not all_gaps:
         return None
         
     valid_gaps = []
     
-    for gi, gj in gaps:
+    for g_info in all_gaps:
+        gi = g_info["gi"]
+        gj = g_info["gj"]
         ang1, d1, c1, id1 = items[gi]
         ang2, d2, c2, id2 = items[gj]
+        mid = g_info["pos"]
+        gap_w = g_info["gap_w"]
         
         if (id1, id2) in visited or (id2, id1) in visited:
             continue
             
-        mid = (c1 + c2) / 2
         mx, my = mid
         rel = mid - boat_pos
         distm = math.hypot(rel[0], rel[1]) + 1e-6
@@ -408,7 +388,13 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             })
             
     if not valid_gaps:
-        return None
+        # 엄격한 필터를 통과한 갭이 없으면 all_gaps 중 목적지 거리가 가장 가까운 갭을 fallback으로 사용
+        unvisited = [g for g in all_gaps if g["pair"] not in visited and (g["pair"][1], g["pair"][0]) not in visited]
+        pool = unvisited if unvisited else all_gaps
+        pool_sorted = sorted(pool, key=lambda g: math.hypot(tx - g["pos"][0], ty - g["pos"][1]))
+        fallback_g = pool_sorted[0].copy()
+        fallback_g["score"] = 0.001
+        valid_gaps = [fallback_g]
         
     valid_gaps.sort(key=lambda x: x["score"], reverse=True)
     best = valid_gaps[0]
@@ -441,8 +427,8 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             break
             
     best["candidates"] = candidates
-    best["total_gaps_count"] = len(valid_gaps)
-    best["all_gaps"] = [{"pos": g["pos"].copy(), "c1": g["c1"].copy(), "c2": g["c2"].copy()} for g in valid_gaps]
+    best["total_gaps_count"] = len(all_gaps)
+    best["all_gaps"] = [{"pos": g["pos"].copy(), "c1": g["c1"].copy(), "c2": g["c2"].copy()} for g in all_gaps]
     return best
 
 def reactive_avoidance(dists, angles):
