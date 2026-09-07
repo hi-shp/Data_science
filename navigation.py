@@ -186,9 +186,13 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             gaps_set.add((i, i+1))
             
     # 2) 3개 이상의 장애물 조합(1-2, 2-3뿐만 아니라 1-3, 1-4 등) 및 깊이 단차가 있는 모든 가능한 틈새 조합 탐색
+    # O(N)으로 각 클러스터와 장애물 간 거리 제곱을 사전 계산하여 O(N^2) 중복 연산 제거
+    d2_items = [(ox - it[2][0])**2 + (oy - it[2][1])**2 for it in items]
+    
     for i in range(len(items)):
+        c1 = items[i][2]
+        d2_c1 = d2_items[i]
         for j in range(i + 1, len(items)):
-            c1 = items[i][2]
             c2 = items[j][2]
             v_gap = c2 - c1
             gap_w = math.hypot(v_gap[0], v_gap[1])
@@ -197,13 +201,15 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             if not (45.0 <= gap_w <= 280.0):
                 continue
                 
-            # c1과 c2 사이 게이트 선분을 가로막는 다른 장애물(예: 1과 3 사이의 2번 장애물)이 있는지 정밀 검사
-            d2_c1 = (ox - c1[0])**2 + (oy - c1[1])**2
-            d2_c2 = (ox - c2[0])**2 + (oy - c2[1])**2
-            mask_obs = (d2_c1 > 28.0**2) & (d2_c2 > 28.0**2)
-            near_obs = obstacles[mask_obs]
+            # 바운딩 박스 빠른 필터링: c1과 c2 영역 바깥에 있는 장애물은 검사 대상에서 즉시 배제
+            min_x = (c1[0] if c1[0] < c2[0] else c2[0]) - 25.0
+            max_x = (c1[0] if c1[0] > c2[0] else c2[0]) + 25.0
+            min_y = (c1[1] if c1[1] < c2[1] else c2[1]) - 25.0
+            max_y = (c1[1] if c1[1] > c2[1] else c2[1]) + 25.0
             
-            if len(near_obs) > 0:
+            mask_obs = (d2_c1 > 784.0) & (d2_items[j] > 784.0) & (ox >= min_x) & (ox <= max_x) & (oy >= min_y) & (oy <= max_y)
+            if np.any(mask_obs):
+                near_obs = obstacles[mask_obs]
                 px = near_obs[:, 0] - c1[0]
                 py = near_obs[:, 1] - c1[1]
                 t = (px * v_gap[0] + py * v_gap[1]) / (gap_w * gap_w + 1e-6)

@@ -35,7 +35,7 @@ def run():
 
         # 실시간 배속 설정에 따른 서브스텝 반복 실행
         sub_steps = max(1, int(getattr(env, 'sim_speed', 1)))
-        plan_interval = 1 if sub_steps <= 2 else (2 if sub_steps <= 8 else 3)
+        plan_interval = 1 if sub_steps <= 2 else (2 if sub_steps <= 4 else 3)
         hits = None
         new_wp = None
         
@@ -53,7 +53,8 @@ def run():
             env.grid *= 0.945
 
             # 연산 부하 절감을 위한 적응형 인지/탐색 주기
-            if step_idx % plan_interval == 0 or step_idx == sub_steps - 1:
+            should_plan = (step_idx % plan_interval == 0 or step_idx == sub_steps - 1)
+            if should_plan:
                 new_c = extract_clusters_from_grid(env.grid)
                 env.clusters, env.cluster_ids = match_clusters(
                     env.clusters, env.cluster_ids, new_c
@@ -171,30 +172,30 @@ def run():
             if new_wp is not None and env.current_wp is None:
                 env.current_wp = new_wp
                             
-            if env.current_wp is not None and not clear_to_target:
-                temp_visited = env.visited.copy()
-                temp_visited.add(env.current_wp["pair"])
-                temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
-                
-                vec = env.current_wp["pos"] - env.boat_pos
-                next_head = math.atan2(vec[1], vec[0])
-                
-                # 2차 갭 탐색 (1차 웨이포인트 이후 전방에 장애물 갭이 존재하면 주황색 2차 웨이포인트로 표출)
-                env.next_wp = find_gap(
-                    env.clusters, env.cluster_ids,
-                    env.current_wp["pos"], next_head,
-                    env.target, temp_visited,
-                    env.grid, env.dynamic_obstacles,
-                    params=env.params,
-                    is_next_wp=True
-                )
-            else:
-                env.next_wp = None
+            if should_plan:
+                if env.current_wp is not None and not clear_to_target:
+                    temp_visited = env.visited.copy()
+                    temp_visited.add(env.current_wp["pair"])
+                    temp_visited.add((env.current_wp["pair"][1], env.current_wp["pair"][0]))
+                    
+                    vec = env.current_wp["pos"] - env.boat_pos
+                    next_head = math.atan2(vec[1], vec[0])
+                    
+                    # 2차 갭 탐색 (1차 웨이포인트 이후 전방에 장애물 갭이 존재하면 주황색 2차 웨이포인트로 표출)
+                    env.next_wp = find_gap(
+                        env.clusters, env.cluster_ids,
+                        env.current_wp["pos"], next_head,
+                        env.target, temp_visited,
+                        env.grid, env.dynamic_obstacles,
+                        params=env.params,
+                        is_next_wp=True
+                    )
+                else:
+                    env.next_wp = None
 
             env.path_timer += env.dt
             if env.path_timer >= 0.01:
                 env.path_timer = 0
-                env.path_surf.fill((0, 0, 0, 0))
                 
                 boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
                 if env.current_wp is None:

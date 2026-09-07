@@ -76,9 +76,13 @@ def extract_clusters_from_grid(grid):
         return []
     
     flat_labels = labeled_array.ravel()
-    counts = np.bincount(flat_labels, minlength=num_features + 1)[1:]
-    sum_y = np.bincount(flat_labels, weights=_Y_FLAT, minlength=num_features + 1)[1:]
-    sum_x = np.bincount(flat_labels, weights=_X_FLAT, minlength=num_features + 1)[1:]
+    nonzero = flat_labels > 0
+    sub_labels = flat_labels[nonzero]
+    if len(sub_labels) == 0:
+        return []
+    counts = np.bincount(sub_labels, minlength=num_features + 1)[1:]
+    sum_y = np.bincount(sub_labels, weights=_Y_FLAT[nonzero], minlength=num_features + 1)[1:]
+    sum_x = np.bincount(sub_labels, weights=_X_FLAT[nonzero], minlength=num_features + 1)[1:]
     
     valid = counts > 0
     cy = sum_y[valid] / counts[valid]
