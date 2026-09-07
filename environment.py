@@ -49,7 +49,7 @@ class BoatEnv:
         self.lidar_range = 320
         self.rel_angles = np.linspace(-np.pi, np.pi, self.lidar_beams, endpoint=False)
         
-        self.mass = 12
+        self.mass = 14
         self.inertia = 4.2
         self.drag = 0.2
         self.rot_drag = 0.8
@@ -80,7 +80,7 @@ class BoatEnv:
         
         self.obs_n = 80
         self.obs_r = 17
-        self.min_obs = 110
+        self.min_obs = 120
         
         self.grid = init_grid()
         self.clusters = []
@@ -249,7 +249,7 @@ class BoatEnv:
         tR = self.pwm_to_thrust(R)
         # 220도 범위 내 최소 장애물 거리에 따른 순수 연속 함수 속도 제어 (장애물 근접 시 최소 속도를 더욱 낮추어 서행)
         em_dist = float(getattr(self, 'min_wide_dist', 999.0))
-        speed_factor = (math.tanh(em_dist / 100.0)) ** 1.35
+        speed_factor = (math.tanh(em_dist / 70.0)) ** 1.35
         target_fwd = ((tL + tR) / 6.0) * speed_factor
             
         if not hasattr(self, 'current_fwd'):
@@ -260,7 +260,7 @@ class BoatEnv:
         hv = np.array([math.cos(self.boat_heading), math.sin(self.boat_heading)])
         
         acc = self.current_fwd / self.mass
-        vel_norm = np.linalg.norm(self.boat_vel)
+        vel_norm = math.hypot(self.boat_vel[0], self.boat_vel[1])
         
         # 유체 항력
         drag = -self.drag * self.boat_vel * vel_norm
@@ -338,24 +338,37 @@ class BoatEnv:
             near_mask = dx_b * dx_b + dy_b * dy_b < 180.0 * 180.0
             if np.any(near_mask):
                 near_obs = self.dynamic_obstacles[near_mask]
+                near_ox = near_obs[:, 0]
+                near_oy = near_obs[:, 1]
+                near_or = near_obs[:, 2]
                 for w in self.wakes:
-                    for ox, oy, ob_r in near_obs:
-                        dx = w[0] - ox; dy = w[1] - oy
-                        dist = math.hypot(dx, dy)
-                        
-                        # 1. 장애물 내부로 들어간 파도는 완전히 소멸/흡수 (Absorption)
-                        if dist < ob_r + 2:
-                            w[3] = 0
-                            break
-                        
-                        # 2. 장애물 둘레에 파도가 닿으면 자글자글한 초미세 나노 거품 파편들이 반사 산란 (Nano-Spray Droplets)
-                        if abs(dist - (w[2] + ob_r)) < 5.0 and w[3] > 35:
+                    if w[3] <= 0:
+                        continue
+                    wx, wy = w[0], w[1]
+                    # 벡터화: 해당 파도 입자와 근접 장애물 전체 거리를 한 번에 계산
+                    dx_arr = wx - near_ox
+                    dy_arr = wy - near_oy
+                    dist_arr = np.sqrt(dx_arr * dx_arr + dy_arr * dy_arr)
+                    
+                    # 1. 장애물 내부로 들어간 파도는 완전히 소멸/흡수 (Absorption)
+                    if np.any(dist_arr < near_or + 2):
+                        w[3] = 0
+                        continue
+                    
+                    # 2. 장애물 둘레에 파도가 닿으면 나노 거품 반사 산란
+                    if w[3] > 35:
+                        contact = np.abs(dist_arr - (w[2] + near_or)) < 5.0
+                        if np.any(contact):
+                            cidx = np.where(contact)[0]
                             if random.random() < 0.35:
+                                k = cidx[0]
+                                ox_k = near_ox[k]; oy_k = near_oy[k]; or_k = near_or[k]
+                                dx_k = dx_arr[k]; dy_k = dy_arr[k]
                                 for _ in range(random.randint(2, 4)):
-                                    angle = math.atan2(dy, dx) + random.uniform(-0.8, 0.8)
+                                    angle = math.atan2(dy_k, dx_k) + random.uniform(-0.8, 0.8)
                                     spd = random.uniform(0.8, 1.8)
-                                    fx = ox + math.cos(angle) * (ob_r + random.uniform(0.8, 2.2))
-                                    fy = oy + math.sin(angle) * (ob_r + random.uniform(0.8, 2.2))
+                                    fx = ox_k + math.cos(angle) * (or_k + random.uniform(0.8, 2.2))
+                                    fy = oy_k + math.sin(angle) * (or_k + random.uniform(0.8, 2.2))
                                     self.reflected_wakes.append([
                                         fx, fy, random.uniform(0.3, 0.65), w[3] * 0.85,
                                         math.cos(angle) * spd, math.sin(angle) * spd

@@ -12,6 +12,8 @@ class EnvRenderer:
         self.hud_surf = pygame.Surface((210, 110), pygame.SRCALPHA)
         self.bezier_surf = pygame.Surface((190, 220), pygame.SRCALPHA)
         self.weights_surf = pygame.Surface((190, 220), pygame.SRCALPHA)
+        self._cand_surf = pygame.Surface((env.w, env.h), pygame.SRCALPHA)
+        self.shadow_surf = pygame.Surface((180, 180), pygame.SRCALPHA)
         self.font = pygame.font.SysFont(None, 24)
         self.bold_font = pygame.font.SysFont(None, 26, bold=True)
         self.small_font = pygame.font.SysFont(None, 18)
@@ -136,13 +138,9 @@ class EnvRenderer:
         pygame.draw.line(env.screen, (255, 255, 255, 180), (tx - 16, ty), (tx + 16, ty), 1)
         pygame.draw.line(env.screen, (255, 255, 255, 180), (tx, ty - 16), (tx, ty + 16), 1)
         
-        env.screen.blit(env.path_surf, (0, 0))
-        
-        # 5. 경로 및 타겟 점
-        # 5. 경로 및 타겟 점
-        # 5. 1차 및 2차 경로 및 타겟 점 렌더링
-        show_1st = getattr(env, 'show_1st_path', getattr(env, 'show_paths', True))
-        show_2nd = getattr(env, 'show_2nd_path', getattr(env, 'show_paths', True))
+        # 5. 실시간 동적 추종 궤적 (베지어 곡선 및 웨이포인트)
+        show_1st = getattr(env, 'show_1st_path', True)
+        show_2nd = getattr(env, 'show_2nd_path', True)
 
         if show_2nd:
             if env.next_wp is not None:
@@ -181,7 +179,8 @@ class EnvRenderer:
 
         # 6. 차순위 후보 웨이포인트 렌더링 (투명도 적용)
         if getattr(env, 'show_candidates', True) and getattr(env, 'candidate_wps', None):
-            cand_surf = pygame.Surface((env.w, env.h), pygame.SRCALPHA)
+            cand_surf = self._cand_surf
+            cand_surf.fill((0, 0, 0, 0))
             cand_colors = [(80, 210, 255, 130), (255, 180, 70, 120)]
             for rank_idx, cand in enumerate(env.candidate_wps[:2]):
                 col = cand_colors[rank_idx % len(cand_colors)]
@@ -226,14 +225,16 @@ class EnvRenderer:
         left_h = [TR(left_center, p[0], p[1]) for p in hull_local]
         right_h = [TR(right_center, p[0], p[1]) for p in hull_local]
         
-        # 선체 하부 앰비언트 수중 그림자
-        env.shadow_surf.fill((0, 0, 0, 0))
+        # 선체 하부 앰비언트 수중 그림자 (180x180 로컬 버퍼 최적화)
+        self.shadow_surf.fill((0, 0, 0, 0))
         shadow_offset = 7
-        left_shadow = [(p[0]+shadow_offset, p[1]+shadow_offset) for p in left_h]
-        right_shadow = [(p[0]+shadow_offset, p[1]+shadow_offset) for p in right_h]
-        pygame.draw.polygon(env.shadow_surf, (8, 30, 55, 150), left_shadow)
-        pygame.draw.polygon(env.shadow_surf, (8, 30, 55, 150), right_shadow)
-        env.screen.blit(env.shadow_surf, (0, 0))
+        sx_base = int(bx - 90)
+        sy_base = int(by - 90)
+        left_shadow = [(p[0] + shadow_offset - sx_base, p[1] + shadow_offset - sy_base) for p in left_h]
+        right_shadow = [(p[0] + shadow_offset - sx_base, p[1] + shadow_offset - sy_base) for p in right_h]
+        pygame.draw.polygon(self.shadow_surf, (8, 30, 55, 150), left_shadow)
+        pygame.draw.polygon(self.shadow_surf, (8, 30, 55, 150), right_shadow)
+        env.screen.blit(self.shadow_surf, (sx_base, sy_base))
 
         # 좌/우 선체 (군함/실험선 건메탈 그레이 - Tone 1: Gunmetal Grey)
         pygame.draw.polygon(env.screen, (52, 60, 70), left_h)

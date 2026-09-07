@@ -42,11 +42,11 @@ def bezier_path_is_blocked(path, obstacles, boat_radius=25, margin=10):
     ox = obstacles[:, 0]
     oy = obstacles[:, 1]
     orad2 = (obstacles[:, 2] + boat_radius + margin) ** 2
-    for p in path:
-        px, py = p[0], p[1]
-        if np.any((ox - px)**2 + (oy - py)**2 <= orad2):
-            return True
-    return False
+    # 벡터화: 모든 경로 점과 장애물 사이 거리를 한 번에 계산
+    px = path[:, 0][:, None]  # (N, 1)
+    py = path[:, 1][:, None]
+    d2 = (ox[None, :] - px)**2 + (oy[None, :] - py)**2  # (N, M)
+    return bool(np.any(d2 <= orad2[None, :]))
 
 def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_radius=25, boat_speed=0.0, params=None):
     if not target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius):
@@ -73,7 +73,7 @@ def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obs
     
     # 각도 차이가 작으면 (동일 방향/미세 갱신) 안전
     switch_ang_diff = abs(wrap(ang_new - ang_curr))
-    if switch_ang_diff < np.deg2rad(25.0):
+    if switch_ang_diff < 0.4363323129985824:  # deg2rad(25.0)
         return True
         
     # 1. 현재 선박 헤딩에서 새 웨이포인트로 선회하는 베지어 곡선 검증
@@ -88,12 +88,17 @@ def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obs
     ang_head_to_new = wrap(ang_new - boat_heading)
     sweep_radius = 110.0
     
-    for ox, oy, orad in obstacles:
-        dx = ox - bx
-        dy = oy - by
-        obs_dist = math.hypot(dx, dy)
-        
-        if obs_dist - orad < sweep_radius:
+    dx_all = obstacles[:, 0] - bx
+    dy_all = obstacles[:, 1] - by
+    dist_all = np.sqrt(dx_all * dx_all + dy_all * dy_all)
+    close_mask = (dist_all - obstacles[:, 2]) < sweep_radius
+    if np.any(close_mask):
+        for k in np.where(close_mask)[0]:
+            dx = dx_all[k]
+            dy = dy_all[k]
+            orad = obstacles[k, 2]
+            obs_dist = dist_all[k]
+            
             ang_obs = math.atan2(dy, dx)
             rel_ang = wrap(ang_obs - boat_heading)
             
@@ -115,19 +120,18 @@ def is_front_blocked(boat_pos, boat_heading, obstacles, boat_radius=25, block_di
     if obstacles is None or len(obstacles) == 0:
         return False
     bx, by = boat_pos
-    fov_rad = np.deg2rad(fov_deg)  # 좌우 45도 = 총 90도 전방 부채꼴
+    fov_rad = np.deg2rad(fov_deg)
     
-    for ox, oy, orad in obstacles:
-        dx = ox - bx
-        dy = oy - by
-        dist = math.hypot(dx, dy)
-        clear_dist = dist - orad
-        if clear_dist < block_dist:
-            ang_to_obs = math.atan2(dy, dx)
-            rel_ang = abs(wrap(ang_to_obs - boat_heading))
-            if rel_ang <= fov_rad:
-                return True
-    return False
+    dx = obstacles[:, 0] - bx
+    dy = obstacles[:, 1] - by
+    dist = np.sqrt(dx * dx + dy * dy)
+    clear_dist = dist - obstacles[:, 2]
+    close_mask = clear_dist < block_dist
+    if not np.any(close_mask):
+        return False
+    ang_to_obs = np.arctan2(dy[close_mask], dx[close_mask])
+    rel_ang = np.abs((ang_to_obs - boat_heading + np.pi) % (2 * np.pi) - np.pi)
+    return bool(np.any(rel_ang <= fov_rad))
 
 def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, obstacles, params=None, is_next_wp=False):
     bx, by = boat_pos
@@ -148,13 +152,17 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
 
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])
     
-    max_ang = np.deg2rad(85) if is_next_wp else np.deg2rad(65)
+    h_cos = math.cos(boat_heading)
+    h_sin = math.sin(boat_heading)
+    h_vec = np.array([h_cos, h_sin], dtype=np.float32)
+    
+    max_ang = 1.4835298641951802 if is_next_wp else 1.1344640137963142  # deg2rad(85) / deg2rad(65)
     max_dist_cut = (dist_to_target + 15) if is_next_wp else (dist_to_target - 20)
 
     items = []
     for i, c in enumerate(clusters):
         v = c - boat_pos
-        dist = np.linalg.norm(v)
+        dist = math.hypot(v[0], v[1])
         # 목적지보다 멀거나 전방 탐색각을 벗어난 측방/후방 장애물 엄격 제외
         if dist > max_dist_cut:
             continue
@@ -174,7 +182,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     gaps_set = set()
     # 1) 라이다 각도 상 분리된 인접 쌍 (라이다 상 검은색 빈 공간)
     for i in range(len(items) - 1):
-        if (items[i+1][0] - items[i][0]) > np.deg2rad(2.0):
+        if (items[i+1][0] - items[i][0]) > 0.03490658503988659:  # deg2rad(2.0)
             gaps_set.add((i, i+1))
             
     # 2) 3개 이상의 장애물 조합(1-2, 2-3뿐만 아니라 1-3, 1-4 등) 및 깊이 단차가 있는 모든 가능한 틈새 조합 탐색
@@ -183,7 +191,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             c1 = items[i][2]
             c2 = items[j][2]
             v_gap = c2 - c1
-            gap_w = np.linalg.norm(v_gap)
+            gap_w = math.hypot(v_gap[0], v_gap[1])
             
             # 최소 통과 폭 (45px) ~ 전방 게이트 유효 최대 폭 (280px)
             if not (45.0 <= gap_w <= 280.0):
@@ -228,8 +236,8 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         mid = (c1 + c2) / 2
         mx, my = mid
         rel = mid - boat_pos
-        distm = np.linalg.norm(rel) + 1e-6
-        dist_mid_to_target = np.linalg.norm(target_pos - mid)
+        distm = math.hypot(rel[0], rel[1]) + 1e-6
+        dist_mid_to_target = math.hypot(tx - mx, ty - my)
         
         # 1. 갭(mid)이 현재 탐색 기준 위치보다 목적지에 유의미하게 가까워져야 함
         req_progress_dist = -5.0 if is_next_wp else -15.0
@@ -313,20 +321,45 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         min_clear = max(min_clear, 0)
         if min_clear < 15.0:
             continue
+
+        # 갭 기둥(c1, c2) 자체 경로 간섭 검사:
+        # 두 장애물이 배 진행방향과 평행(앞뒤)하게 서 있어서 앞 기둥이 배->중점(mid) 진입로를 가로막는 경우 즉시 배제
+        col_pillar = False
+        for pt in [c1, c2]:
+            t_p = ((pt[0] - bx) * vx + (pt[1] - by) * vy) / seg2
+            if 0.08 < t_p < 0.92:
+                proj_x = bx + t_p * vx
+                proj_y = by + t_p * vy
+                d_p = math.hypot(pt[0] - proj_x, pt[1] - proj_y)
+                if d_p < 30.0:
+                    col_pillar = True
+                    break
+        if col_pillar:
+            continue
             
         # 갭 선분(c1->c2)의 단위 벡터 및 게이트 법선 벡터
         v_gap = c2 - c1
-        gap_w = np.linalg.norm(v_gap)
+        gap_w = math.hypot(v_gap[0], v_gap[1])
         u_gap = v_gap / (gap_w + 1e-6)
         n_gate = np.array([-u_gap[1], u_gap[0]])
-        h_vec = np.array([math.cos(boat_heading), math.sin(boat_heading)])
+        u_approach = rel / distm
         
-        # 현재 배가 바라보는 기준(h_vec)으로 게이트가 기울어진 정도에 따른 상대너비 (Relative Aperture Width)
-        # 배가 바라보는 방향에 수직(직교)인 게이트일수록 상대너비 = 1.0 (100% 개방)
-        # 배가 바라보는 방향에 비스듬히 기울어질수록 상대너비 = |dot(n_gate, h_vec)| = |sin(상대각도)| 비례 감소
-        # 배가 바라보는 방향과 평행할수록 상대너비 = 0.0 (완전 닫힘)
-        rel_width = abs(float(np.dot(n_gate, h_vec)))
-        clear_score = max(rel_width, 0.05)
+        # 현재 배가 바라보는 헤딩(h_vec) 및 배에서 갭으로 들어가는 진입선(u_approach) 기준 상대너비
+        # 배의 진행/진입 방향에 수직(직교)인 게이트일수록 상대너비 = 1.0 (100% 개방)
+        # 배의 진행/진입 방향과 평행할수록 상대너비 = 0.0 (완전 닫힘)
+        rel_width_h = abs(float(np.dot(n_gate, h_vec)))
+        rel_width_app = abs(float(np.dot(n_gate, u_approach)))
+        rel_width = min(rel_width_h, rel_width_app)
+        
+        # 체감 유효 통과 폭 (Effective Aperture Width)
+        effective_width = gap_w * rel_width
+        
+        # 배의 반경이 25px(전폭 50px)이므로, 유효 통과폭이 42px 미만이거나
+        # 선박 진행방향과 거의 평행(상대너비 0.22 미만, 약 13도 이내)한 통과 불가능 갭은 원천 배제
+        if effective_width < 42.0 or rel_width < 0.22:
+            continue
+            
+        clear_score = rel_width
         clear_factor = clear_score ** clear_exp
         
         # 갭 선분(c1->c2)과 현재 위치에서 목적지까지의 방향(gps_vec) 간의 수직도(Orthogonality) 계산
@@ -396,7 +429,8 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         # 2. 물리적 위치가 1순위 및 앞선 후보들과 너무 가까운 갭 배제 (최소 50px 이상 이격)
         too_close = False
         for spos in selected_positions:
-            if np.linalg.norm(g["pos"] - spos) < 50.0:
+            dp = g["pos"] - spos
+            if math.hypot(dp[0], dp[1]) < 50.0:
                 too_close = True
                 break
         if too_close:

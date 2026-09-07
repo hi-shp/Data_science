@@ -59,7 +59,7 @@ def run():
                     env.clusters, env.cluster_ids, new_c
                 )
 
-                dist_to_target = np.linalg.norm(env.target - env.boat_pos)
+                dist_to_target = math.hypot(env.target[0] - env.boat_pos[0], env.target[1] - env.boat_pos[1])
                 boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
                 clear_to_target = is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params)
 
@@ -93,33 +93,33 @@ def run():
                 c2 = env.current_wp.get("c2")
                 mid = env.current_wp["pos"]
                 vec_to_wp = mid - env.boat_pos
-                dnow = np.linalg.norm(vec_to_wp)
+                dnow = math.hypot(vec_to_wp[0], vec_to_wp[1])
                 
                 # 1. 웨이포인트 중심점 근접 시 즉시 해제 (28px 이내)
-                if dnow < 50:
+                if dnow < 60:
                     should_clear = True
                     
                 # 2. 웨이포인트 게이트 선 통과 판정 (c1, c2 사이 게이트 선을 전방으로 통과 시 즉시 해제)
                 if not should_clear and c1 is not None and c2 is not None:
-                    v_gate = c2 - c1
-                    gate_len = np.linalg.norm(v_gate)
+                    vgx = c2[0] - c1[0]; vgy = c2[1] - c1[1]
+                    gate_len = math.hypot(vgx, vgy)
                     if gate_len > 1e-3:
-                        u_gate = v_gate / gate_len
-                        n_gate = np.array([-u_gate[1], u_gate[0]])
-                        h_vec = np.array([math.cos(env.boat_heading), math.sin(env.boat_heading)])
-                        if np.dot(n_gate, h_vec) < 0:
-                            n_gate = -n_gate
-                        rel_boat = env.boat_pos - mid
-                        d_normal = np.dot(rel_boat, n_gate)
-                        d_lateral = abs(np.dot(rel_boat, u_gate))
-                        if 0.0 <= d_normal < 50.0 and d_lateral < (gate_len / 2.0 + 20.0):
+                        ugx = vgx / gate_len; ugy = vgy / gate_len
+                        ngx = -ugy; ngy = ugx
+                        hx = math.cos(env.boat_heading); hy = math.sin(env.boat_heading)
+                        if ngx * hx + ngy * hy < 0:
+                            ngx = -ngx; ngy = -ngy
+                        rbx = env.boat_pos[0] - mid[0]; rby = env.boat_pos[1] - mid[1]
+                        d_normal = rbx * ngx + rby * ngy
+                        d_lateral = abs(rbx * ugx + rby * ugy)
+                        if 0.0 <= d_normal < 60.0 and d_lateral < (gate_len / 2.0 + 20.0):
                             should_clear = True
                             
                 # 3. 웨이포인트를 이미 지나쳐 측후방으로 넘어간 경우 (95도 이상 & 75px 이내)
                 if not should_clear:
                     wp_angle = math.atan2(vec_to_wp[1], vec_to_wp[0])
                     angle_diff = abs(wrap(wp_angle - env.boat_heading))
-                    if angle_diff > np.deg2rad(95) and dnow < 75:
+                    if angle_diff > 1.6580627893946132 and dnow < 75:  # np.deg2rad(95)
                         should_clear = True
                     
                 if should_clear:
@@ -157,8 +157,9 @@ def run():
                     c1_old = env.current_wp.get("c1")
                     c2_old = env.current_wp.get("c2")
                     if c1_old is not None and c2_old is not None and len(env.clusters) >= 2:
-                        d1 = [np.linalg.norm(c - c1_old) for c in env.clusters]
-                        d2 = [np.linalg.norm(c - c2_old) for c in env.clusters]
+                        cl_arr = np.array(env.clusters)  # (N, 2)
+                        d1 = np.sqrt(np.sum((cl_arr - c1_old)**2, axis=1))
+                        d2 = np.sqrt(np.sum((cl_arr - c2_old)**2, axis=1))
                         i1, i2 = int(np.argmin(d1)), int(np.argmin(d2))
                         if d1[i1] < 35.0 and d2[i2] < 35.0 and i1 != i2:
                             env.current_wp["c1"] = env.clusters[i1]
@@ -229,8 +230,9 @@ def run():
             env.validate_wp_grid()
             env.validate_wp_obstacle_5x5()
 
-            if env.collide() or np.linalg.norm(env.target - env.boat_pos) < 70:
-                is_success = (np.linalg.norm(env.target - env.boat_pos) < 70 and not env.collide())
+            dist_tgt_end = math.hypot(env.target[0] - env.boat_pos[0], env.target[1] - env.boat_pos[1])
+            if env.collide() or dist_tgt_end < 70:
+                is_success = (dist_tgt_end < 70 and not env.collide())
                 tag = "SUCCESS" if is_success else "FAIL"
                 ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 outdir = r"screenshot"

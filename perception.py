@@ -53,13 +53,18 @@ def init_grid():
     return np.zeros((GRID_H, GRID_W), dtype=np.float32)
 
 def update_grid(grid, hits):
-    for p in hits:
-        if p is not None:
-            gx = int(p[0] // GRID)
-            gy = int(p[1] // GRID)
-            if 0 <= gx < GRID_W and 0 <= gy < GRID_H:
-                if grid[gy, gx] < 20.0:
-                    grid[gy, gx] += 1.0
+    coords = [p for p in hits if p is not None]
+    if not coords:
+        return
+    arr = np.array(coords, dtype=np.float32)
+    gx = (arr[:, 0] / GRID).astype(np.intp)
+    gy = (arr[:, 1] / GRID).astype(np.intp)
+    valid = (gx >= 0) & (gx < GRID_W) & (gy >= 0) & (gy < GRID_H)
+    gx = gx[valid]
+    gy = gy[valid]
+    for k in range(len(gx)):
+        if grid[gy[k], gx[k]] < 20.0:
+            grid[gy[k], gx[k]] += 1.0
 
 def extract_clusters_from_grid(grid):
     OCC = 2.0
@@ -87,27 +92,34 @@ def match_clusters(prev_clusters, prev_ids, new_clusters, max_dist=28.0):
     if len(prev_clusters) == 0 or len(prev_ids) == 0:
         return new_clusters, list(range(len(new_clusters)))
     
-    new_ids = []
+    n_new = len(new_clusters)
+    n_prev = len(prev_clusters)
+    
+    # 거리 행렬을 벡터 연산으로 일괄 계산
+    new_arr = np.array(new_clusters)    # (n_new, 2)
+    prev_arr = np.array(prev_clusters)  # (n_prev, 2)
+    diff = new_arr[:, None, :] - prev_arr[None, :, :]
+    dist_mat = np.sqrt(np.sum(diff * diff, axis=2))
+    
+    new_ids = [0] * n_new
     used_prev = set()
     maxid = max(prev_ids) + 1 if prev_ids else 0
     
-    for c in new_clusters:
-        best_d = max_dist
-        best_id = None
+    for i in range(n_new):
+        row = dist_mat[i]
         best_idx = None
-        for i, (prev_c, pid) in enumerate(zip(prev_clusters, prev_ids)):
-            if i in used_prev:
+        best_d = max_dist
+        for j in range(n_prev):
+            if j in used_prev:
                 continue
-            d = np.linalg.norm(c - prev_c)
-            if d < best_d:
-                best_d = d
-                best_id = pid
-                best_idx = i
-        if best_id is not None:
-            new_ids.append(best_id)
+            if row[j] < best_d:
+                best_d = row[j]
+                best_idx = j
+        if best_idx is not None:
+            new_ids[i] = prev_ids[best_idx]
             used_prev.add(best_idx)
         else:
-            new_ids.append(maxid)
+            new_ids[i] = maxid
             maxid += 1
             
     return new_clusters, new_ids

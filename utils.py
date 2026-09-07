@@ -69,33 +69,44 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     shift_p1 = np.zeros(2, dtype=np.float32)
     shift_p2 = np.zeros(2, dtype=np.float32)
     
-    for (ox, oy, orad) in obstacles:
-        obs_pos = np.array([ox, oy], dtype=np.float32)
-        dists = np.linalg.norm(nominal_pts - obs_pos, axis=1)
-        min_idx = np.argmin(dists)
-        min_dist = dists[min_idx]
-        t_idx = min_idx / 29.0
+    if len(obstacles) > 0:
+        obs_pos_all = obstacles[:, :2]  # (M, 2)
+        obs_rad_all = obstacles[:, 2]   # (M,)
         
-        safe_margin = orad + boat_radius + min_clearance
-        encroach = safe_margin - min_dist
+        # (30, M) 거리 행렬을 한 번에 계산
+        diff_x = nominal_pts[:, 0:1] - obs_pos_all[:, 0]  # (30, M)
+        diff_y = nominal_pts[:, 1:2] - obs_pos_all[:, 1]  # (30, M)
+        dists_all = np.sqrt(diff_x**2 + diff_y**2)         # (30, M)
+        min_idx_all = np.argmin(dists_all, axis=0)          # (M,)
+        min_dist_all = dists_all[min_idx_all, np.arange(len(obs_rad_all))]  # (M,)
         
-        if encroach > 0:
-            pt = nominal_pts[min_idx]
-            vec_from_obs = pt - obs_pos
-            norm_vec = np.linalg.norm(vec_from_obs)
-            if norm_vec > 1e-4:
-                push_dir = vec_from_obs / norm_vec
-            else:
-                side = np.dot(obs_pos - p0, n_dir)
-                push_dir = -n_dir if side >= 0 else n_dir
+        safe_margins = obs_rad_all + boat_radius + min_clearance
+        encroach_all = safe_margins - min_dist_all
+        
+        active = encroach_all > 0
+        if np.any(active):
+            active_idx = np.where(active)[0]
+            for k in active_idx:
+                min_idx = min_idx_all[k]
+                encroach = encroach_all[k]
+                t_idx = min_idx / 29.0
                 
-            push_mag = min(160.0, encroach * 1.4)
-            
-            w1 = max(0.2, 1.0 - t_idx * 0.7)
-            w2 = max(0.2, t_idx * 0.7 + 0.3)
-            
-            shift_p1 += push_dir * (push_mag * w1)
-            shift_p2 += push_dir * (push_mag * w2)
+                pt = nominal_pts[min_idx]
+                obs_pos = obs_pos_all[k]
+                vec_from_obs = pt - obs_pos
+                norm_vec = math.hypot(vec_from_obs[0], vec_from_obs[1])
+                if norm_vec > 1e-4:
+                    push_dir = vec_from_obs / norm_vec
+                else:
+                    side = (obs_pos[0] - p0[0]) * n_dir[0] + (obs_pos[1] - p0[1]) * n_dir[1]
+                    push_dir = -n_dir if side >= 0 else n_dir
+                    
+                push_mag = min(160.0, encroach * 1.4)
+                w1 = max(0.2, 1.0 - t_idx * 0.7)
+                w2 = max(0.2, t_idx * 0.7 + 0.3)
+                
+                shift_p1 += push_dir * (push_mag * w1)
+                shift_p2 += push_dir * (push_mag * w2)
             
     p1 = p1 + shift_p1
     p2 = p2 + shift_p2
@@ -103,14 +114,12 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     return cubic_bezier(p0, p1, p2, p3, n=90)
 
 def pure_pursuit(path, boat_pos, lookahead=70):
-    if path is None:
+    if path is None or len(path) == 0:
         return None
-
-    for i in range(len(path)-1):
-        p = path[i]
-        if np.linalg.norm(p - boat_pos) > lookahead:
-            return p
-    
+    dists = np.sqrt(np.sum((path - boat_pos)**2, axis=1))
+    far = np.where(dists > lookahead)[0]
+    if len(far) > 0:
+        return path[far[0]]
     return path[-1]
 
 def find_pp_target(path, pos, L=80):
