@@ -249,9 +249,22 @@ Estimated ETA:   {eta_str}
                         env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)
                         
                     if env.current_wp is not None and env.next_wp is not None:
-                        vec = env.current_wp["pos"] - env.boat_pos
-                        next_start_head = math.atan2(vec[1], vec[0])
-                        env.next_bezier_path = make_bezier_path(env.current_wp["pos"], next_start_head, env.next_wp["pos"], obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
+                        if env.bezier_path is not None and len(env.bezier_path) >= 2:
+                            t1 = env.bezier_path[-1] - env.bezier_path[-2]
+                            if np.linalg.norm(t1) > 1e-6:
+                                next_start_head = math.atan2(t1[1], t1[0])
+                            else:
+                                vec = env.current_wp["pos"] - env.boat_pos
+                                next_start_head = math.atan2(vec[1], vec[0])
+                        else:
+                            vec = env.current_wp["pos"] - env.boat_pos
+                            next_start_head = math.atan2(vec[1], vec[0])
+
+                        env.next_bezier_path = make_bezier_path(
+                            env.current_wp["pos"], next_start_head, env.next_wp["pos"],
+                            obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd,
+                            start_tangent_fixed=True
+                        )
                         if env.next_bezier_path is not None:
                             env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=75)
                     else:
