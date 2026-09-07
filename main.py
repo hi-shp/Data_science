@@ -96,7 +96,7 @@ def run():
                 dnow = np.linalg.norm(vec_to_wp)
                 
                 # 1. 웨이포인트 중심점 근접 시 즉시 해제 (28px 이내)
-                if dnow < 40:
+                if dnow < 50:
                     should_clear = True
                     
                 # 2. 웨이포인트 게이트 선 통과 판정 (c1, c2 사이 게이트 선을 전방으로 통과 시 즉시 해제)
@@ -112,7 +112,7 @@ def run():
                         rel_boat = env.boat_pos - mid
                         d_normal = np.dot(rel_boat, n_gate)
                         d_lateral = abs(np.dot(rel_boat, u_gate))
-                        if 0.0 <= d_normal < 40.0 and d_lateral < (gate_len / 2.0 + 20.0):
+                        if 0.0 <= d_normal < 50.0 and d_lateral < (gate_len / 2.0 + 20.0):
                             should_clear = True
                             
                 # 3. 웨이포인트를 이미 지나쳐 측후방으로 넘어간 경우 (95도 이상 & 75px 이내)

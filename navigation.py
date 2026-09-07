@@ -314,16 +314,19 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         if min_clear < 15.0:
             continue
             
-        # 갭 선분(c1->c2)의 폭 및 단위 벡터
+        # 갭 선분(c1->c2)의 단위 벡터 및 게이트 법선 벡터
         v_gap = c2 - c1
         gap_w = np.linalg.norm(v_gap)
         u_gap = v_gap / (gap_w + 1e-6)
+        n_gate = np.array([-u_gap[1], u_gap[0]])
+        h_vec = np.array([math.cos(boat_heading), math.sin(boat_heading)])
         
-        # 선박 진행방향(boat_heading) 기준으로 체감되는 갭 통과 난이도/유효 너비 (Apparent Opening Clearance)
-        # 선박 진행방향에 수직인 평면에 투영된 체감 너비: 남북방향(수직)일수록 넓고, 평행할수록 0에 수렴
-        apparent_width = abs(v_gap[1] * math.cos(boat_heading) - v_gap[0] * math.sin(boat_heading))
-        net_clear_width = max(apparent_width - 34.0, 0.0)  # 장애물 직경(17*2=34) 제외 순수 통과 폭
-        clear_score = max(min(net_clear_width / 120.0, 1.0), 0.05)
+        # 현재 배가 바라보는 기준(h_vec)으로 게이트가 기울어진 정도에 따른 상대너비 (Relative Aperture Width)
+        # 배가 바라보는 방향에 수직(직교)인 게이트일수록 상대너비 = 1.0 (100% 개방)
+        # 배가 바라보는 방향에 비스듬히 기울어질수록 상대너비 = |dot(n_gate, h_vec)| = |sin(상대각도)| 비례 감소
+        # 배가 바라보는 방향과 평행할수록 상대너비 = 0.0 (완전 닫힘)
+        rel_width = abs(float(np.dot(n_gate, h_vec)))
+        clear_score = max(rel_width, 0.05)
         clear_factor = clear_score ** clear_exp
         
         # 갭 선분(c1->c2)과 현재 위치에서 목적지까지의 방향(gps_vec) 간의 수직도(Orthogonality) 계산
