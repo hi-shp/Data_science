@@ -96,7 +96,7 @@ def run():
                 dnow = np.linalg.norm(vec_to_wp)
                 
                 # 1. 웨이포인트 중심점 근접 시 즉시 해제 (28px 이내)
-                if dnow < 28:
+                if dnow < 40:
                     should_clear = True
                     
                 # 2. 웨이포인트 게이트 선 통과 판정 (c1, c2 사이 게이트 선을 전방으로 통과 시 즉시 해제)

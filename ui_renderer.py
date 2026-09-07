@@ -756,20 +756,20 @@ class EnvRenderer:
             sx_max = self.scale_x_max
             sy_max = self.scale_y_max
             
-            # Y축 눈금선 및 수치 표기 (상하 반전 적용: 상단 -Y, 하단 +Y)
-            surf.blit(self.small_font.render(f"-{sy_max:.1f}", True, (160, 200, 230)), (4, gy - 2))
+            # Y축 눈금선 및 수치 표기 (상단 +Y, 하단 -Y)
+            surf.blit(self.small_font.render(f"+{sy_max:.1f}", True, (160, 200, 230)), (2, gy - 2))
             surf.blit(self.small_font.render(" 0.0", True, (0, 200, 255)), (2, y_center - 6))
-            surf.blit(self.small_font.render(f"+{sy_max:.1f}", True, (160, 200, 230)), (2, gy + gh - 8))
+            surf.blit(self.small_font.render(f"-{sy_max:.1f}", True, (160, 200, 230)), (4, gy + gh - 8))
             
             # 배경 중심 기준선 (Y = 0: 전방 직진선)
             pygame.draw.line(surf, (0, 140, 180), (gx, y_center), (gx + gw, y_center), 1)
             pygame.draw.line(surf, (25, 55, 80), (gx + gw//2, gy), (gx + gw//2, gy + gh), 1)
             
-            # 3차 베지어 곡선 궤적 포인트 생성 (상하 반전: + y_val 방향으로 아래쪽 매핑)
+            # 3차 베지어 곡선 궤적 포인트 생성 (+ y_val 방향으로 위쪽 매핑)
             plot_pts = []
             for x_val, y_val in zip(xm, ym):
                 px = int(gx + (x_val / max(0.1, sx_max)) * (gw - 12))
-                py = int(y_center + (y_val / max(0.1, sy_max)) * (gh * 0.44))
+                py = int(y_center - (y_val / max(0.1, sy_max)) * (gh * 0.44))
                 px = max(gx, min(gx + gw, px))
                 py = max(gy, min(gy + gh, py))
                 plot_pts.append((px, py))
@@ -811,9 +811,9 @@ class EnvRenderer:
         else:
             sy_max = self.scale_y_max
             sx_max = self.scale_x_max
-            surf.blit(self.small_font.render(f"-{sy_max:.1f}", True, (160, 200, 230)), (4, gy - 2))
+            surf.blit(self.small_font.render(f"+{sy_max:.1f}", True, (160, 200, 230)), (2, gy - 2))
             surf.blit(self.small_font.render(" 0.0", True, (0, 200, 255)), (2, y_center - 6))
-            surf.blit(self.small_font.render(f"+{sy_max:.1f}", True, (160, 200, 230)), (2, gy + gh - 8))
+            surf.blit(self.small_font.render(f"-{sy_max:.1f}", True, (160, 200, 230)), (4, gy + gh - 8))
             pygame.draw.line(surf, (0, 140, 180), (gx, y_center), (gx + gw, y_center), 1)
             pygame.draw.line(surf, (50, 225, 255), (gx, y_center), (gx + gw - 20, y_center), 3)
             path_len_m = 0.0
@@ -949,8 +949,8 @@ class EnvRenderer:
         steer_txt = self.small_font.render(f"Steer: {steer_val:+.2f}", True, (220, 235, 255))
         hud_surf.blit(steer_txt, (10, 60))
         
-        # Heading
-        hdg_deg = math.degrees(env.boat_heading) % 360
+        # Heading (라이다 좌표계 일치: 북쪽/상향 0도, 전방 90도, 좌 0도, 우 180도)
+        hdg_deg = (math.degrees(env.boat_heading) + 90) % 360
         hdg_txt = self.small_font.render(f"Heading: {hdg_deg:.0f}\u00b0", True, (220, 235, 255))
         hud_surf.blit(hdg_txt, (10, 76))
         
