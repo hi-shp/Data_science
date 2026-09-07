@@ -113,7 +113,7 @@ def run():
                         rbx = env.boat_pos[0] - mid[0]; rby = env.boat_pos[1] - mid[1]
                         d_normal = rbx * ngx + rby * ngy
                         d_lateral = abs(rbx * ugx + rby * ugy)
-                        if 0.0 <= d_normal < 60.0 and d_lateral < (gate_len / 2.0 + 20.0):
+                        if 15.0 <= d_normal < 60.0 and d_lateral < (gate_len / 2.0 + 20.0):
                             should_clear = True
                             
                 # 3. 웨이포인트를 이미 지나쳐 측후방으로 넘어간 경우 (95도 이상 & 75px 이내)
