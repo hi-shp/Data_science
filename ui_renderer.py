@@ -600,6 +600,26 @@ class EnvRenderer:
                     pygame.draw.circle(self.cam_surf, (255, 255, 255), (mx, 65), 3)
 
         self.cam_surf.blit(self.font.render("LiDAR Gauge View", True, (255, 255, 255)), (10, 8))
+        
+        # 라이다 게이지 색상별 거리 의미 범례 (Legend HUD)
+        # 50px = 1m 기준: <70px (~1.4m), 70~140px (~2.8m), 140~220px (~4.4m), >220px (>4.4m)
+        legend_items = [
+            ((230, 60, 50), "<1.4m"),
+            ((240, 160, 40), "<2.8m"),
+            ((210, 210, 50), "<4.4m"),
+            ((40, 170, 160), ">4.4m")
+        ]
+        leg_bg = pygame.Rect(148, 6, 166, 22)
+        pygame.draw.rect(self.cam_surf, (8, 16, 28, 220), leg_bg, border_radius=3)
+        pygame.draw.rect(self.cam_surf, (0, 120, 180), leg_bg, 1, border_radius=3)
+        
+        lx = 152
+        for col, txt in legend_items:
+            pygame.draw.rect(self.cam_surf, col, (lx, 11, 7, 11), border_radius=1)
+            ltxt = self.small_font.render(txt, True, (215, 230, 245))
+            self.cam_surf.blit(ltxt, (lx + 9, 10))
+            lx += 9 + ltxt.get_width() + 4
+        
         env.screen.blit(self.cam_surf, (700, env.sim_h + 35))
 
         # --- 3. LiDAR Depth 1st-Person View (하단 렌더링: 해수면 배경 처리) ---
