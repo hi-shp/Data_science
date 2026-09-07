@@ -898,6 +898,7 @@ class EnvRenderer:
             ("Clear", (255, 215, 40)),     # Obstacle Clearance
             ("Perpend", (255, 140, 40)),   # Orthogonality to GPS (perp_exp)
             ("Proxim", (255, 90, 190)),    # Proximity to Boat
+            ("Center", (100, 220, 255)),   # Baseline Restoring Tendency (center_exp)
             ("Cluster", (170, 130, 255))   # Cluster Density
         ]
         
@@ -909,7 +910,7 @@ class EnvRenderer:
             # 가중치 w와 점수 raw를 곱하여 실제 기여 점수 산출 (w가 0이면 0% 표출)
             weighted_vals = []
             for k, _ in FACTOR_ITEMS:
-                item = factors.get(k, factors.get('Perpend' if k == 'EffWidth' else None))
+                item = factors.get(k)
                 if isinstance(item, dict):
                     w = float(item.get("w", 0.0))
                     raw = float(item.get("raw", 0.0))
@@ -923,7 +924,7 @@ class EnvRenderer:
             ratios = [v / tot if tot > 1e-6 else 0.0 for v in weighted_vals]
             
             for i, (name, col) in enumerate(FACTOR_ITEMS):
-                y_pos = 46 + i * 27
+                y_pos = 36 + i * 25
                 lbl = self.small_font.render(name, True, (210, 225, 240))
                 surf.blit(lbl, (10, y_pos - 2))
                 
@@ -940,7 +941,7 @@ class EnvRenderer:
         else:
             # 웨이포인트가 없을 때 (대기 상태 UI 유지)
             for i, (name, col) in enumerate(FACTOR_ITEMS):
-                y_pos = 46 + i * 27
+                y_pos = 36 + i * 25
                 lbl = self.small_font.render(name, True, (120, 145, 170))
                 surf.blit(lbl, (10, y_pos - 2))
                 
