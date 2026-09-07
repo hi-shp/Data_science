@@ -113,6 +113,7 @@ class BoatEnv:
         self.show_lidar = True
         self.show_lidar_range = True
         self.candidate_wps = []
+        self.total_gaps_count = 0
         
         self.cb1_rect = pygame.Rect(40, 668, 20, 20)
         self.cb2_rect = pygame.Rect(40, 704, 20, 20)
@@ -194,6 +195,7 @@ class BoatEnv:
         self.current_wp = None
         self.next_wp = None
         self.visited = set()
+        self.total_gaps_count = 0
         
         self.wp_check_timer = 0
         self.steer_timer = 0

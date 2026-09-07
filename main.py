@@ -70,6 +70,7 @@ def run():
                     env.current_wp = None
                     env.next_wp = None
                     env.candidate_wps = []
+                    env.total_gaps_count = 0
                 else:
                     # 경로 상에 장애물이 있으면 장애물 사이 갭(웨이포인트)을 찾아 안전하게 우회
                     new_wp = find_gap(
@@ -81,10 +82,13 @@ def run():
                     )
                     if new_wp is not None:
                         env.candidate_wps = new_wp.get("candidates", [])
+                        env.total_gaps_count = new_wp.get("total_gaps_count", 0)
                     elif env.current_wp is not None:
                         env.candidate_wps = env.current_wp.get("candidates", [])
+                        env.total_gaps_count = env.current_wp.get("total_gaps_count", 0)
                     else:
                         env.candidate_wps = []
+                        env.total_gaps_count = 0
             else:
                 boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
 
@@ -133,6 +137,7 @@ def run():
                         env.next_wp = None
                     else:
                         env.current_wp = None
+                        env.total_gaps_count = 0
                     env.candidate_wps = []
 
             # 1차 웨이포인트 양쪽 장애물의 실시간 위치 및 점수 갱신

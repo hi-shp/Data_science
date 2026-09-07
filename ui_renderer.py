@@ -560,12 +560,6 @@ class EnvRenderer:
                 
                 pygame.draw.rect(self.cam_surf, color, (x1, 2, w_s, cam_h - 4))
 
-        # 각도 보조 구분선
-        for deg in [-60, -30, 0, 30, 60]:
-            s_idx = int((deg + 90) / 180.0 * n_slices)
-            gx = int(s_idx * cam_w / n_slices)
-            pygame.draw.line(self.cam_surf, (255, 255, 255, 70), (gx, 0), (gx, cam_h), 1)
-
         # 웨이포인트 및 최종 목표 지점 수직 오버레이 신호선
         marker_objs = []
         show_1st = getattr(env, 'show_1st_path', getattr(env, 'show_paths', True))
@@ -612,6 +606,29 @@ class EnvRenderer:
 
         # 패널 타이틀
         self.cam_surf.blit(self.font.render("LiDAR Gauge View", True, (255, 255, 255)), (10, 8))
+
+        # 현재 고려 중인 모든 갭의 개수 표시 HUD 뱃지 (우측 상단)
+        total_gaps = getattr(env, 'total_gaps_count', 0)
+        if getattr(env, 'current_wp', None) is not None and total_gaps > 0:
+            gap_txt = f"Gaps: {total_gaps}"
+            lbl_gap = self.small_font.render(gap_txt, True, (0, 240, 255))
+            bw = lbl_gap.get_width() + 16
+            bh = 22
+            bx_pos = cam_w - bw - 10
+            by_pos = 7
+            pygame.draw.rect(self.cam_surf, (12, 28, 52, 225), (bx_pos, by_pos, bw, bh), border_radius=4)
+            pygame.draw.rect(self.cam_surf, (0, 180, 255), (bx_pos, by_pos, bw, bh), 1, border_radius=4)
+            self.cam_surf.blit(lbl_gap, (bx_pos + 8, by_pos + 2))
+        elif getattr(env, 'current_wp', None) is None:
+            dir_txt = "Direct"
+            lbl_dir = self.small_font.render(dir_txt, True, (20, 250, 80))
+            bw = lbl_dir.get_width() + 16
+            bh = 22
+            bx_pos = cam_w - bw - 10
+            by_pos = 7
+            pygame.draw.rect(self.cam_surf, (10, 36, 22, 225), (bx_pos, by_pos, bw, bh), border_radius=4)
+            pygame.draw.rect(self.cam_surf, (20, 220, 80), (bx_pos, by_pos, bw, bh), 1, border_radius=4)
+            self.cam_surf.blit(lbl_dir, (bx_pos + 8, by_pos + 2))
 
         # 패널 하단 거리 색상 범례 도킹 바 (Legend HUD Bar)
         # 50px = 1m 기준: <70px (~1.4m), 70~140px (~2.8m), 140~220px (~4.4m), >220px (>4.4m)
