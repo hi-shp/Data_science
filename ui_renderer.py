@@ -15,6 +15,7 @@ class EnvRenderer:
         self.font = pygame.font.SysFont(None, 24)
         self.bold_font = pygame.font.SysFont(None, 26, bold=True)
         self.small_font = pygame.font.SysFont(None, 18)
+        self.micro_font = pygame.font.SysFont(None, 15)
         self.curv_buffer = None
         self.curv_y_max = 0.08
         self.smooth_path_m = 0.0
@@ -587,39 +588,52 @@ class EnvRenderer:
                 mx = int(s_idx * cam_w / n_slices)
                 
                 if obj_type == 'wp1':
-                    pygame.draw.line(self.cam_surf, (0, 255, 220), (mx, 0), (mx, cam_h), 2)
-                    pygame.draw.circle(self.cam_surf, (0, 255, 220), (mx, 25), 6)
-                    pygame.draw.circle(self.cam_surf, (255, 255, 255), (mx, 25), 2)
+                    pygame.draw.line(self.cam_surf, (0, 255, 220), (mx, 0), (mx, cam_h - 26), 2)
+                    pygame.draw.circle(self.cam_surf, (0, 255, 220), (mx, 32), 6)
+                    pygame.draw.circle(self.cam_surf, (255, 255, 255), (mx, 32), 2)
+                    lbl_wp1 = self.micro_font.render("WP1", True, (0, 255, 220))
+                    tx = mx + 8 if mx + 32 < cam_w else mx - lbl_wp1.get_width() - 8
+                    self.cam_surf.blit(lbl_wp1, (tx, 26))
                 elif obj_type == 'wp2':
-                    pygame.draw.line(self.cam_surf, (200, 100, 255), (mx, 0), (mx, cam_h), 2)
-                    pygame.draw.circle(self.cam_surf, (200, 100, 255), (mx, 45), 6)
-                    pygame.draw.circle(self.cam_surf, (255, 255, 255), (mx, 45), 2)
+                    pygame.draw.line(self.cam_surf, (200, 100, 255), (mx, 0), (mx, cam_h - 26), 2)
+                    pygame.draw.circle(self.cam_surf, (200, 100, 255), (mx, 54), 6)
+                    pygame.draw.circle(self.cam_surf, (255, 255, 255), (mx, 54), 2)
+                    lbl_wp2 = self.micro_font.render("WP2", True, (200, 100, 255))
+                    tx = mx + 8 if mx + 32 < cam_w else mx - lbl_wp2.get_width() - 8
+                    self.cam_surf.blit(lbl_wp2, (tx, 48))
                 elif obj_type == 'target':
-                    pygame.draw.line(self.cam_surf, (20, 250, 80), (mx, 0), (mx, cam_h), 3)
-                    pygame.draw.circle(self.cam_surf, (20, 250, 80), (mx, 65), 7)
-                    pygame.draw.circle(self.cam_surf, (255, 255, 255), (mx, 65), 3)
+                    pygame.draw.line(self.cam_surf, (20, 250, 80), (mx, 0), (mx, cam_h - 26), 3)
+                    pygame.draw.circle(self.cam_surf, (20, 250, 80), (mx, 76), 7)
+                    pygame.draw.circle(self.cam_surf, (255, 255, 255), (mx, 76), 3)
+                    lbl_tgt = self.micro_font.render("Target", True, (20, 250, 80))
+                    tx = mx + 9 if mx + 42 < cam_w else mx - lbl_tgt.get_width() - 8
+                    self.cam_surf.blit(lbl_tgt, (tx, 70))
 
+        # 패널 타이틀
         self.cam_surf.blit(self.font.render("LiDAR Gauge View", True, (255, 255, 255)), (10, 8))
-        
-        # 라이다 게이지 색상별 거리 의미 범례 (Legend HUD)
+
+        # 패널 하단 거리 색상 범례 도킹 바 (Legend HUD Bar)
         # 50px = 1m 기준: <70px (~1.4m), 70~140px (~2.8m), 140~220px (~4.4m), >220px (>4.4m)
+        legend_bar_y = cam_h - 24
+        pygame.draw.rect(self.cam_surf, (8, 16, 28, 230), (0, legend_bar_y, cam_w, 24))
+        pygame.draw.line(self.cam_surf, (0, 140, 210), (0, legend_bar_y), (cam_w, legend_bar_y), 1)
+
         legend_items = [
             ((230, 60, 50), "<1.4m"),
             ((240, 160, 40), "<2.8m"),
             ((210, 210, 50), "<4.4m"),
             ((40, 170, 160), ">4.4m")
         ]
-        leg_bg = pygame.Rect(148, 6, 166, 22)
-        pygame.draw.rect(self.cam_surf, (8, 16, 28, 220), leg_bg, border_radius=3)
-        pygame.draw.rect(self.cam_surf, (0, 120, 180), leg_bg, 1, border_radius=3)
         
-        lx = 152
-        for col, txt in legend_items:
-            pygame.draw.rect(self.cam_surf, col, (lx, 11, 7, 11), border_radius=1)
-            ltxt = self.small_font.render(txt, True, (215, 230, 245))
-            self.cam_surf.blit(ltxt, (lx + 9, 10))
-            lx += 9 + ltxt.get_width() + 4
-        
+        # 총 4개 아이템을 패널 가로폭(320px)에 균등 정렬 배치
+        col_spacing = 74
+        start_x = (cam_w - (col_spacing * 4 - 6)) // 2
+        for i, (col, txt) in enumerate(legend_items):
+            ix = start_x + i * col_spacing
+            pygame.draw.rect(self.cam_surf, col, (ix, legend_bar_y + 7, 9, 9), border_radius=2)
+            ltxt = self.micro_font.render(txt, True, (215, 230, 245))
+            self.cam_surf.blit(ltxt, (ix + 12, legend_bar_y + 6))
+
         env.screen.blit(self.cam_surf, (700, env.sim_h + 35))
 
         # --- 3. LiDAR Depth 1st-Person View (하단 렌더링: 해수면 배경 처리) ---
