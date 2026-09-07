@@ -79,7 +79,7 @@ class BoatEnv:
         
         self.obs_n = 80
         self.obs_r = 17
-        self.min_obs = 120
+        self.min_obs = 110
         
         self.grid = init_grid()
         self.clusters = []
@@ -98,6 +98,7 @@ class BoatEnv:
         self.next_bezier_path = None
         self.pursuit_target = None
         self.next_pursuit_target = None
+        self.heading_target = 0.0
         self.wakes = [] # [x, y, radius, alpha]
         self.reflected_wakes = [] # [x, y, radius, alpha] (장애물 충돌 반사파)
         
@@ -184,6 +185,7 @@ class BoatEnv:
         dx = self.target[0] - self.boat_pos[0]
         dy = self.target[1] - self.boat_pos[1]
         self.boat_heading = math.atan2(dy, dx)
+        self.heading_target = self.boat_heading
         
         self.grid[:] = 0
         self.clusters = []
@@ -478,9 +480,15 @@ class BoatEnv:
             if min_front_dist > self.params['em_exit'] and self.emergency_cooldown <= 0:
                 self.emergency_mode = False
 
-        if self.pursuit_target is None: return 0
+        if self.pursuit_target is None:
+            if self.current_wp is not None:
+                self.heading_target = math.atan2(self.current_wp["pos"][1] - self.boat_pos[1], self.current_wp["pos"][0] - self.boat_pos[0])
+            else:
+                self.heading_target = math.atan2(self.target[1] - self.boat_pos[1], self.target[0] - self.boat_pos[0])
+            return 0
         px, py = self.pursuit_target
         heading_target = math.atan2(py - self.boat_pos[1], px - self.boat_pos[0])
+        self.heading_target = heading_target
         heading_error = wrap(heading_target - self.boat_heading)
 
         # 거리에 따라 연속적으로 조향 및 회피력 스케일링

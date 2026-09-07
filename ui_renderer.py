@@ -992,8 +992,9 @@ class EnvRenderer:
         steer_txt = self.small_font.render(f"Steer: {steer_val:+.2f}", True, (220, 235, 255))
         hud_surf.blit(steer_txt, (10, 60))
         
-        # Heading (라이다 좌표계 일치: 북쪽/상향 0도, 전방 90도, 좌 0도, 우 180도)
-        hdg_deg = (math.degrees(env.boat_heading) + 90) % 360
+        # Heading (선박이 매 프레임 실시간 목표로 하는 각도, 라이다 좌표계: 북쪽 0도, 전방 90도, 남쪽 180도)
+        tgt_h = getattr(env, 'heading_target', env.boat_heading)
+        hdg_deg = (math.degrees(tgt_h) + 90) % 360
         hdg_txt = self.small_font.render(f"Heading: {hdg_deg:.0f}\u00b0", True, (220, 235, 255))
         hud_surf.blit(hdg_txt, (10, 76))
         
