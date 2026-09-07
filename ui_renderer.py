@@ -687,23 +687,22 @@ class EnvRenderer:
             text_rect = lbl_dir.get_rect(center=badge_rect.center)
             self.cam_surf.blit(lbl_dir, text_rect)
 
-        # 전방 180도 화각 표시를 위한 하단 각도 단위 뱃지 (0°, 90°, 180°)
+        # 전방 180도 화각 표시를 위한 하단 각도 단위 텍스트 (0°, 90°, 180°) - 버튼 박스 없이 숫자만 표시
         legend_bar_y = cam_h - 25
-        ang_y = legend_bar_y - 19
-        angles_spec = [(0, "0°", 6), (90, "90°", cam_w // 2), (180, "180°", cam_w - 6)]
+        angles_spec = [(0, "0°", 8), (90, "90°", cam_w // 2), (180, "180°", cam_w - 8)]
         for deg, txt, anchor_x in angles_spec:
-            lbl_ang = self.small_font.render(txt, True, (240, 248, 255))
-            lw, lh = lbl_ang.get_width() + 8, 16
+            lbl_ang = self.small_font.render(txt, True, (0, 180, 240))
+            lbl_shadow = self.small_font.render(txt, True, (10, 20, 35))
+            lw, lh = lbl_ang.get_width(), lbl_ang.get_height()
             if deg == 0:
                 bx = anchor_x
             elif deg == 180:
                 bx = anchor_x - lw
             else:
                 bx = anchor_x - lw // 2
-            r_ang = pygame.Rect(bx, ang_y, lw, lh)
-            pygame.draw.rect(self.cam_surf, (8, 18, 32, 220), r_ang, border_radius=3)
-            pygame.draw.rect(self.cam_surf, (0, 160, 230, 180), r_ang, 1, border_radius=3)
-            self.cam_surf.blit(lbl_ang, lbl_ang.get_rect(center=r_ang.center))
+            by = legend_bar_y - lh - 4
+            self.cam_surf.blit(lbl_shadow, (bx + 1, by + 1))
+            self.cam_surf.blit(lbl_ang, (bx, by))
 
         # 패널 하단 거리 색상 범례 도킹 바 (Legend HUD Bar)
         # 50px = 1m 기준: <70px (~1.4m), 70~140px (~2.8m), 140~220px (~4.4m), >220px (>4.4m)
