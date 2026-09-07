@@ -687,22 +687,52 @@ class EnvRenderer:
             text_rect = lbl_dir.get_rect(center=badge_rect.center)
             self.cam_surf.blit(lbl_dir, text_rect)
 
-        # 전방 180도 화각 표시를 위한 하단 각도 단위 텍스트 (0°, 90°, 180°) - 버튼 박스 없이 숫자만 표시
+        # 모든 갭 표시 활성화 시 각도 바로 위쪽 좌우 일렬 선상에 각 갭의 각도 위치를 점으로 표출
         legend_bar_y = cam_h - 25
+        sample_lh = self.small_font.render("0°", True, (0, 0, 0)).get_height()
+        dot_y = legend_bar_y - sample_lh - 9
+
+        if getattr(env, 'show_all_gaps', False) and getattr(env, 'all_gaps', None):
+            # 좌우 일렬 수평 가이드선
+            pygame.draw.line(self.cam_surf, (0, 180, 240, 90), (8, dot_y), (cam_w - 8, dot_y), 1)
+
+            for idx, g in enumerate(env.all_gaps):
+                mid = g["pos"]
+                dx_g = mid[0] - bx
+                dy_g = mid[1] - by
+                lf_g = dx_g * f_vec[0] + dy_g * f_vec[1]
+                lr_g = dx_g * r_vec[0] + dy_g * r_vec[1]
+
+                ang_g = math.atan2(lr_g, lf_g)
+                if -math.pi / 2 <= ang_g <= math.pi / 2:
+                    s_idx = int((ang_g + math.pi / 2) / math.pi * n_slices)
+                    gx = int(s_idx * cam_w / n_slices)
+                    gx = max(6, min(cam_w - 6, gx))
+
+                    # 갭 위치 점 (섀도우 + 시안 링 + 코어 도트)
+                    pygame.draw.circle(self.cam_surf, (10, 20, 35), (gx, dot_y), 5)
+                    pygame.draw.circle(self.cam_surf, (0, 240, 255), (gx, dot_y), 4)
+                    pygame.draw.circle(self.cam_surf, (255, 255, 255), (gx, dot_y), 2)
+
+                    # 갭 인덱스 라벨 (G1, G2, ...)
+                    lbl_g = self.micro_font.render(f"G{idx + 1}", True, (0, 255, 255))
+                    self.cam_surf.blit(lbl_g, (gx - lbl_g.get_width() // 2, dot_y - 12))
+
+        # 전방 180도 화각 표시를 위한 하단 각도 단위 텍스트 (0°, 90°, 180°) - 버튼 박스 없이 숫자만 표시
         angles_spec = [(0, "0°", 8), (90, "90°", cam_w // 2), (180, "180°", cam_w - 8)]
         for deg, txt, anchor_x in angles_spec:
             lbl_ang = self.small_font.render(txt, True, (0, 180, 240))
             lbl_shadow = self.small_font.render(txt, True, (10, 20, 35))
             lw, lh = lbl_ang.get_width(), lbl_ang.get_height()
             if deg == 0:
-                bx = anchor_x
+                bx_pos = anchor_x
             elif deg == 180:
-                bx = anchor_x - lw
+                bx_pos = anchor_x - lw
             else:
-                bx = anchor_x - lw // 2
-            by = legend_bar_y - lh - 4
-            self.cam_surf.blit(lbl_shadow, (bx + 1, by + 1))
-            self.cam_surf.blit(lbl_ang, (bx, by))
+                bx_pos = anchor_x - lw // 2
+            by_pos = legend_bar_y - lh - 4
+            self.cam_surf.blit(lbl_shadow, (bx_pos + 1, by_pos + 1))
+            self.cam_surf.blit(lbl_ang, (bx_pos, by_pos))
 
         # 패널 하단 거리 색상 범례 도킹 바 (Legend HUD Bar)
         # 50px = 1m 기준: <70px (~1.4m), 70~140px (~2.8m), 140~220px (~4.4m), >220px (>4.4m)
