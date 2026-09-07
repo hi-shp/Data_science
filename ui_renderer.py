@@ -426,23 +426,52 @@ class EnvRenderer:
         
         # 일시정지(PAUSE) 버튼
         is_paused = getattr(env, 'paused', False)
-        p_bg = (240, 140, 30) if is_paused else (25, 45, 70)
-        p_border = (255, 255, 255) if is_paused else (80, 120, 160)
-        p_col = (10, 25, 45) if is_paused else (220, 230, 240)
+        p_hover = env.pause_btn.collidepoint(mpos)
+        
+        if is_paused:
+            p_bg = (245, 130, 20) if p_hover else (225, 110, 15)
+            p_border = (255, 255, 255)
+            p_col = (255, 255, 255)
+            border_w = 2
+        else:
+            p_bg = (35, 65, 100) if p_hover else (20, 40, 65)
+            p_border = (0, 220, 255) if p_hover else (70, 110, 150)
+            p_col = (255, 255, 255) if p_hover else (200, 225, 245)
+            border_w = 2 if p_hover else 1
         
         pygame.draw.rect(env.screen, p_bg, env.pause_btn, border_radius=4)
-        pygame.draw.rect(env.screen, p_border, env.pause_btn, 2, border_radius=4)
-        lbl_p = self.bold_font.render("||", True, p_col) if is_paused else self.font.render("||", True, p_col)
-        env.screen.blit(lbl_p, (env.pause_btn.centerx - lbl_p.get_width()//2, env.pause_btn.centery - lbl_p.get_height()//2))
+        pygame.draw.rect(env.screen, p_border, env.pause_btn, border_w, border_radius=4)
+        
+        cx, cy = env.pause_btn.center
+        if is_paused:
+            # 선명한 재생 삼각형 아이콘 (Play Polygon)
+            play_pts = [(cx - 5, cy - 7), (cx - 5, cy + 7), (cx + 6, cy)]
+            pygame.draw.polygon(env.screen, p_col, play_pts)
+        else:
+            # 선명한 일시정지 더블 바 아이콘 (Pause Double Bars)
+            pygame.draw.rect(env.screen, p_col, (cx - 6, cy - 7, 4, 14), border_radius=1)
+            pygame.draw.rect(env.screen, p_col, (cx + 2, cy - 7, 4, 14), border_radius=1)
 
         # 배속 버튼
         cur_spd = getattr(env, 'sim_speed', 1)
         for spd, btn_rect in env.speed_btns.items():
             is_active = (cur_spd == spd and not is_paused)
-            btn_bg = (0, 235, 255) if is_active else (25, 45, 70)
-            btn_border = (255, 255, 255) if is_active else (70, 105, 145)
-            border_w = 3 if is_active else 1
-            text_color = (0, 15, 35) if is_active else (210, 225, 240)
+            s_hover = btn_rect.collidepoint(mpos)
+            if is_active:
+                btn_bg = (0, 235, 255)
+                btn_border = (255, 255, 255)
+                border_w = 3
+                text_color = (0, 15, 35)
+            elif s_hover:
+                btn_bg = (35, 60, 90)
+                btn_border = (0, 200, 255)
+                border_w = 1
+                text_color = (240, 250, 255)
+            else:
+                btn_bg = (25, 45, 70)
+                btn_border = (70, 105, 145)
+                border_w = 1
+                text_color = (210, 225, 240)
             
             pygame.draw.rect(env.screen, btn_bg, btn_rect, border_radius=4)
             pygame.draw.rect(env.screen, btn_border, btn_rect, border_w, border_radius=4)
@@ -687,36 +716,64 @@ class EnvRenderer:
             text_rect = lbl_dir.get_rect(center=badge_rect.center)
             self.cam_surf.blit(lbl_dir, text_rect)
 
-        # 모든 갭 표시 활성화 시 각도 바로 위쪽 좌우 일렬 선상에 각 갭의 각도 위치를 점으로 표출
+        # 모든 갭 표시 활성화 시 각도 바로 위쪽 좌우 일렬 선상에 각 갭 및 웨이포인트(WP1, WP2)의 각도 위치를 점으로 표출
         legend_bar_y = cam_h - 25
         sample_lh = self.small_font.render("0°", True, (0, 0, 0)).get_height()
         dot_y = legend_bar_y - sample_lh - 9
 
-        if getattr(env, 'show_all_gaps', False) and getattr(env, 'all_gaps', None):
+        if getattr(env, 'show_all_gaps', False):
             # 좌우 일렬 수평 가이드선
             pygame.draw.line(self.cam_surf, (0, 180, 240, 90), (8, dot_y), (cam_w - 8, dot_y), 1)
 
-            for idx, g in enumerate(env.all_gaps):
-                mid = g["pos"]
-                dx_g = mid[0] - bx
-                dy_g = mid[1] - by
-                lf_g = dx_g * f_vec[0] + dy_g * f_vec[1]
-                lr_g = dx_g * r_vec[0] + dy_g * r_vec[1]
+            # 1. 탐지된 모든 장애물 쌍 틈새(갭) 각도 점 (번호 텍스트 없이 깔끔한 점으로 표출)
+            if getattr(env, 'all_gaps', None):
+                for g in env.all_gaps:
+                    mid = g["pos"]
+                    dx_g = mid[0] - bx
+                    dy_g = mid[1] - by
+                    lf_g = dx_g * f_vec[0] + dy_g * f_vec[1]
+                    lr_g = dx_g * r_vec[0] + dy_g * r_vec[1]
 
-                ang_g = math.atan2(lr_g, lf_g)
-                if -math.pi / 2 <= ang_g <= math.pi / 2:
-                    s_idx = int((ang_g + math.pi / 2) / math.pi * n_slices)
-                    gx = int(s_idx * cam_w / n_slices)
-                    gx = max(6, min(cam_w - 6, gx))
+                    ang_g = math.atan2(lr_g, lf_g)
+                    if -math.pi / 2 <= ang_g <= math.pi / 2:
+                        s_idx = int((ang_g + math.pi / 2) / math.pi * n_slices)
+                        gx = int(s_idx * cam_w / n_slices)
+                        gx = max(6, min(cam_w - 6, gx))
 
-                    # 갭 위치 점 (섀도우 + 시안 링 + 코어 도트)
-                    pygame.draw.circle(self.cam_surf, (10, 20, 35), (gx, dot_y), 5)
-                    pygame.draw.circle(self.cam_surf, (0, 240, 255), (gx, dot_y), 4)
-                    pygame.draw.circle(self.cam_surf, (255, 255, 255), (gx, dot_y), 2)
+                        # 갭 위치 점 (섀도우 + 시안 링 + 화이트 코어)
+                        pygame.draw.circle(self.cam_surf, (10, 20, 35), (gx, dot_y), 4)
+                        pygame.draw.circle(self.cam_surf, (0, 220, 255), (gx, dot_y), 3)
+                        pygame.draw.circle(self.cam_surf, (255, 255, 255), (gx, dot_y), 1)
 
-                    # 갭 인덱스 라벨 (G1, G2, ...)
-                    lbl_g = self.micro_font.render(f"G{idx + 1}", True, (0, 255, 255))
-                    self.cam_surf.blit(lbl_g, (gx - lbl_g.get_width() // 2, dot_y - 12))
+            # 2. 1차 웨이포인트(WP1) 각도 점 표출 (제외하지 않고 반드시 포함)
+            if getattr(env, 'current_wp', None) is not None:
+                dx_w1 = env.current_wp["pos"][0] - bx
+                dy_w1 = env.current_wp["pos"][1] - by
+                lf_w1 = dx_w1 * f_vec[0] + dy_w1 * f_vec[1]
+                lr_w1 = dx_w1 * r_vec[0] + dy_w1 * r_vec[1]
+                ang_w1 = math.atan2(lr_w1, lf_w1)
+                if -math.pi / 2 <= ang_w1 <= math.pi / 2:
+                    s_idx1 = int((ang_w1 + math.pi / 2) / math.pi * n_slices)
+                    gx1 = max(6, min(cam_w - 6, int(s_idx1 * cam_w / n_slices)))
+                    # 1차 웨이포인트 점 (네온 시안 강조)
+                    pygame.draw.circle(self.cam_surf, (10, 20, 35), (gx1, dot_y), 6)
+                    pygame.draw.circle(self.cam_surf, (0, 255, 220), (gx1, dot_y), 5)
+                    pygame.draw.circle(self.cam_surf, (255, 255, 255), (gx1, dot_y), 2)
+
+            # 3. 2차 웨이포인트(WP2) 각도 점 표출 (제외하지 않고 반드시 포함)
+            if getattr(env, 'next_wp', None) is not None:
+                dx_w2 = env.next_wp["pos"][0] - bx
+                dy_w2 = env.next_wp["pos"][1] - by
+                lf_w2 = dx_w2 * f_vec[0] + dy_w2 * f_vec[1]
+                lr_w2 = dx_w2 * r_vec[0] + dy_w2 * r_vec[1]
+                ang_w2 = math.atan2(lr_w2, lf_w2)
+                if -math.pi / 2 <= ang_w2 <= math.pi / 2:
+                    s_idx2 = int((ang_w2 + math.pi / 2) / math.pi * n_slices)
+                    gx2 = max(6, min(cam_w - 6, int(s_idx2 * cam_w / n_slices)))
+                    # 2차 웨이포인트 점 (퍼플/마젠타 강조)
+                    pygame.draw.circle(self.cam_surf, (10, 20, 35), (gx2, dot_y), 6)
+                    pygame.draw.circle(self.cam_surf, (200, 100, 255), (gx2, dot_y), 5)
+                    pygame.draw.circle(self.cam_surf, (255, 255, 255), (gx2, dot_y), 2)
 
         # 전방 180도 화각 표시를 위한 하단 각도 단위 텍스트 (0°, 90°, 180°) - 버튼 박스 없이 숫자만 표시
         angles_spec = [(0, "0°", 8), (90, "90°", cam_w // 2), (180, "180°", cam_w - 8)]
@@ -1085,9 +1142,12 @@ class EnvRenderer:
         pygame.draw.rect(hud_surf, (0, 160, 230), (0, 0, hud_w, hud_h), 2)
         
         # 모드 표시
+        is_paused = getattr(env, 'paused', False)
         em = getattr(env, 'emergency_mode', False)
         has_wp = env.current_wp is not None
-        if em:
+        if is_paused:
+            mode_txt = self.bold_font.render("PAUSED", True, (255, 140, 20))
+        elif em:
             mode_txt = self.bold_font.render("AVOIDING", True, (255, 80, 60))
         elif has_wp:
             mode_txt = self.bold_font.render("GAP PASS", True, (0, 255, 220))

@@ -132,14 +132,14 @@ class BoatEnv:
         self.cb5_row_rect = pygame.Rect(35, 807, 275, 30)
         
         self.paused = False
-        self.pause_btn = pygame.Rect(40, 852, 48, 30)
+        self.pause_btn = pygame.Rect(38, 848, 52, 34)
         self.sim_speed = 1
         self.speed_btns = {
-            1: pygame.Rect(94, 852, 38, 30),
-            2: pygame.Rect(138, 852, 38, 30),
-            4: pygame.Rect(182, 852, 38, 30),
-            8: pygame.Rect(226, 852, 38, 30),
-            16: pygame.Rect(270, 852, 46, 30)
+            1: pygame.Rect(96, 848, 38, 34),
+            2: pygame.Rect(140, 848, 38, 34),
+            4: pygame.Rect(184, 848, 38, 34),
+            8: pygame.Rect(228, 848, 38, 34),
+            16: pygame.Rect(272, 848, 46, 34)
         }
         
         self.renderer = EnvRenderer(self)
@@ -232,6 +232,7 @@ class BoatEnv:
             for spd, rect in self.speed_btns.items():
                 if rect.collidepoint(pos):
                     self.sim_speed = spd
+                    self.paused = False
                     break
 
     def update_dynamic_obstacles(self):
