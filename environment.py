@@ -40,7 +40,8 @@ class BoatEnv:
             'cluster_pen_w': 2.0,
             'wp_switch_thresh': 1.1,
             'perp_exp': 3.0,
-            'prox_exp': 4.0
+            'prox_exp': 4.0,
+            'center_exp': 1.5
         }
         self.load_params()
          

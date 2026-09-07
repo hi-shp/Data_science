@@ -144,6 +144,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     cluster_pen_w = params.get('cluster_pen_w', 2.0) if params else 2.0
     perp_exp = params.get('perp_exp', 3.0) if params else 3.0
     prox_exp = params.get('prox_exp', 4.0) if params else 4.0
+    center_exp = params.get('center_exp', 1.5) if params else 1.5
 
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])
     
@@ -167,11 +168,21 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         
     items.sort(key=lambda x: x[0])
     
-    gaps = []
+    gaps_set = set()
+    # 1) 라이다 각도 상 분리된 인접 쌍 (라이다 상 검은색 빈 공간)
     for i in range(len(items) - 1):
         if (items[i+1][0] - items[i][0]) > np.deg2rad(2.0):
-            gaps.append((i, i+1))
+            gaps_set.add((i, i+1))
             
+    # 2) 라이다 상에 바로 붙어있어도(각도차가 작아 검은 빈틈 없이 색깔만 달라도 = 거리/깊이 차이 발생),
+    #    2차원 실제 물리 거리가 선박 통과 가능 폭(45~160px)인 모든 장애물 쌍을 틈으로 인정
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            d_buoys = np.linalg.norm(items[i][2] - items[j][2])
+            if 45.0 <= d_buoys <= 160.0:
+                gaps_set.add((i, j))
+                
+    gaps = sorted(list(gaps_set))
     if not gaps:
         return None
         
@@ -244,36 +255,26 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         obs_f = obstacles[mask]
         
         if len(obs_f) > 0:
-            px = obs_f[:, 0] - bx
-            py = obs_f[:, 1] - by
-            t = np.clip((px * vx + py * vy) / seg2, 0.0, 1.0)
-            cx = bx + t * vx
-            cy = by + t * vy
-            dists_to_seg = np.sqrt((obs_f[:, 0] - cx)**2 + (obs_f[:, 1] - cy)**2) - obs_f[:, 2]
-            min_clear = float(np.min(dists_to_seg))
-            
-            # 보트 눈앞(160px 이내) 장애물과의 간격이 좁을 경우(45px 미만) 선제적 페널티 부여
-            d_boat = np.hypot(px, py)
-            close_mask = (d_boat < 160.0) & (dists_to_seg < 45.0)
-            if np.any(close_mask):
-                close_d = np.maximum(dists_to_seg[close_mask], 0.0)
-                near_clear_penalty = float(np.prod(np.maximum(0.1, (close_d / 45.0) ** 1.5)))
+            # c1, c2(게이트 기둥) 자체는 통과 대상이므로 보트->중점 선분 장애물 간섭 검사에서 제외
+            d_to_c1 = (obs_f[:, 0] - c1[0])**2 + (obs_f[:, 1] - c1[1])**2
+            d_to_c2 = (obs_f[:, 0] - c2[0])**2 + (obs_f[:, 1] - c2[1])**2
+            other_mask = (d_to_c1 > 28.0**2) & (d_to_c2 > 28.0**2)
+            obs_path = obs_f[other_mask]
+
+            if len(obs_path) > 0:
+                px = obs_path[:, 0] - bx
+                py = obs_path[:, 1] - by
+                t = np.clip((px * vx + py * vy) / seg2, 0.0, 1.0)
+                cx = bx + t * vx
+                cy = by + t * vy
+                dists_to_seg = np.sqrt((obs_path[:, 0] - cx)**2 + (obs_path[:, 1] - cy)**2) - obs_path[:, 2]
+                min_clear = float(np.min(dists_to_seg))
             else:
-                near_clear_penalty = 1.0
-                
-            cnt = int(np.sum((obs_f[:, 0] - mx)**2 + (obs_f[:, 1] - my)**2 < 10000.0))
-            cluster_pen = math.exp(-0.5 * cnt)
+                min_clear = 9999.0
             
+            cluster_pen = 1.0
+            near_clear_penalty = 1.0
             depth_pen = 1.0
-            if distm > 10:
-                dir_x = mx - bx
-                dir_y = my - by
-                norm_x = dir_x / distm
-                norm_y = dir_y / distm
-                past_x = mx + norm_x * 120
-                past_y = my + norm_y * 120
-                past_blocked = int(np.sum((obs_f[:, 0] - past_x)**2 + (obs_f[:, 1] - past_y)**2 < 6400.0))
-                depth_pen = math.exp(-1.5 * past_blocked)
         else:
             min_clear = 9999.0
             near_clear_penalty = 1.0
@@ -284,7 +285,6 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         path_clear = min(min_clear / 160, 1)**2.2
         
         # 갭 선분(c1->c2)과 현재 위치에서 목적지까지의 방향(gps_vec) 간의 수직도(Orthogonality) 계산
-        # 2D 외적 크기 |gps_vec x u_gap| = |sin(theta)|: 목적지 방향에 대해 직교(90도)할 때 1.0, 사선/기울어질수록 감소
         v_gap = c2 - c1
         gap_w = np.linalg.norm(v_gap)
         u_gap = v_gap / (gap_w + 1e-6)
@@ -292,12 +292,21 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         perp_factor = max(perp_score, 0.05) ** perp_exp
         
         # 선박과의 근접도 (Proximity to Boat): 배와 가까울수록 높은 점수 부여
-        prox_score = min(1.0, 140.0 / max(distm, 140.0))
+        prox_score = min(1.0, 65.0 / max(distm, 35.0))
         prox_factor = max(prox_score, 0.05) ** prox_exp
+        
+        # 기준 위도(시작점-목적지 연결 직선: target_pos[1])에서 벗어난 정도에 따라 가운데로 복귀하려는 성질
+        base_y = target_pos[1]
+        boat_dev = abs(by - base_y)
+        gap_dev = abs(my - base_y)
+        center_closeness = math.exp(-((gap_dev / 160.0)**2))
+        dev_ratio = min(boat_dev / 150.0, 2.0)
+        eff_center_exp = center_exp * (0.4 + 0.8 * dev_ratio)
+        center_factor = max(center_closeness, 0.05) ** eff_center_exp
         
         width_w = min(gap_w / 90, 1)
         
-        sc = (heading_align**align_exp) * (forward_proj**fwd_exp) * (lateral_full**0.5) * (path_clear**clear_exp) * (width_w**width_exp) * (cluster_pen**cluster_pen_w) * depth_pen * near_clear_penalty * perp_factor * prox_factor
+        sc = (heading_align**align_exp) * (forward_proj**fwd_exp) * (lateral_full**0.5) * (path_clear**clear_exp) * (width_w**width_exp) * (cluster_pen**cluster_pen_w) * depth_pen * near_clear_penalty * perp_factor * prox_factor * center_factor
         
         if sc > 0:
             term_align = float(heading_align**align_exp)
@@ -305,6 +314,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             term_clear = float(path_clear**clear_exp)
             term_perp = float(perp_factor)
             term_prox = float(prox_factor)
+            term_center = float(center_factor)
             term_cluster = float(cluster_pen**cluster_pen_w)
             
             valid_gaps.append({
@@ -319,6 +329,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
                     "Clear": {"raw": float(path_clear), "w": float(clear_exp)},
                     "Perpend": {"raw": float(perp_score), "w": float(perp_exp)},
                     "Proxim": {"raw": float(prox_score), "w": float(prox_exp)},
+                    "Center": {"raw": float(center_closeness), "w": float(eff_center_exp)},
                     "Cluster": {"raw": float(cluster_pen), "w": float(cluster_pen_w)}
                 }
             })
@@ -328,7 +339,34 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         
     valid_gaps.sort(key=lambda x: x["score"], reverse=True)
     best = valid_gaps[0]
-    best["candidates"] = valid_gaps[1:3]  # 순위 높은 2, 3위 차순위 후보
+    
+    # 2번째, 3번째 웨이포인트 후보는 1순위(현재 웨이포인트) 및 앞선 후보와 장애물 쌍/위치가 중복되지 않도록 선별
+    candidates = []
+    selected_pairs = {tuple(sorted(best["pair"]))}
+    selected_positions = [best["pos"]]
+    
+    for g in valid_gaps[1:]:
+        pair_key = tuple(sorted(g["pair"]))
+        # 1. 1순위 및 앞선 후보와 동일한 장애물 쌍 배제 (동일 갭 중복 배제)
+        if pair_key in selected_pairs:
+            continue
+            
+        # 2. 물리적 위치가 1순위 및 앞선 후보들과 너무 가까운 갭 배제 (최소 50px 이상 이격)
+        too_close = False
+        for spos in selected_positions:
+            if np.linalg.norm(g["pos"] - spos) < 50.0:
+                too_close = True
+                break
+        if too_close:
+            continue
+            
+        candidates.append(g)
+        selected_pairs.add(pair_key)
+        selected_positions.append(g["pos"])
+        if len(candidates) >= 2:
+            break
+            
+    best["candidates"] = candidates
     return best
 
 def reactive_avoidance(dists, angles):
