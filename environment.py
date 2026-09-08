@@ -524,8 +524,8 @@ class BoatEnv:
         
         avoid = reactive_avoidance(dists, self.rel_angles)
         
-        # 반발력 정상 작동: 웨이포인트 선회 방향과 반대로 충돌할 때만 상쇄 방지를 위해 소프트 감쇠(0.25) 적용
-        if self.current_wp is not None and (steer_f * avoid < 0) and abs(steer_f) > 0.15:
+        # 반발력과 조향이 반대로 충돌할 때 조향력 상쇄(직진 현상)를 방지하기 위해 반발력 소프트 감쇠(0.25) 적용
+        if (steer_f * avoid < 0) and abs(steer_f) > 0.15:
             avoid *= 0.25
             
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)

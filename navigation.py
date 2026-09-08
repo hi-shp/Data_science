@@ -49,13 +49,26 @@ def bezier_path_is_blocked(path, obstacles, boat_radius=25, margin=10):
     return bool(np.any(d2 <= orad2[None, :]))
 
 def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_radius=25, boat_speed=0.0, params=None):
-    # 1. 목적지 방향 직선 경로(시야) 확보 여부 1차 검사
-    if not target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius):
-        return False
     if obstacles is None or len(obstacles) == 0:
         return True
+
+    # 1. 선박 정면(헤딩 방향) 근접 거리에 장애물이 있으면 선회 공간 부족으로 직행 차단 (웨이포인트 우회 우선)
+    dx_f = obstacles[:, 0] - boat_pos[0]
+    dy_f = obstacles[:, 1] - boat_pos[1]
+    dist_f = np.sqrt(dx_f * dx_f + dy_f * dy_f)
+    clear_dist_f = dist_f - obstacles[:, 2]
+    front_close = clear_dist_f < (boat_radius + 75.0)
+    if np.any(front_close):
+        ang_f = np.arctan2(dy_f[front_close], dx_f[front_close])
+        rel_f = np.abs(wrap(ang_f - boat_heading))
+        if np.any(rel_f < 0.6981317007977318):  # np.deg2rad(40.0)
+            return False
+
+    # 2. 목적지 방향 직선 경로(시야) 확보 여부 1차 검사
+    if not target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius):
+        return False
         
-    # 2. 현재 헤딩에서 목적지로 꺾을 때 선회 궤적(베지어 곡선)에 장애물이 없는지 검증
+    # 3. 현재 헤딩에서 목적지로 꺾을 때 선회 궤적(베지어 곡선)에 장애물이 없는지 검증
     from utils import make_bezier_path
     p = params or {}
     margin = float(p.get('clear_margin', 10.0))
