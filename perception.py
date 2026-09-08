@@ -41,20 +41,19 @@ def lidar_hits_np(boat_pos, boat_heading, rel_angles, obstacles, lidar_range, ma
     else:
         d_final = np.full(n, lidar_range, dtype=np.float32)
 
-    # 맵 외곽 벽(Boundary Walls)을 장애물로 인식
+    # 맵 외곽 벽(Boundary Walls)을 장애물로 인식 (목적지 방향 정면 수직벽 xmax 제외)
     if map_bounds is not None:
         xmin, ymin, xmax, ymax = map_bounds
         t_left = np.where(vx < -1e-5, (xmin - x0) / np.minimum(vx, -1e-5), lidar_range)
-        t_right = np.where(vx > 1e-5, (xmax - x0) / np.maximum(vx, 1e-5), lidar_range)
+        # 목적지 방향의 정면 수직벽(xmax)은 벽으로 인식하지 않음
         t_top = np.where(vy < -1e-5, (ymin - y0) / np.minimum(vy, -1e-5), lidar_range)
         t_bottom = np.where(vy > 1e-5, (ymax - y0) / np.maximum(vy, 1e-5), lidar_range)
 
         t_left = np.where(t_left > 0, t_left, lidar_range)
-        t_right = np.where(t_right > 0, t_right, lidar_range)
         t_top = np.where(t_top > 0, t_top, lidar_range)
         t_bottom = np.where(t_bottom > 0, t_bottom, lidar_range)
 
-        t_wall = np.minimum(np.minimum(t_left, t_right), np.minimum(t_top, t_bottom))
+        t_wall = np.minimum(t_left, np.minimum(t_top, t_bottom))
         d_final = np.minimum(d_final, t_wall[:, 0].astype(np.float32))
     
     valid = d_final < lidar_range

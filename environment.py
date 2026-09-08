@@ -417,11 +417,12 @@ class BoatEnv:
         ch = math.cos(self.boat_heading)
         sh = math.sin(self.boat_heading)
 
-        # 라인트레이싱 모드: 외곽 벽(Boundary Walls)을 장애물로 인식 및 충돌 판정
+        # 라인트레이싱 모드: 외곽 벽(Boundary Walls)을 장애물로 인식 및 충돌 판정 (목적지 방향 정면 수직벽 xmax 제외)
         if getattr(self, 'linetrace_mode', False):
             hull_margin = 18.0
-            if bx <= hull_margin or bx >= (self.w - hull_margin) or \
-               by <= hull_margin or by >= (self.sim_h - hull_margin):
+            if bx <= hull_margin or \
+               by <= hull_margin or by >= (self.sim_h - hull_margin) or \
+               bx >= self.w:
                 return True
 
         # 장애물 충돌: 선체 로컬 좌표계로 변환하여 3개 선체 폴리곤(좌/우 선체, 데크)과 원형 장애물 정밀 표면 충돌 검사
