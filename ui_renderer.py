@@ -1048,11 +1048,10 @@ class EnvRenderer:
         self.real_cam_surf.blit(self.font.render("LiDAR 1st View", True, (255, 255, 255)), (10, 10))
         env.screen.blit(self.real_cam_surf, (1050, env.sim_h + 35))
 
-        # --- 4. 실시간 베지어 곡선 & 곡률 프로파일 그래프 ---
-        self._draw_bezier_profile()
-
-        # --- 5. 웨이포인트 우선순위 가중치 비율 막대 게이지 ---
-        self._draw_weight_breakdown()
+        # --- 4. 실시간 베지어 곡선 & 곡률 프로파일 그래프 & 5. 가중치 패널 (라인트레이싱 모드에서는 완전 제외) ---
+        if not getattr(env, 'linetrace_mode', False):
+            self._draw_bezier_profile()
+            self._draw_weight_breakdown()
 
     def _draw_bezier_profile(self):
         """우측 하단: 실시간 3차 베지어 곡선(Cubic S-Curve) 2D 궤적 그래프 (X: 전진거리, Y: 좌우편차 - 상하반전 및 3차 수식 표기)"""
