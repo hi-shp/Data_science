@@ -104,7 +104,7 @@ Estimated ETA:   {eta_str}
                 # 연산 부하 절감을 위한 적응형 인지/탐색 주기
                 should_plan = (step_idx % plan_interval == 0 or step_idx == sub_steps - 1)
                 if should_plan:
-                    new_c = extract_clusters_from_grid(env.grid)
+                    new_c = extract_clusters_from_grid(env.grid, env.boat_pos, env.boat_heading)
                     env.clusters, env.cluster_ids = match_clusters(
                         env.clusters, env.cluster_ids, new_c
                     )

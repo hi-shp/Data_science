@@ -40,7 +40,9 @@ def lidar_hits_np(boat_pos, boat_heading, rel_angles, obstacles, lidar_range):
 
     d_final = np.min(t, axis=1).astype(np.float32)
     
-    valid = d_final < lidar_range
+    # 전방 180도 (헤딩 기준 좌우 ±90도: |rel_angles| <= pi/2) 내의 빔만 히트점(hits) 생성
+    front_mask = np.abs(rel_angles) <= (np.pi / 2.0 + 1e-4)
+    valid = (d_final < lidar_range) & front_mask
     hits_x = x0 + vx[:, 0] * d_final
     hits_y = y0 + vy[:, 0] * d_final
     hits = [None] * len(d_final)
@@ -68,7 +70,7 @@ def update_grid(grid, hits):
 
 from sklearn.cluster import DBSCAN
 
-def extract_clusters_from_grid(grid):
+def extract_clusters_from_grid(grid, boat_pos=None, boat_heading=None):
     OCC = 1.0
     gy, gx = np.where(grid >= OCC)
     if len(gx) == 0:
@@ -76,8 +78,23 @@ def extract_clusters_from_grid(grid):
     
     world_x = gx * GRID + GRID / 2.0
     world_y = gy * GRID + GRID / 2.0
+
+    # 전방 180도(헤딩 기준 좌우 ±90도)에 해당하는 점유 격자만 사용
+    if boat_pos is not None and boat_heading is not None:
+        dx = world_x - boat_pos[0]
+        dy = world_y - boat_pos[1]
+        ch = math.cos(boat_heading)
+        sh = math.sin(boat_heading)
+        front_mask = (dx * ch + dy * sh) >= 0
+        if not np.any(front_mask):
+            return []
+        world_x = world_x[front_mask]
+        world_y = world_y[front_mask]
+        weights = grid[gy[front_mask], gx[front_mask]]
+    else:
+        weights = grid[gy, gx]
+    
     pts = np.column_stack((world_x, world_y))
-    weights = grid[gy, gx]
     
     # DBSCAN 클러스터링: 장애물 반경 17px(지름 34px) 내에 찍힌 모든 라이다 히트점을 하나의 덩어리로 병합
     db = DBSCAN(eps=42.0, min_samples=1).fit(pts)
