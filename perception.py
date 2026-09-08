@@ -66,31 +66,34 @@ def update_grid(grid, hits):
         if grid[gy[k], gx[k]] < 20.0:
             grid[gy[k], gx[k]] += 1.0
 
+from sklearn.cluster import DBSCAN
+
 def extract_clusters_from_grid(grid):
     OCC = 1.0
-    mask = grid >= OCC
-    if not np.any(mask):
-        return []
-    labeled_array, num_features = label(mask)
-    if num_features == 0:
+    gy, gx = np.where(grid >= OCC)
+    if len(gx) == 0:
         return []
     
-    flat_labels = labeled_array.ravel()
-    nonzero = flat_labels > 0
-    sub_labels = flat_labels[nonzero]
-    if len(sub_labels) == 0:
-        return []
-    counts = np.bincount(sub_labels, minlength=num_features + 1)[1:]
-    sum_y = np.bincount(sub_labels, weights=_Y_FLAT[nonzero], minlength=num_features + 1)[1:]
-    sum_x = np.bincount(sub_labels, weights=_X_FLAT[nonzero], minlength=num_features + 1)[1:]
+    world_x = gx * GRID + GRID / 2.0
+    world_y = gy * GRID + GRID / 2.0
+    pts = np.column_stack((world_x, world_y))
+    weights = grid[gy, gx]
     
-    valid = counts > 0
-    cy = sum_y[valid] / counts[valid]
-    cx = sum_x[valid] / counts[valid]
+    # DBSCAN 클러스터링: 장애물 반경 17px(지름 34px) 내에 찍힌 모든 라이다 히트점을 하나의 덩어리로 병합
+    db = DBSCAN(eps=42.0, min_samples=1).fit(pts)
+    labels = db.labels_
     
-    world_x = cx * GRID + GRID / 2.0
-    world_y = cy * GRID + GRID / 2.0
-    return [np.array([wx, wy], dtype=np.float32) for wx, wy in zip(world_x, world_y)]
+    clusters = []
+    for lbl in sorted(set(labels)):
+        mask = (labels == lbl)
+        w = weights[mask]
+        total_w = float(np.sum(w))
+        if total_w > 0:
+            cx = float(np.sum(world_x[mask] * w) / total_w)
+            cy = float(np.sum(world_y[mask] * w) / total_w)
+            clusters.append(np.array([cx, cy], dtype=np.float32))
+            
+    return clusters
 
 def match_clusters(prev_clusters, prev_ids, new_clusters, max_dist=28.0):
     if len(prev_clusters) == 0 or len(prev_ids) == 0:
