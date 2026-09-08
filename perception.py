@@ -67,7 +67,7 @@ def update_grid(grid, hits):
             grid[gy[k], gx[k]] += 1.0
 
 def extract_clusters_from_grid(grid):
-    OCC = 2.0
+    OCC = 1.0
     mask = grid >= OCC
     if not np.any(mask):
         return []

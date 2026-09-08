@@ -60,6 +60,22 @@ def run():
                     env.clusters, env.cluster_ids, new_c
                 )
 
+                # [Gaps 버튼 전용 데이터] 필터링 없이 탐지된 모든 클러스터 쌍 사이의 모든 가능한 틈새(N C 2) 생성
+                gui_all_gaps = []
+                n_c = len(env.clusters)
+                for i in range(n_c):
+                    c1 = env.clusters[i]
+                    for j in range(i + 1, n_c):
+                        c2 = env.clusters[j]
+                        mid_pt = (c1 + c2) / 2.0
+                        gui_all_gaps.append({
+                            "pos": mid_pt.copy(),
+                            "c1": c1.copy(),
+                            "c2": c2.copy()
+                        })
+                env.all_gaps = gui_all_gaps
+                env.total_gaps_count = len(gui_all_gaps)
+
                 dist_to_target = math.hypot(env.target[0] - env.boat_pos[0], env.target[1] - env.boat_pos[1])
                 boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
                 clear_to_target = is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params)
@@ -70,8 +86,6 @@ def run():
                     env.current_wp = None
                     env.next_wp = None
                     env.candidate_wps = []
-                    env.total_gaps_count = 0
-                    env.all_gaps = []
                 else:
                     # 경로 상에 장애물이 있으면 장애물 사이 갭(웨이포인트)을 찾아 안전하게 우회
                     new_wp = find_gap(
@@ -83,16 +97,10 @@ def run():
                     )
                     if new_wp is not None:
                         env.candidate_wps = new_wp.get("candidates", [])
-                        env.total_gaps_count = new_wp.get("total_gaps_count", 0)
-                        env.all_gaps = new_wp.get("all_gaps", [])
                     elif env.current_wp is not None:
                         env.candidate_wps = env.current_wp.get("candidates", [])
-                        env.total_gaps_count = env.current_wp.get("total_gaps_count", 0)
-                        env.all_gaps = env.current_wp.get("all_gaps", [])
                     else:
                         env.candidate_wps = []
-                        env.total_gaps_count = 0
-                        env.all_gaps = []
             else:
                 boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
 

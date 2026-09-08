@@ -52,17 +52,17 @@ def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_ra
     if obstacles is None or len(obstacles) == 0:
         return True
 
-    # 1. 선박 정면(헤딩 방향) 근접 거리에 장애물이 있으면 선회 공간 부족으로 직행 차단 (웨이포인트 우회 우선)
-    dx_f = obstacles[:, 0] - boat_pos[0]
-    dy_f = obstacles[:, 1] - boat_pos[1]
-    dist_f = np.sqrt(dx_f * dx_f + dy_f * dy_f)
-    clear_dist_f = dist_f - obstacles[:, 2]
-    front_close = clear_dist_f < (boat_radius + 75.0)
-    if np.any(front_close):
-        ang_f = np.arctan2(dy_f[front_close], dx_f[front_close])
-        rel_f = np.abs(wrap(ang_f - boat_heading))
-        if np.any(rel_f < 0.2617993877991494):  # np.deg2rad(15.0)
-            return False
+    # # 1. 선박 정면(헤딩 방향) 근접 거리에 장애물이 있으면 선회 공간 부족으로 직행 차단 (웨이포인트 우회 우선)
+    # dx_f = obstacles[:, 0] - boat_pos[0]
+    # dy_f = obstacles[:, 1] - boat_pos[1]
+    # dist_f = np.sqrt(dx_f * dx_f + dy_f * dy_f)
+    # clear_dist_f = dist_f - obstacles[:, 2]
+    # front_close = clear_dist_f < (boat_radius + 75.0)
+    # if np.any(front_close):
+    #     ang_f = np.arctan2(dy_f[front_close], dx_f[front_close])
+    #     rel_f = np.abs(wrap(ang_f - boat_heading))
+    #     if np.any(rel_f < 0.2617993877991494):  # np.deg2rad(15.0)
+    #         return False
 
     # 2. 목적지 방향 직선 경로(시야) 확보 여부 1차 검사
     if not target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius):
@@ -469,12 +469,12 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     
     # [순수 GUI 편의 기능 전용 데이터]
     # 주행 및 회피 알고리즘에는 일절 관여하지 않으며, 사용자가 화면에서 빨간 부표 사이의 
-    # 모든 조합(2개->1갭, 3개->3갭 등 N C 2) 틈새 위치를 점으로 시각화하여 확인할 수 있도록 분리 전달
+    # 모든 조합(2개->1갭, 3개->3갭 등 N C 2) 틈새 위치를 필터링 없이 점으로 시각화하여 확인할 수 있도록 분리 전달
     gui_all_gaps = []
-    for i in range(len(items)):
-        c1 = items[i][2]
-        for j in range(i + 1, len(items)):
-            c2 = items[j][2]
+    for i in range(len(clusters)):
+        c1 = clusters[i]
+        for j in range(i + 1, len(clusters)):
+            c2 = clusters[j]
             mid_pt = (c1 + c2) / 2.0
             gui_all_gaps.append({
                 "pos": mid_pt.copy(),
