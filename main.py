@@ -92,6 +92,7 @@ def run():
                 )
                 env.heading_target = h_target
                 env.min_wide_dist = min_front
+                env.prev_steer = steer
                 env.current_wp = None
                 env.next_wp = None
                 env.candidate_wps = []

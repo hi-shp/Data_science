@@ -501,80 +501,91 @@ def reactive_avoidance(dists, angles):
 def line_trace_steering(boat_pos, boat_heading, target_pos, dists, rel_angles, boat_ang_vel=0.0, prev_steer=0.0):
     """
     [라인트레이싱 원리 반응형 항법 알고리즘]
-    1순위: 목적지 방향 직행 조향
-    2순위: 전방 탐지 범위 내 장애물 조우 시 가장 가까운 히트점 각도의 반대 방향으로 회피 편향각 부여
-           (목표 방향 기준 최대 편향각을 50도로 엄격 제한하여 절대 뒤로 돌지 않고 완만하고 안정적인 회피)
+    1순위: 목적지 방향 직행 조향 (Steer to Target)
+    2순위: 전방 시야 내 장애물 조우 시 가장 가까운 히트점의 반대 방향으로 즉각적이고 민첩한 회피 조향
+    - 급선회 제한(인위적 각도 캡)을 완전히 제거하여 위험 시 즉시 전방 장애물을 신속하게 회피.
+    - 전방 시야각(65도) 밖으로 장애물이 벗어나면 코사인 감쇠 가중치에 의해 자연스럽게 1순위 목적지 직행으로 복귀하여 뒤로 도는 현상 원천 차단.
+    - 광각(220도) 감지 거리를 반환하여 장애물 밀집 구간에서 선체 속도를 자연스럽게 감속 제어.
     """
     bx, by = boat_pos
     tx, ty = target_pos
     
     # 1. 목적지 방향 (1순위 기본 방향)
-    dx = tx - bx
-    dy = ty - by
-    goal_angle = math.atan2(dy, dx)
+    goal_angle = math.atan2(ty - by, tx - bx)
+    heading_err = wrap(goal_angle - boat_heading)
+    steer_goal = float(np.clip(heading_err * 1.30, -1.0, 1.0))
     
-    # 2. 전방 감시 구역 (|rel_angle| <= 75도) 내 장애물 탐지
-    # 75도를 벗어난 측면/후방 장애물은 배의 전진을 가로막지 않으므로 과도한 회전 방지
-    fwd_fov = 1.309  # np.deg2rad(75)
-    fwd_mask = np.abs(rel_angles) <= fwd_fov
+    # 2. 전방 유효 시야각 (|rel_angle| <= 65도) 내 장애물 탐지
+    fov_rad = 1.134464  # np.deg2rad(65)
+    fwd_mask = np.abs(rel_angles) <= fov_rad
     fwd_indices = np.where(fwd_mask)[0]
     
-    SAFE_DIST = 195.0       # 장애물 감지 및 회피 개시 거리 (px)
+    # 광각(220도) 전체 범위 내 최소 거리 (선박 물리 엔진의 연속 속도 제어 연동)
+    wide_mask = np.abs(rel_angles) <= 1.91986  # np.deg2rad(110)
+    min_wide = float(np.min(dists[wide_mask])) if np.any(wide_mask) else 999.0
+    
+    SAFE_DIST = 180.0       # 장애물 감지 및 회피 개시 거리 (px)
+    CRIT_DIST = 55.0        # 긴급 완전 회피 기준 거리 (px)
     
     if len(fwd_indices) > 0:
         fwd_dists = dists[fwd_indices]
-        min_idx_in_fwd = int(np.argmin(fwd_dists))
-        closest_idx = fwd_indices[min_idx_in_fwd]
+        min_i = int(np.argmin(fwd_dists))
+        closest_idx = fwd_indices[min_i]
         min_dist = float(dists[closest_idx])
         closest_ang = float(rel_angles[closest_idx])
     else:
         min_dist = 999.0
         closest_ang = 0.0
         
-    deflection = 0.0
     if min_dist < SAFE_DIST:
-        # 장애물 조우: 가장 가까운 히트점의 반대 방향으로 회피 편향각(deflection) 부여
-        # 우현(closest_ang > 0)에 장애물 -> 좌회전(deflection < 0)
-        # 좌현(closest_ang < 0)에 장애물 -> 우회전(deflection > 0)
+        # 장애물 조우: 가장 가까운 히트점의 반대 방향으로 회피 조향
+        # 우현(closest_ang > 0)에 장애물 -> 좌회전(avoid_dir < 0)
+        # 좌현(closest_ang < 0)에 장애물 -> 우회전(avoid_dir > 0)
         if abs(closest_ang) > 0.04:
             avoid_dir = -float(np.sign(closest_ang))
         else:
-            # 정면 정중앙 장애물인 경우: 좌/우 여유 공간 비교하여 더 열린 쪽으로 회피
-            left_mask = (rel_angles < -0.08) & fwd_mask
-            right_mask = (rel_angles > 0.08) & fwd_mask
-            left_clear = float(np.min(dists[left_mask])) if np.any(left_mask) else 0.0
-            right_clear = float(np.min(dists[right_mask])) if np.any(right_mask) else 0.0
-            avoid_dir = -1.0 if left_clear >= right_clear else 1.0
+            # 정면 정중앙 장애물: 좌/우 여유 공간 비교하여 더 넓게 트인 쪽으로 회피
+            left_mask = (rel_angles < -0.05) & fwd_mask
+            right_mask = (rel_angles > 0.05) & fwd_mask
+            left_c = float(np.min(dists[left_mask])) if np.any(left_mask) else 0.0
+            right_c = float(np.min(dists[right_mask])) if np.any(right_mask) else 0.0
+            avoid_dir = -1.0 if left_c >= right_c else 1.0
             
-        # 거리가 가까울수록, 정면에 가까울수록 편향각 증가
-        dist_factor = float(np.clip((SAFE_DIST - min_dist) / (SAFE_DIST - 45.0), 0.0, 1.0))
-        front_factor = float(max(0.0, math.cos(closest_ang)))
+        # 전방 각도 집중도(정면에 가까울수록 최대 회피력 발휘, 65도 경계로 벗어나면 부드럽게 0으로 수렴)
+        front_f = max(0.0, math.cos(closest_ang * (np.pi / 2.0 / fov_rad)))
+        urgency = float(np.clip((SAFE_DIST - min_dist) / (SAFE_DIST - CRIT_DIST), 0.0, 1.0))
         
-        # 최대 편향각을 55도(0.96rad)로 엄격히 제한하여 절대 뒤로 돌지(U-Turn) 않도록 방지
-        MAX_DEFLECTION = 0.9599  # np.deg2rad(55)
-        deflection = avoid_dir * (dist_factor ** 0.65) * (0.35 + 0.65 * front_factor) * MAX_DEFLECTION
-
-    # 측면 근접 보호(Flank Guard): 배 옆(75~100도)에 장애물이 60px 이내로 근접 시 선미 충돌 방지
-    flank_mask = (np.abs(rel_angles) > fwd_fov) & (np.abs(rel_angles) <= 1.745)
+        # 긴급도에 따른 적극적인 회피 조향
+        avoid_steer = avoid_dir * (0.75 + 0.25 * urgency)
+        avoid_weight = urgency * front_f
+        
+        # 근접 위험 시 급선회(100% 회피 조향) 허용
+        if min_dist < CRIT_DIST + 15.0:
+            steer_cmd = avoid_dir * 1.0
+        else:
+            steer_cmd = (1.0 - avoid_weight) * steer_goal + avoid_weight * avoid_steer
+    else:
+        steer_cmd = steer_goal
+        
+    # 측면 근접 보호(Flank Guard): 배 옆(65~95도)에 장애물이 45px 이내로 근접 시 외측 선체 찰과 방지
+    flank_mask = (np.abs(rel_angles) > fov_rad) & (np.abs(rel_angles) <= 1.658)
     if np.any(flank_mask):
-        flank_min = float(np.min(dists[flank_mask]))
-        if flank_min < 60.0:
-            flank_idx = np.where(flank_mask)[0][np.argmin(dists[flank_mask])]
-            flank_ang = float(rel_angles[flank_idx])
-            flank_dir = -float(np.sign(flank_ang))
-            flank_guard = flank_dir * float(np.clip((60.0 - flank_min) / 25.0, 0.0, 0.55))
-            if abs(flank_guard) > abs(deflection):
-                deflection = flank_guard
+        f_dists = dists[flank_mask]
+        f_min = float(np.min(f_dists))
+        if f_min < 45.0:
+            f_idx = np.where(flank_mask)[0][np.argmin(f_dists)]
+            f_ang = float(rel_angles[f_idx])
+            f_dir = -float(np.sign(f_ang))
+            f_push = f_dir * float(np.clip((45.0 - f_min) / 20.0, 0.0, 0.5))
+            if (steer_cmd * f_dir) <= 0:
+                steer_cmd = steer_cmd * 0.5 + f_push
 
-    # 목표 헤딩각 = 목적지 방향 + 장애물 회피 편향각
-    # 목적지 방향에서 최대 55도 이내로만 틀어지므로 전방 전진성을 완벽히 보장
-    cmd_heading = goal_angle + deflection
-    heading_err = wrap(cmd_heading - boat_heading)
+    # 3. 각속도 댐핑 및 지수 이동 평균 평활화 (오버슈트 및 횡방향 출렁임 방지)
+    d_term = -0.25 * float(boat_ang_vel)
+    steer_raw = float(np.clip(steer_cmd + d_term, -1.0, 1.0))
+    steer_f = float(np.clip(0.55 * steer_raw + 0.45 * prev_steer, -1.0, 1.0))
     
-    # 3. 각속도 댐핑 및 지수 이동 평균 평활화 (오버슈트 및 지그재그 진동 방지)
-    d_term = -0.30 * float(boat_ang_vel)
-    steer_raw = float(np.clip(heading_err * 1.30, -1.0, 1.0)) + d_term
-    alpha = 0.50
-    steer_f = float(np.clip(alpha * steer_raw + (1.0 - alpha) * prev_steer, -1.0, 1.0))
+    # HUD 표출용 지향 헤딩각
+    cmd_heading = boat_heading + steer_f * 0.8
     
-    return steer_f, cmd_heading, min_dist
+    return steer_f, cmd_heading, min_wide
