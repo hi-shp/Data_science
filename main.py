@@ -105,6 +105,8 @@ def run():
                 env.next_bezier_path = None
                 env.pursuit_target = None
                 env.next_pursuit_target = None
+                env.all_gaps = []
+                env.total_gaps_count = 0
             else:
                 if should_plan:
                     dist_to_target = math.hypot(env.target[0] - env.boat_pos[0], env.target[1] - env.boat_pos[1])

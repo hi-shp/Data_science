@@ -153,8 +153,9 @@ class EnvRenderer:
         pygame.draw.line(env.screen, (255, 255, 255, 180), (tx, ty - 16), (tx, ty + 16), 1)
         
         # 5. 실시간 동적 추종 궤적 (베지어 곡선 및 웨이포인트)
-        show_1st = getattr(env, 'show_1st_path', True)
-        show_2nd = getattr(env, 'show_2nd_path', True)
+        is_lt = getattr(env, 'linetrace_mode', False)
+        show_1st = getattr(env, 'show_1st_path', True) and not is_lt
+        show_2nd = getattr(env, 'show_2nd_path', True) and not is_lt
 
         if show_2nd:
             if env.next_wp is not None:
@@ -191,8 +192,8 @@ class EnvRenderer:
                 pygame.draw.circle(env.screen, (255, 255, 255), (int(px_t), int(py_t)), 10, 2)
                 pygame.draw.circle(env.screen, (255, 50, 150), (int(px_t), int(py_t)), 5)
 
-        # 6. 차순위 후보 웨이포인트 렌더링 (투명도 적용)
-        if getattr(env, 'show_candidates', True) and getattr(env, 'candidate_wps', None):
+        # 6. 차순위 후보 웨이포인트 렌더링 (투명도 적용, 라인트레이싱 모드에서는 완전 제외)
+        if not is_lt and getattr(env, 'show_candidates', True) and getattr(env, 'candidate_wps', None):
             cand_surf = self._cand_surf
             cand_surf.fill((0, 0, 0, 0))
             cand_colors = [(80, 210, 255, 130), (255, 180, 70, 120)]
@@ -209,8 +210,8 @@ class EnvRenderer:
                 cand_surf.blit(txt_rank, (int(mid[0]) + 10, int(mid[1]) - 8))
             env.screen.blit(cand_surf, (0, 0))
 
-        # 6-2. 고려 중인 모든 갭의 중간점 위치 렌더링 (Gaps 버튼 클릭 시 ON/OFF 토글)
-        if getattr(env, 'show_all_gaps', False) and getattr(env, 'all_gaps', None):
+        # 6-2. 고려 중인 모든 갭의 중간점 위치 렌더링 (Gaps 버튼 클릭 시 ON/OFF 토글, 라인트레이싱 모드에서는 완전 제외)
+        if not is_lt and getattr(env, 'show_all_gaps', False) and getattr(env, 'all_gaps', None):
             gaps_surf = getattr(self, '_all_gaps_surf', None)
             if gaps_surf is None:
                 self._all_gaps_surf = pygame.Surface((env.w, env.h), pygame.SRCALPHA)
