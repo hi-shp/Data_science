@@ -238,30 +238,28 @@ class EnvRenderer:
         # 8. 실시간 텔레메트리 HUD
         self._draw_telemetry()
 
-        # 8-2. 메인 시뮬레이션 맵 좌측 상단 HUD 모드 배지 / 토글 버튼
+        # 8-2. 메인 시뮬레이션 맵 좌측 상단 모드 토글 버튼 (LINE TRACING / GAP NAVIGATION)
         mpos = pygame.mouse.get_pos()
-        top_btn = getattr(env, 'mode_btn_top_rect', pygame.Rect(25, 16, 220, 28))
+        top_btn = getattr(env, 'mode_btn_top_rect', pygame.Rect(25, 16, 165, 28))
+        env.mode_btn_top_rect = top_btn
         top_hover = top_btn.collidepoint(mpos)
         is_lt_active = getattr(env, 'linetrace_mode', False)
-        is_lt_queued = getattr(env, 'linetrace_queued', False)
 
         if is_lt_active:
-            t_bg = (12, 48, 34, 235) if top_hover else (8, 36, 24, 215)
-            t_border = (0, 255, 170)
-            t_str = "● MODE: LINE-TRACE (ON)"
-            t_col = (0, 255, 180)
-            t_bw = 2
+            t_str = "LINE TRACING"
+            t_bg = (16, 42, 36, 210) if top_hover else (12, 32, 26, 185)
+            t_border = (0, 220, 160) if top_hover else (0, 160, 120)
+            t_col = (180, 255, 220) if top_hover else (140, 230, 190)
         else:
-            t_bg = (18, 38, 62, 230) if top_hover else (12, 26, 44, 210)
-            t_border = (0, 200, 255) if top_hover else (0, 130, 180)
-            t_str = "○ MODE: GAP NAV (ON)"
-            t_col = (210, 245, 255) if top_hover else (160, 205, 235)
-            t_bw = 1
+            t_str = "GAP NAVIGATION"
+            t_bg = (18, 36, 58, 210) if top_hover else (12, 26, 42, 185)
+            t_border = (0, 190, 240) if top_hover else (0, 125, 175)
+            t_col = (200, 235, 255) if top_hover else (150, 195, 225)
 
         top_surf = pygame.Surface((top_btn.w, top_btn.h), pygame.SRCALPHA)
         pygame.draw.rect(top_surf, t_bg, (0, 0, top_btn.w, top_btn.h), border_radius=4)
-        pygame.draw.rect(top_surf, t_border, (0, 0, top_btn.w, top_btn.h), t_bw, border_radius=4)
-        t_lbl = self.bold_font.render(t_str, True, t_col) if (is_lt_active or is_lt_queued) else self.font.render(t_str, True, t_col)
+        pygame.draw.rect(top_surf, t_border, (0, 0, top_btn.w, top_btn.h), 1, border_radius=4)
+        t_lbl = self.font.render(t_str, True, t_col)
         top_surf.blit(t_lbl, t_lbl.get_rect(center=(top_btn.w // 2, top_btn.h // 2)))
         env.screen.blit(top_surf, (top_btn.x, top_btn.y))
 
@@ -407,31 +405,6 @@ class EnvRenderer:
 
         # 마우스 커서 위치 확인 (호버 인터랙션)
         mpos = pygame.mouse.get_pos()
-
-        # 0. 항법 알고리즘 모드 토글 버튼 (라인트레이싱 원리 모드 vs 기존 갭 항법)
-        mode_btn = getattr(env, 'mode_btn_rect', pygame.Rect(38, 634, 275, 25))
-        m_hover = mode_btn.collidepoint(mpos)
-        is_lt_active = getattr(env, 'linetrace_mode', False)
-        is_lt_queued = getattr(env, 'linetrace_queued', False)
-
-        if is_lt_active:
-            m_bg = (16, 60, 42) if m_hover else (10, 42, 30)
-            m_border = (0, 255, 170)
-            m_text = "Mode: Line-Trace (ON)"
-            m_tcol = (0, 255, 180)
-            border_w = 2
-        else:
-            m_bg = (24, 45, 72) if m_hover else (16, 30, 50)
-            m_border = (0, 210, 255) if m_hover else (0, 130, 175)
-            m_text = "Mode: Gap Nav (ON)"
-            m_tcol = (220, 245, 255) if m_hover else (150, 195, 225)
-            border_w = 1
-
-        pygame.draw.rect(env.screen, m_bg, mode_btn, border_radius=4)
-        pygame.draw.rect(env.screen, m_border, mode_btn, border_w, border_radius=4)
-        lbl_m = self.bold_font.render(m_text, True, m_tcol) if (is_lt_active or is_lt_queued) else self.font.render(m_text, True, m_tcol)
-        m_rect = lbl_m.get_rect(center=mode_btn.center)
-        env.screen.blit(lbl_m, m_rect)
 
         # 체크박스 렌더링
         # 1. Show 1st Path (시안)

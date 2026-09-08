@@ -121,8 +121,7 @@ class BoatEnv:
         self.linetrace_mode = False
         self.linetrace_queued = False
         self.needs_break = False
-        self.mode_btn_rect = pygame.Rect(38, 634, 275, 25)
-        self.mode_btn_top_rect = pygame.Rect(25, 18, 220, 28)
+        self.mode_btn_top_rect = pygame.Rect(25, 16, 165, 28)
         
         self.cb1_rect = pygame.Rect(40, 668, 20, 20)
         self.cb2_rect = pygame.Rect(40, 704, 20, 20)
@@ -221,10 +220,9 @@ class BoatEnv:
             self.linetrace_queued = False
 
     def handle_click(self, pos):
-        is_mode_click = (getattr(self, 'mode_btn_rect', None) and self.mode_btn_rect.collidepoint(pos)) or \
-                        (getattr(self, 'mode_btn_top_rect', None) and self.mode_btn_top_rect.collidepoint(pos))
+        is_mode_click = getattr(self, 'mode_btn_top_rect', None) and self.mode_btn_top_rect.collidepoint(pos)
         if is_mode_click:
-            # 버튼 클릭 시 다음 에피소드 예약이 아니라 현재 실행 중인 에피소드에서 실시간으로 알고리즘 즉시 변경
+            # 버튼 클릭 시 현재 실행 중인 에피소드에서 실시간으로 알고리즘 즉시 변경 (GAP NAVIGATION <-> LINE TRACING)
             self.linetrace_mode = not getattr(self, 'linetrace_mode', False)
             self.linetrace_queued = False
         elif getattr(self, 'cb1_row_rect', self.cb1_rect).collidepoint(pos) or self.cb1_rect.collidepoint(pos):
