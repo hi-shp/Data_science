@@ -258,13 +258,13 @@ Estimated ETA:   {eta_str}
                     
                     boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
                     if env.current_wp is None:
-                        # 목적지 다이렉트 직행: 베지어 곡률을 대폭 줄여 목적지를 향해 신속히 선회/직진
+                        # 목적지 직행 상황에서도 회전 궤적 주변 장애물을 넉넉히 우회할 수 있도록 obstacles 전달
                         goal = env.target
-                        env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd, is_direct=True)
+                        env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                     else:
                         # 웨이포인트(갭) 우회 통과 구간: 속도 기반 선행 회전 및 장애물 외측 굴곡 곡률 부여
                         goal = env.current_wp["pos"]
-                        env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd, is_direct=False)
+                        env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
                         
                     if env.bezier_path is not None:
                         env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)

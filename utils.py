@@ -18,7 +18,7 @@ def cubic_bezier(p0, p1, p2, p3, n=90):
     B = (1-T)**3 * p0 + 3*(1-T)**2*T*p1 + 3*(1-T)*T**2*p2 + T**3*p3
     return B
 
-def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=25, min_clearance=35.0, boat_speed=0.0, start_tangent_fixed=False, is_direct=False):
+def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=25, min_clearance=35.0, boat_speed=0.0, start_tangent_fixed=False):
     d = np.linalg.norm(goal - boat_pos)
     if d < 1:
         return None
@@ -32,18 +32,7 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     u_goal = v_to_goal / d
     forward = np.array([math.cos(boat_heading), math.sin(boat_heading)])
 
-    # 1. 목적지 다이렉트 직행 모드: 곡률을 대폭 줄여 목적지를 향해 신속하고 직선에 가깝게 직행
-    if is_direct:
-        forward_dist = min(12.0, d * 0.06) * max(0.10, math.cos(ang_diff * 0.5))
-        p1 = boat_pos + forward * forward_dist
-
-        v_goal = p3 - p1
-        norm_v_goal = np.linalg.norm(v_goal)
-        v_goal_n = np.zeros(2) if norm_v_goal < 1e-6 else v_goal / norm_v_goal
-        p2 = p3 - v_goal_n * min(12.0, d * 0.06)
-        return cubic_bezier(p0, p1, p2, p3, n=90)
-
-    # 2. 장애물이 없는 목적지 직행 상황: 곡률을 대폭 줄여 목적지를 향해 직선에 가깝게 직행
+    # 1. 장애물이 없는 목적지 직행 상황: 곡률을 대폭 줄여 목적지를 향해 직선에 가깝게 직행
     if obstacles is None or len(obstacles) == 0:
         if start_tangent_fixed:
             forward_dist = min(93.0, d * 0.40)

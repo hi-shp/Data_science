@@ -72,7 +72,7 @@ def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_ra
     from utils import make_bezier_path
     p = params or {}
     margin = float(p.get('clear_margin', 10.0))
-    test_path = make_bezier_path(boat_pos, boat_heading, target_pos, obstacles=obstacles, boat_radius=boat_radius, boat_speed=boat_speed, is_direct=True)
+    test_path = make_bezier_path(boat_pos, boat_heading, target_pos, obstacles=obstacles, boat_radius=boat_radius, boat_speed=boat_speed)
     if bezier_path_is_blocked(test_path, obstacles, boat_radius=boat_radius, margin=margin):
         return False
     return True
