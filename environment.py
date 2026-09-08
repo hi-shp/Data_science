@@ -118,6 +118,12 @@ class BoatEnv:
         self.all_gaps = []
         self.gaps_btn_rect = None
         
+        self.linetrace_mode = False
+        self.linetrace_queued = False
+        self.needs_break = False
+        self.mode_btn_rect = pygame.Rect(38, 634, 275, 25)
+        self.mode_btn_top_rect = pygame.Rect(25, 18, 220, 28)
+        
         self.cb1_rect = pygame.Rect(40, 668, 20, 20)
         self.cb2_rect = pygame.Rect(40, 704, 20, 20)
         self.cb3_rect = pygame.Rect(40, 740, 20, 20)
@@ -210,9 +216,24 @@ class BoatEnv:
         self.next_pursuit_target = None
         self.wakes = []
         self.emergency_mode = False
+        if getattr(self, 'linetrace_queued', False):
+            self.linetrace_mode = True
+            self.linetrace_queued = False
 
     def handle_click(self, pos):
-        if getattr(self, 'cb1_row_rect', self.cb1_rect).collidepoint(pos) or self.cb1_rect.collidepoint(pos):
+        is_mode_click = (getattr(self, 'mode_btn_rect', None) and self.mode_btn_rect.collidepoint(pos)) or \
+                        (getattr(self, 'mode_btn_top_rect', None) and self.mode_btn_top_rect.collidepoint(pos))
+        if is_mode_click:
+            if getattr(self, 'linetrace_mode', False):
+                # Currently in line-trace mode -> turn OFF
+                # 버튼을 끄면 에피소드 종료가 아니라 동일한 에피소드에서 알고리즘만 즉시 기존으로 변경
+                self.linetrace_mode = False
+                self.linetrace_queued = False
+            else:
+                # Currently in gap nav mode -> toggle queue for next episode
+                # 버튼을 누르면 다음 에피소드가 그 모드가 켜지도록
+                self.linetrace_queued = not getattr(self, 'linetrace_queued', False)
+        elif getattr(self, 'cb1_row_rect', self.cb1_rect).collidepoint(pos) or self.cb1_rect.collidepoint(pos):
             self.show_1st_path = not getattr(self, 'show_1st_path', True)
             self.show_paths = self.show_1st_path or getattr(self, 'show_2nd_path', True)
         elif getattr(self, 'cb2_row_rect', self.cb2_rect).collidepoint(pos) or self.cb2_rect.collidepoint(pos):
@@ -258,7 +279,7 @@ class BoatEnv:
         tR = self.pwm_to_thrust(R)
         # 220도 범위 내 최소 장애물 거리에 따른 순수 연속 함수 속도 제어 (장애물 근접 시 최소 속도를 더욱 낮추어 서행)
         em_dist = float(getattr(self, 'min_wide_dist', 999.0))
-        speed_factor = (math.tanh(em_dist / 100.0)) ** 1.35
+        speed_factor = (math.tanh(em_dist / 50.0)) ** 1.35
         target_fwd = ((tL + tR) / 6.0) * speed_factor
             
         if not hasattr(self, 'current_fwd'):

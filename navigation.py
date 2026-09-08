@@ -497,3 +497,74 @@ def reactive_avoidance(dists, angles):
     w = np.exp(-((d / sigma)**2))
     front = np.maximum(1.2 - np.abs(ang) / (np.pi / 2.0), 0.3)
     return float(np.sum(-w * front * np.sin(ang)))
+
+def line_trace_steering(boat_pos, boat_heading, target_pos, dists, rel_angles, boat_ang_vel=0.0, prev_steer=0.0):
+    """
+    [라인트레이싱 원리 반응형 항법 알고리즘]
+    1순위: 목적지 방향 직행 조향
+    2순위: 전방 탐지 범위 내 장애물 조우 시 가장 가까운 히트점 각도의 반대 방향으로 회피 조향
+    """
+    bx, by = boat_pos
+    tx, ty = target_pos
+    
+    # 1. 목적지 방향 (1순위)
+    dx = tx - bx
+    dy = ty - by
+    goal_angle = math.atan2(dy, dx)
+    heading_err = wrap(goal_angle - boat_heading)
+    steer_goal = float(np.clip(heading_err * 1.15, -1.0, 1.0))
+    
+    # 2. 전방 라이다 히트점 기반 장애물 감지 (2순위)
+    # 전방 220도 범위 (|rel_angle| <= 110도) 내 빔 탐색
+    fwd_mask = np.abs(rel_angles) <= 1.9198621771937625  # deg2rad(110)
+    fwd_indices = np.where(fwd_mask)[0]
+    
+    SAFE_DIST = 185.0       # 장애물 감지 및 회피 개시 거리 (px)
+    CRITICAL_DIST = 75.0    # 긴급 완전 회피 거리 (px)
+    
+    if len(fwd_indices) > 0:
+        fwd_dists = dists[fwd_indices]
+        min_idx_in_fwd = int(np.argmin(fwd_dists))
+        closest_idx = fwd_indices[min_idx_in_fwd]
+        min_dist = float(dists[closest_idx])
+        closest_ang = float(rel_angles[closest_idx])
+    else:
+        min_dist = 999.0
+        closest_ang = 0.0
+        
+    if min_dist < SAFE_DIST:
+        # 장애물 조우: 라인트레이싱 원리로 가장 가까운 히트점의 반대 방향으로 선회
+        # 우현(closest_ang > 0)에 장애물 -> 좌회전(steer < 0)
+        # 좌현(closest_ang < 0)에 장애물 -> 우회전(steer > 0)
+        if abs(closest_ang) > 0.05:
+            avoid_dir = -float(np.sign(closest_ang))
+        else:
+            # 정면 정중앙 장애물인 경우: 좌/우 여유 공간 비교하여 더 열린 쪽으로 선회
+            left_mask = (rel_angles < -0.1) & fwd_mask
+            right_mask = (rel_angles > 0.1) & fwd_mask
+            left_clear = float(np.min(dists[left_mask])) if np.any(left_mask) else 0.0
+            right_clear = float(np.min(dists[right_mask])) if np.any(right_mask) else 0.0
+            avoid_dir = -1.0 if left_clear >= right_clear else 1.0
+            
+        # 거리가 가까워질수록 회피 강도 증가 (라인트레이서의 센서 감응 특성)
+        urgency = float(np.clip((SAFE_DIST - min_dist) / (SAFE_DIST - CRITICAL_DIST), 0.0, 1.0))
+        avoid_steer = avoid_dir * (0.65 + 0.35 * urgency)
+        
+        # 1순위(목표 추종)와 2순위(장애물 반대 회피) 가중치 블렌딩
+        avoid_weight = urgency ** 1.1
+        steer_cmd = (1.0 - avoid_weight) * steer_goal + avoid_weight * avoid_steer
+        if min_dist < CRITICAL_DIST + 10.0:
+            steer_cmd = avoid_steer  # 초근접 시 100% 회피 우선
+    else:
+        steer_cmd = steer_goal
+        
+    # 3. 각속도 댐핑 및 이동 평균 평활화 (선체 오버슈트/도리도리 방지)
+    d_term = -0.32 * float(boat_ang_vel)
+    steer_raw = steer_cmd + d_term
+    alpha = 0.50
+    steer_f = float(np.clip(alpha * steer_raw + (1.0 - alpha) * prev_steer, -1.0, 1.0))
+    
+    # HUD 표출용 목표 헤딩각
+    heading_target = boat_heading + steer_f * 0.75
+    
+    return steer_f, heading_target, min_dist

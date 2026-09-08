@@ -238,6 +238,39 @@ class EnvRenderer:
         # 8. 실시간 텔레메트리 HUD
         self._draw_telemetry()
 
+        # 8-2. 메인 시뮬레이션 맵 좌측 상단 HUD 모드 배지 / 토글 버튼
+        mpos = pygame.mouse.get_pos()
+        top_btn = getattr(env, 'mode_btn_top_rect', pygame.Rect(25, 16, 220, 28))
+        top_hover = top_btn.collidepoint(mpos)
+        is_lt_active = getattr(env, 'linetrace_mode', False)
+        is_lt_queued = getattr(env, 'linetrace_queued', False)
+
+        if is_lt_active:
+            t_bg = (12, 48, 34, 235) if top_hover else (8, 36, 24, 215)
+            t_border = (0, 255, 170)
+            t_str = "● MODE: LINE-TRACE"
+            t_col = (0, 255, 180)
+            t_bw = 2
+        elif is_lt_queued:
+            t_bg = (58, 44, 12, 235) if top_hover else (44, 32, 8, 215)
+            t_border = (255, 215, 40)
+            t_str = "◐ NEXT: LINE-TRACE"
+            t_col = (255, 225, 70)
+            t_bw = 2
+        else:
+            t_bg = (18, 38, 62, 230) if top_hover else (12, 26, 44, 210)
+            t_border = (0, 200, 255) if top_hover else (0, 130, 180)
+            t_str = "○ MODE: GAP NAV"
+            t_col = (210, 245, 255) if top_hover else (160, 205, 235)
+            t_bw = 1
+
+        top_surf = pygame.Surface((top_btn.w, top_btn.h), pygame.SRCALPHA)
+        pygame.draw.rect(top_surf, t_bg, (0, 0, top_btn.w, top_btn.h), border_radius=4)
+        pygame.draw.rect(top_surf, t_border, (0, 0, top_btn.w, top_btn.h), t_bw, border_radius=4)
+        t_lbl = self.bold_font.render(t_str, True, t_col) if (is_lt_active or is_lt_queued) else self.font.render(t_str, True, t_col)
+        top_surf.blit(t_lbl, t_lbl.get_rect(center=(top_btn.w // 2, top_btn.h // 2)))
+        env.screen.blit(top_surf, (top_btn.x, top_btn.y))
+
         pygame.display.flip()
 
     def _draw_boat_hull(self, bx, by, ch, sh):
@@ -380,6 +413,37 @@ class EnvRenderer:
 
         # 마우스 커서 위치 확인 (호버 인터랙션)
         mpos = pygame.mouse.get_pos()
+
+        # 0. 항법 알고리즘 모드 토글 버튼 (라인트레이싱 원리 모드 vs 기존 갭 항법)
+        mode_btn = getattr(env, 'mode_btn_rect', pygame.Rect(38, 634, 275, 25))
+        m_hover = mode_btn.collidepoint(mpos)
+        is_lt_active = getattr(env, 'linetrace_mode', False)
+        is_lt_queued = getattr(env, 'linetrace_queued', False)
+
+        if is_lt_active:
+            m_bg = (16, 60, 42) if m_hover else (10, 42, 30)
+            m_border = (0, 255, 170)
+            m_text = "Mode: Line-Trace (ACTIVE)"
+            m_tcol = (0, 255, 180)
+            border_w = 2
+        elif is_lt_queued:
+            m_bg = (70, 52, 14) if m_hover else (48, 36, 8)
+            m_border = (255, 215, 40)
+            m_text = "Line-Trace: ARMED (Next Ep)"
+            m_tcol = (255, 225, 70)
+            border_w = 2
+        else:
+            m_bg = (24, 45, 72) if m_hover else (16, 30, 50)
+            m_border = (0, 210, 255) if m_hover else (0, 130, 175)
+            m_text = "Mode: Gap Nav (Default)"
+            m_tcol = (220, 245, 255) if m_hover else (150, 195, 225)
+            border_w = 1
+
+        pygame.draw.rect(env.screen, m_bg, mode_btn, border_radius=4)
+        pygame.draw.rect(env.screen, m_border, mode_btn, border_w, border_radius=4)
+        lbl_m = self.bold_font.render(m_text, True, m_tcol) if (is_lt_active or is_lt_queued) else self.font.render(m_text, True, m_tcol)
+        m_rect = lbl_m.get_rect(center=mode_btn.center)
+        env.screen.blit(lbl_m, m_rect)
 
         # 체크박스 렌더링
         # 1. Show 1st Path (시안)
@@ -717,7 +781,8 @@ class EnvRenderer:
             self.cam_surf.blit(lbl_gap, text_rect)
 
         elif getattr(env, 'current_wp', None) is None:
-            dir_txt = "Direct"
+            is_lt = getattr(env, 'linetrace_mode', False)
+            dir_txt = "L-Trace" if is_lt else "Direct"
             bg_col = (14, 48, 30, 240) if is_hover else (10, 36, 22, 225)
             border_col = (20, 255, 90) if is_hover else (20, 220, 80)
             text_col = (30, 255, 100) if is_hover else (20, 250, 80)
@@ -1158,9 +1223,12 @@ class EnvRenderer:
         # 모드 표시
         is_paused = getattr(env, 'paused', False)
         em = getattr(env, 'emergency_mode', False)
+        is_lt = getattr(env, 'linetrace_mode', False)
         has_wp = env.current_wp is not None
         if is_paused:
             mode_txt = self.bold_font.render("PAUSED", True, (255, 140, 20))
+        elif is_lt:
+            mode_txt = self.bold_font.render("LINE-TRACE", True, (0, 255, 180))
         elif em:
             mode_txt = self.bold_font.render("AVOIDING", True, (255, 80, 60))
         elif has_wp:
