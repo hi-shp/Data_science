@@ -49,10 +49,10 @@ class BoatEnv:
         self.lidar_range = 320
         self.rel_angles = np.linspace(-np.pi, np.pi, self.lidar_beams, endpoint=False)
         
-        self.mass = 14
+        self.mass = 12
         self.inertia = 4.2
         self.drag = 0.2
-        self.rot_drag = 0.8
+        self.rot_drag = 0.2
         self.boat_radius = 25
         
         # 선체 표면 기하 형상 (ui_renderer의 선체 렌더링과 100% 일치하는 정밀 히트박스)
@@ -80,7 +80,7 @@ class BoatEnv:
         
         self.obs_n = 80
         self.obs_r = 17
-        self.min_obs = 120
+        self.min_obs = 110
         
         self.grid = init_grid()
         self.clusters = []
@@ -113,6 +113,10 @@ class BoatEnv:
         self.show_lidar = True
         self.show_lidar_range = True
         self.candidate_wps = []
+        self.total_gaps_count = 0
+        self.show_all_gaps = False
+        self.all_gaps = []
+        self.gaps_btn_rect = None
         
         self.cb1_rect = pygame.Rect(40, 668, 20, 20)
         self.cb2_rect = pygame.Rect(40, 704, 20, 20)
@@ -128,14 +132,14 @@ class BoatEnv:
         self.cb5_row_rect = pygame.Rect(35, 807, 275, 30)
         
         self.paused = False
-        self.pause_btn = pygame.Rect(40, 852, 48, 30)
+        self.pause_btn = pygame.Rect(38, 848, 52, 34)
         self.sim_speed = 1
         self.speed_btns = {
-            1: pygame.Rect(94, 852, 38, 30),
-            2: pygame.Rect(138, 852, 38, 30),
-            4: pygame.Rect(182, 852, 38, 30),
-            8: pygame.Rect(226, 852, 38, 30),
-            16: pygame.Rect(270, 852, 46, 30)
+            1: pygame.Rect(96, 848, 38, 34),
+            2: pygame.Rect(140, 848, 38, 34),
+            4: pygame.Rect(184, 848, 38, 34),
+            8: pygame.Rect(228, 848, 38, 34),
+            16: pygame.Rect(272, 848, 46, 34)
         }
         
         self.renderer = EnvRenderer(self)
@@ -194,6 +198,8 @@ class BoatEnv:
         self.current_wp = None
         self.next_wp = None
         self.visited = set()
+        self.total_gaps_count = 0
+        self.all_gaps = []
         
         self.wp_check_timer = 0
         self.steer_timer = 0
@@ -220,10 +226,13 @@ class BoatEnv:
             self.show_lidar_range = not self.show_lidar_range
         elif self.pause_btn.collidepoint(pos):
             self.paused = not self.paused
+        elif getattr(self, 'gaps_btn_rect', None) and self.gaps_btn_rect.collidepoint(pos):
+            self.show_all_gaps = not getattr(self, 'show_all_gaps', False)
         else:
             for spd, rect in self.speed_btns.items():
                 if rect.collidepoint(pos):
                     self.sim_speed = spd
+                    self.paused = False
                     break
 
     def update_dynamic_obstacles(self):
@@ -249,7 +258,7 @@ class BoatEnv:
         tR = self.pwm_to_thrust(R)
         # 220도 범위 내 최소 장애물 거리에 따른 순수 연속 함수 속도 제어 (장애물 근접 시 최소 속도를 더욱 낮추어 서행)
         em_dist = float(getattr(self, 'min_wide_dist', 999.0))
-        speed_factor = (math.tanh(em_dist / 70.0)) ** 1.35
+        speed_factor = (math.tanh(em_dist / 30.0)) ** 1.35
         target_fwd = ((tL + tR) / 6.0) * speed_factor
             
         if not hasattr(self, 'current_fwd'):
@@ -502,9 +511,9 @@ class BoatEnv:
         heading_error = wrap(heading_target - self.boat_heading)
 
         # 거리에 따라 연속적으로 조향 및 회피력 스케일링
-        clear_ratio = np.clip((min_front_dist - 130.0) / 200.0, 0.0, 1.0)
+        clear_ratio = np.clip((min_front_dist - 120.0) / 200.0, 0.0, 1.0)
         steer_gain = self.params['steer_gain'] + (1.0 - clear_ratio) * 0.12
-        avoid_multiplier = self.params['avoid_normal'] + (1.0 - clear_ratio) * (self.params['avoid_em'] * 0.25)
+        avoid_multiplier = self.params['avoid_normal'] + (1.0 - clear_ratio) * (self.params['avoid_em'] * 0.1)
             
         # 각속도 댐핑을 강화하여 관성 오버슈트 및 휙휙 도는 회전 억제
         d_term = -0.32 * getattr(self, 'boat_ang_vel', 0.0)
