@@ -19,7 +19,7 @@ def target_is_clear(boat_pos, target_pos, obstacles, boat_radius=25):
     
     ox = obstacles[:, 0]
     oy = obstacles[:, 1]
-    orad = obstacles[:, 2] + boat_radius - 4.0
+    orad = obstacles[:, 2] + boat_radius + 4.0  # 안전 여유 4px
     
     px = ox - bx
     py = oy - by

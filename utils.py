@@ -56,7 +56,7 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     # 2. 웨이포인트 추종 및 장애물 통과 구간: 선박 속도 및 각도 편차에 따른 선행 회전(Inward Lead) 및 관성 보정
     if start_tangent_fixed:
         # C1 연속성 유지를 위해 시작 접선 방향(forward)을 엄격히 고정
-        forward_dist = min(91.0, d * 0.40)
+        forward_dist = min(93.0, d * 0.40)
         p1 = boat_pos + forward * forward_dist
     else:
         speed_ratio = np.clip(boat_speed / 80.0, 0.0, 1.0)
@@ -64,7 +64,7 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
         forward_dist = min(93.0, d * 0.40) * lead_shrink
 
         # P1 방향을 목표 방향 안쪽으로 미리 편향하여 조기 선회 유도 (Inward Lead Vector)
-        blend = min(0.4, 0.40 * speed_ratio * math.sin(ang_diff * 0.5))
+        blend = min(0.3, 0.40 * speed_ratio * math.sin(ang_diff * 0.5))
         lead_dir = (1.0 - blend) * forward + blend * u_goal
         norm_lead = np.linalg.norm(lead_dir)
         lead_dir = forward if norm_lead < 1e-6 else lead_dir / norm_lead
@@ -117,7 +117,7 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
                     side = (obs_pos[0] - p0[0]) * n_dir[0] + (obs_pos[1] - p0[1]) * n_dir[1]
                     push_dir = -n_dir if side >= 0 else n_dir
                     
-                push_mag = min(100.0, encroach * 1.4)
+                push_mag = min(160.0, encroach * 1.4)
                 w1 = max(0.2, 1.0 - t_idx * 0.7)
                 w2 = max(0.2, t_idx * 0.7 + 0.3)
                 
