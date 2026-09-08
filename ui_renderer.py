@@ -21,6 +21,15 @@ class EnvRenderer:
         self.curv_buffer = None
         self.curv_y_max = 0.08
         self.smooth_path_m = 0.0
+        self._text_cache = {}
+
+    def get_text_surf(self, font, text, color):
+        key = (id(font), text, color)
+        surf = self._text_cache.get(key)
+        if surf is None:
+            surf = font.render(text, True, color)
+            self._text_cache[key] = surf
+        return surf
 
     def render(self, hits):
         env = self.env
@@ -262,9 +271,9 @@ class EnvRenderer:
 
         if is_lt_active:
             t_str = "LINE TRACING"
-            t_bg = (16, 42, 36, 210) if top_hover else (12, 32, 26, 185)
-            t_border = (0, 220, 160) if top_hover else (0, 160, 120)
-            t_col = (180, 255, 220) if top_hover else (140, 230, 190)
+            t_bg = (45, 12, 36, 210) if top_hover else (32, 8, 25, 185)
+            t_border = (255, 40, 195) if top_hover else (220, 20, 170)
+            t_col = (255, 160, 230) if top_hover else (255, 50, 200)
         else:
             t_str = "GAP NAVIGATION"
             t_bg = (18, 36, 58, 210) if top_hover else (12, 26, 42, 185)
@@ -434,7 +443,7 @@ class EnvRenderer:
             if getattr(env, 'show_closest_obstacle', True):
                 pygame.draw.rect(env.screen, (255, 20, 190), env.cb1_rect.inflate(-6, -6))
             txt_col1 = (255, 140, 220) if cb1_hover else (255, 255, 255)
-            env.screen.blit(self.font.render("Show Closest Obstacle", True, txt_col1), (70, 670))
+            env.screen.blit(self.get_text_surf(self.font, "Show Closest Obstacle", txt_col1), (70, 670))
 
             # 2. Show LiDAR Hits (소프트 옐로우)
             cb2_row = getattr(env, 'cb2_row_rect', env.cb2_rect)
@@ -445,7 +454,7 @@ class EnvRenderer:
             if env.show_lidar:
                 pygame.draw.rect(env.screen, (225, 220, 130), env.cb2_rect.inflate(-6, -6))
             txt_col2 = (250, 245, 175) if cb2_hover else (255, 255, 255)
-            env.screen.blit(self.font.render("Show LiDAR Hits", True, txt_col2), (70, 706))
+            env.screen.blit(self.get_text_surf(self.font, "Show LiDAR Hits", txt_col2), (70, 706))
 
             # 3. Show LiDAR Range (세이지 그린)
             cb3_row = getattr(env, 'cb3_row_rect', env.cb3_rect)
@@ -456,7 +465,7 @@ class EnvRenderer:
             if env.show_lidar_range:
                 pygame.draw.rect(env.screen, (80, 175, 140), env.cb3_rect.inflate(-6, -6))
             txt_col3 = (130, 225, 180) if cb3_hover else (255, 255, 255)
-            env.screen.blit(self.font.render("Show LiDAR Range", True, txt_col3), (70, 742))
+            env.screen.blit(self.get_text_surf(self.font, "Show LiDAR Range", txt_col3), (70, 742))
         else:
             # [기본 갭 항법 모드 UI] 5개 체크박스 구성
             # 1. Show 1st Path (시안)
@@ -467,7 +476,7 @@ class EnvRenderer:
             pygame.draw.rect(env.screen, (255, 255, 255), env.cb1_rect, 2)
             if getattr(env, 'show_1st_path', True): pygame.draw.rect(env.screen, (0, 255, 200), env.cb1_rect.inflate(-6, -6))
             txt_col1 = (120, 255, 230) if cb1_hover else (255, 255, 255)
-            env.screen.blit(self.font.render("Show 1st Path", True, txt_col1), (70, 670))
+            env.screen.blit(self.get_text_surf(self.font, "Show 1st Path", txt_col1), (70, 670))
 
             # 2. Show 2nd Path (오렌지)
             cb2_row = getattr(env, 'cb2_row_rect', env.cb2_rect)
@@ -477,7 +486,7 @@ class EnvRenderer:
             pygame.draw.rect(env.screen, (255, 255, 255), env.cb2_rect, 2)
             if getattr(env, 'show_2nd_path', True): pygame.draw.rect(env.screen, (255, 140, 0), env.cb2_rect.inflate(-6, -6))
             txt_col2 = (255, 185, 95) if cb2_hover else (255, 255, 255)
-            env.screen.blit(self.font.render("Show 2nd Path", True, txt_col2), (70, 706))
+            env.screen.blit(self.get_text_surf(self.font, "Show 2nd Path", txt_col2), (70, 706))
 
             # 3. Show Candidate WPs (연보라)
             cb3_row = getattr(env, 'cb3_row_rect', env.cb3_rect)
@@ -487,7 +496,7 @@ class EnvRenderer:
             pygame.draw.rect(env.screen, (255, 255, 255), env.cb3_rect, 2)
             if getattr(env, 'show_candidates', True): pygame.draw.rect(env.screen, (160, 180, 255), env.cb3_rect.inflate(-6, -6))
             txt_col3 = (195, 215, 255) if cb3_hover else (255, 255, 255)
-            env.screen.blit(self.font.render("Show Candidate WPs", True, txt_col3), (70, 742))
+            env.screen.blit(self.get_text_surf(self.font, "Show Candidate WPs", txt_col3), (70, 742))
 
             # 4. Show LiDAR Hits (소프트 옐로우)
             cb4_row = getattr(env, 'cb4_row_rect', env.cb4_rect)
@@ -497,7 +506,7 @@ class EnvRenderer:
             pygame.draw.rect(env.screen, (255, 255, 255), env.cb4_rect, 2)
             if env.show_lidar: pygame.draw.rect(env.screen, (225, 220, 130), env.cb4_rect.inflate(-6, -6))
             txt_col4 = (250, 245, 175) if cb4_hover else (255, 255, 255)
-            env.screen.blit(self.font.render("Show LiDAR Hits", True, txt_col4), (70, 778))
+            env.screen.blit(self.get_text_surf(self.font, "Show LiDAR Hits", txt_col4), (70, 778))
 
             # 5. Show LiDAR Range (세이지 그린)
             cb5_row = getattr(env, 'cb5_row_rect', env.cb5_rect)
@@ -507,7 +516,7 @@ class EnvRenderer:
             pygame.draw.rect(env.screen, (255, 255, 255), env.cb5_rect, 2)
             if env.show_lidar_range: pygame.draw.rect(env.screen, (80, 175, 140), env.cb5_rect.inflate(-6, -6))
             txt_col5 = (130, 225, 180) if cb5_hover else (255, 255, 255)
-            env.screen.blit(self.font.render("Show LiDAR Range", True, txt_col5), (70, 814))
+            env.screen.blit(self.get_text_surf(self.font, "Show LiDAR Range", txt_col5), (70, 814))
         
         # 일시정지(PAUSE) 버튼
         is_paused = getattr(env, 'paused', False)
@@ -1272,7 +1281,7 @@ class EnvRenderer:
         if is_paused:
             mode_txt = self.bold_font.render("PAUSED", True, (255, 140, 20))
         elif is_lt:
-            mode_txt = self.bold_font.render("LINE-TRACE", True, (0, 255, 180))
+            mode_txt = self.bold_font.render("LINE-TRACE", True, (255, 40, 195))
         elif em:
             mode_txt = self.bold_font.render("AVOIDING", True, (255, 80, 60))
         elif has_wp:

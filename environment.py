@@ -563,12 +563,78 @@ class BoatEnv:
         steer_f = alpha * steer_raw + (1.0 - alpha) * self.prev_steer
         self.prev_steer = steer_f
         
+        # [갭 내비게이션 다이렉트 모드 전용 회피] 라인트레이싱과 동일하게 전방 근접 장애물 발견 시 반대 방향으로 적극 회피
+        if self.current_wp is None:
+            fov_rad = 1.134464  # np.deg2rad(65)
+            fwd_mask = np.abs(self.rel_angles) <= fov_rad
+            fwd_indices = np.where(fwd_mask)[0]
+
+            SAFE_DIST = 160.0       # 장애물 감지 및 회피 개시 거리 (px)
+            CRIT_DIST = 55.0        # 긴급 완전 회피 기준 거리 (px)
+
+            if len(fwd_indices) > 0:
+                fwd_dists = dists[fwd_indices]
+                min_i = int(np.argmin(fwd_dists))
+                closest_idx = fwd_indices[min_i]
+                min_dist = float(dists[closest_idx])
+                closest_ang = float(self.rel_angles[closest_idx])
+            else:
+                min_dist = 999.0
+                closest_ang = 0.0
+
+            if min_dist < SAFE_DIST:
+                # 가장 가까운 회피 대상 장애물 히트점 월드 좌표 계산 (UI 및 디버깅 연동)
+                bx, by = self.boat_pos
+                self.closest_avoid_hit = (
+                    float(bx + math.cos(self.boat_heading + closest_ang) * min_dist),
+                    float(by + math.sin(self.boat_heading + closest_ang) * min_dist)
+                )
+
+                # 장애물 조우: 가장 가까운 히트점의 반대 방향으로 회피 조향
+                # 우현(closest_ang > 0)에 장애물 -> 좌회전(avoid_dir < 0)
+                # 좌현(closest_ang < 0)에 장애물 -> 우회전(avoid_dir > 0)
+                if abs(closest_ang) > 0.04:
+                    avoid_dir = -float(np.sign(closest_ang))
+                else:
+                    # 정면 정중앙 장애물: 좌/우 여유 공간 비교하여 더 넓게 트인 쪽으로 회피
+                    left_mask = (self.rel_angles < -0.05) & fwd_mask
+                    right_mask = (self.rel_angles > 0.05) & fwd_mask
+                    left_c = float(np.min(dists[left_mask])) if np.any(left_mask) else 0.0
+                    right_c = float(np.min(dists[right_mask])) if np.any(right_mask) else 0.0
+                    avoid_dir = -1.0 if left_c >= right_c else 1.0
+
+                front_f = max(0.0, math.cos(closest_ang * (np.pi / 2.0 / fov_rad)))
+                urgency = float(np.clip((SAFE_DIST - min_dist) / (SAFE_DIST - CRIT_DIST), 0.0, 1.0))
+
+                avoid_steer = avoid_dir * (0.75 + 0.25 * urgency)
+                avoid_weight = urgency * front_f
+
+                if min_dist < CRIT_DIST + 15.0:
+                    steer_cmd = avoid_dir * 1.0
+                else:
+                    steer_cmd = (1.0 - avoid_weight) * steer_f + avoid_weight * avoid_steer
+
+                # 측면 근접 보호(Flank Guard): 배 옆(65~95도)에 장애물이 45px 이내로 근접 시 외측 선체 찰과 방지
+                flank_mask = (np.abs(self.rel_angles) > fov_rad) & (np.abs(self.rel_angles) <= 1.658)
+                if np.any(flank_mask):
+                    f_dists = dists[flank_mask]
+                    f_min = float(np.min(f_dists))
+                    if f_min < 45.0:
+                        f_idx = np.where(flank_mask)[0][np.argmin(f_dists)]
+                        f_ang = float(self.rel_angles[f_idx])
+                        f_push = -float(np.sign(f_ang)) * (45.0 - f_min) / 45.0 * 0.45
+                        steer_cmd = float(np.clip(steer_cmd + f_push, -1.0, 1.0))
+
+                return float(np.clip(steer_cmd, -1.0, 1.0))
+            else:
+                self.closest_avoid_hit = None
+
         avoid = reactive_avoidance(dists, self.rel_angles)
-        
+
         # 반발력과 조향이 반대로 충돌할 때 조향력 상쇄(직진 현상)를 방지하기 위해 반발력 소프트 감쇠(0.25) 적용
         if (steer_f * avoid < 0) and abs(steer_f) > 0.15:
             avoid *= 0.25
-            
+
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 
     def render(self, hits):

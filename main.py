@@ -38,9 +38,9 @@ def run():
             env.clock.tick(60)
             continue
 
-        # 실시간 배속 설정에 따른 서브스텝 반복 실행
+        # 실시간 배속 설정에 따른 서브스텝 반복 실행 (4배속까지 100% 연산율 유지)
         sub_steps = max(1, int(getattr(env, 'sim_speed', 1)))
-        plan_interval = 1 if sub_steps <= 2 else (2 if sub_steps <= 4 else 3)
+        plan_interval = 1 if sub_steps <= 4 else 3
         hits = None
         new_wp = None
         
@@ -59,7 +59,7 @@ def run():
             update_grid(env.grid, hits)
             env.grid *= 0.945
 
-            # 연산 부하 절감을 위한 적응형 인지/탐색 주기
+            # 연산 부하 절감을 위한 적응형 인지/탐색 주기 (4배속 이하는 매 스텝 100% 실행)
             should_plan = (step_idx % plan_interval == 0 or step_idx == sub_steps - 1)
             if should_plan:
                 new_c = extract_clusters_from_grid(env.grid)
@@ -67,26 +67,27 @@ def run():
                     env.clusters, env.cluster_ids, new_c
                 )
 
-                # [Gaps 버튼 전용 데이터] 전방 180도(헤딩 기준 좌우 ±90도: 전방 내적 >= 0) 장애물만 기준으로 모든 갭(N C 2) 생성
-                bx, by = env.boat_pos
-                ch = math.cos(env.boat_heading)
-                sh = math.sin(env.boat_heading)
-                front_clusters = [c for c in env.clusters if (c[0] - bx) * ch + (c[1] - by) * sh >= 0]
+                # [Gaps 버튼 전용 데이터] 화면에 렌더링되는 마지막 서브스텝에서만 생성하여 불필요한 객체 할당 방지
+                if step_idx == sub_steps - 1:
+                    bx, by = env.boat_pos
+                    ch = math.cos(env.boat_heading)
+                    sh = math.sin(env.boat_heading)
+                    front_clusters = [c for c in env.clusters if (c[0] - bx) * ch + (c[1] - by) * sh >= 0]
 
-                gui_all_gaps = []
-                n_fc = len(front_clusters)
-                for i in range(n_fc):
-                    c1 = front_clusters[i]
-                    for j in range(i + 1, n_fc):
-                        c2 = front_clusters[j]
-                        mid_pt = (c1 + c2) / 2.0
-                        gui_all_gaps.append({
-                            "pos": mid_pt.copy(),
-                            "c1": c1.copy(),
-                            "c2": c2.copy()
-                        })
-                env.all_gaps = gui_all_gaps
-                env.total_gaps_count = len(gui_all_gaps)
+                    gui_all_gaps = []
+                    n_fc = len(front_clusters)
+                    for i in range(n_fc):
+                        c1 = front_clusters[i]
+                        for j in range(i + 1, n_fc):
+                            c2 = front_clusters[j]
+                            mid_pt = (c1 + c2) / 2.0
+                            gui_all_gaps.append({
+                                "pos": mid_pt.copy(),
+                                "c1": c1.copy(),
+                                "c2": c2.copy()
+                            })
+                    env.all_gaps = gui_all_gaps
+                    env.total_gaps_count = len(gui_all_gaps)
 
             if getattr(env, 'linetrace_mode', False):
                 steer, h_target, min_front, c_hit = line_trace_steering(
@@ -300,11 +301,12 @@ def run():
             if env.collide() or dist_tgt_end < 70:
                 is_success = (dist_tgt_end < 70 and not env.collide())
                 tag = "SUCCESS" if is_success else "FAIL"
+                subfolder = "success" if is_success else "fail"
                 ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                outdir = r"screenshot"
+                outdir = os.path.join("screenshot", subfolder)
                 if not os.path.exists(outdir):
                     try:
-                        os.makedirs(outdir)
+                        os.makedirs(outdir, exist_ok=True)
                     except:
                         pass
                 p = os.path.join(outdir, f"{ts}_{tag}.png")

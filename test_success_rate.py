@@ -329,12 +329,13 @@ Estimated ETA:   {eta_str}
                         collision_count += 1
                     completed_episodes += 1
                     
-                    # 에피소드 종료 순간 스크린샷 캡처 및 저장 (규칙: {timestamp}_{SUCCESS/FAIL}.png)
+                    # 에피소드 종료 순간 스크린샷 캡처 및 저장 (규칙: screenshot/{success|fail}/{timestamp}_{SUCCESS/FAIL}.png)
+                    subfolder = "success" if is_success else "fail"
                     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    outdir = r"screenshot"
+                    outdir = os.path.join("screenshot", subfolder)
                     if not os.path.exists(outdir):
                         try:
-                            os.makedirs(outdir)
+                            os.makedirs(outdir, exist_ok=True)
                         except Exception:
                             pass
                     p = os.path.join(outdir, f"{ts}_{tag}.png")
