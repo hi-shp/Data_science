@@ -61,7 +61,7 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     else:
         speed_ratio = np.clip(boat_speed / 80.0, 0.0, 1.0)
         lead_shrink = max(0.4, 1.0 - 0.50 * speed_ratio * math.sin(ang_diff * 0.5))
-        forward_dist = min(91.0, d * 0.40) * lead_shrink
+        forward_dist = min(93.0, d * 0.40) * lead_shrink
 
         # P1 방향을 목표 방향 안쪽으로 미리 편향하여 조기 선회 유도 (Inward Lead Vector)
         blend = min(0.3, 0.40 * speed_ratio * math.sin(ang_diff * 0.5))

@@ -113,10 +113,6 @@ class BoatEnv:
         self.show_lidar = True
         self.show_lidar_range = True
         self.candidate_wps = []
-        self.total_gaps_count = 0
-        self.show_all_gaps = False
-        self.all_gaps = []
-        self.gaps_btn_rect = None
         
         self.cb1_rect = pygame.Rect(40, 668, 20, 20)
         self.cb2_rect = pygame.Rect(40, 704, 20, 20)
@@ -132,14 +128,14 @@ class BoatEnv:
         self.cb5_row_rect = pygame.Rect(35, 807, 275, 30)
         
         self.paused = False
-        self.pause_btn = pygame.Rect(38, 848, 52, 34)
+        self.pause_btn = pygame.Rect(40, 852, 48, 30)
         self.sim_speed = 1
         self.speed_btns = {
-            1: pygame.Rect(96, 848, 38, 34),
-            2: pygame.Rect(140, 848, 38, 34),
-            4: pygame.Rect(184, 848, 38, 34),
-            8: pygame.Rect(228, 848, 38, 34),
-            16: pygame.Rect(272, 848, 46, 34)
+            1: pygame.Rect(94, 852, 38, 30),
+            2: pygame.Rect(138, 852, 38, 30),
+            4: pygame.Rect(182, 852, 38, 30),
+            8: pygame.Rect(226, 852, 38, 30),
+            16: pygame.Rect(270, 852, 46, 30)
         }
         
         self.renderer = EnvRenderer(self)
@@ -198,8 +194,6 @@ class BoatEnv:
         self.current_wp = None
         self.next_wp = None
         self.visited = set()
-        self.total_gaps_count = 0
-        self.all_gaps = []
         
         self.wp_check_timer = 0
         self.steer_timer = 0
@@ -226,13 +220,10 @@ class BoatEnv:
             self.show_lidar_range = not self.show_lidar_range
         elif self.pause_btn.collidepoint(pos):
             self.paused = not self.paused
-        elif getattr(self, 'gaps_btn_rect', None) and self.gaps_btn_rect.collidepoint(pos):
-            self.show_all_gaps = not getattr(self, 'show_all_gaps', False)
         else:
             for spd, rect in self.speed_btns.items():
                 if rect.collidepoint(pos):
                     self.sim_speed = spd
-                    self.paused = False
                     break
 
     def update_dynamic_obstacles(self):

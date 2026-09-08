@@ -49,8 +49,16 @@ def bezier_path_is_blocked(path, obstacles, boat_radius=25, margin=10):
     return bool(np.any(d2 <= orad2[None, :]))
 
 def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_radius=25, boat_speed=0.0, params=None):
-    # 목적지 방향 직선 경로(시야)가 확보되면 즉시 직행 허용 (선회 궤적 차단 검사 제거)
-    return target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius)
+    if not target_is_clear(boat_pos, target_pos, obstacles, boat_radius=boat_radius):
+        return False
+    from utils import make_bezier_path
+    p = params or {}
+    margin = float(p.get('clear_margin', 10.0))
+    # 목적지까지 회전하는 실제 베지어 궤적이 장애물과 충돌하는지 검증
+    test_path = make_bezier_path(boat_pos, boat_heading, target_pos, obstacles=obstacles, boat_radius=boat_radius, boat_speed=boat_speed)
+    if bezier_path_is_blocked(test_path, obstacles, boat_radius=boat_radius, margin=margin):
+        return False
+    return True
 
 def is_waypoint_switch_safe(boat_pos, boat_heading, curr_wp_pos, new_wp_pos, obstacles, boat_radius=25, boat_speed=0.0, params=None):
     if curr_wp_pos is None or new_wp_pos is None or len(obstacles) == 0:
@@ -441,24 +449,6 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             break
             
     best["candidates"] = candidates
-    
-    # [순수 GUI 편의 기능 전용 데이터]
-    # 주행 및 회피 알고리즘에는 일절 관여하지 않으며, 사용자가 화면에서 빨간 부표 사이의 
-    # 모든 조합(2개->1갭, 3개->3갭 등 N C 2) 틈새 위치를 점으로 시각화하여 확인할 수 있도록 분리 전달
-    gui_all_gaps = []
-    for i in range(len(items)):
-        c1 = items[i][2]
-        for j in range(i + 1, len(items)):
-            c2 = items[j][2]
-            mid_pt = (c1 + c2) / 2.0
-            gui_all_gaps.append({
-                "pos": mid_pt.copy(),
-                "c1": c1.copy(),
-                "c2": c2.copy()
-            })
-            
-    best["total_gaps_count"] = len(gui_all_gaps)
-    best["all_gaps"] = gui_all_gaps
     return best
 
 def reactive_avoidance(dists, angles):
