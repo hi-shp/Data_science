@@ -248,19 +248,13 @@ class EnvRenderer:
         if is_lt_active:
             t_bg = (12, 48, 34, 235) if top_hover else (8, 36, 24, 215)
             t_border = (0, 255, 170)
-            t_str = "● MODE: LINE-TRACE"
+            t_str = "● MODE: LINE-TRACE (ON)"
             t_col = (0, 255, 180)
-            t_bw = 2
-        elif is_lt_queued:
-            t_bg = (58, 44, 12, 235) if top_hover else (44, 32, 8, 215)
-            t_border = (255, 215, 40)
-            t_str = "◐ NEXT: LINE-TRACE"
-            t_col = (255, 225, 70)
             t_bw = 2
         else:
             t_bg = (18, 38, 62, 230) if top_hover else (12, 26, 44, 210)
             t_border = (0, 200, 255) if top_hover else (0, 130, 180)
-            t_str = "○ MODE: GAP NAV"
+            t_str = "○ MODE: GAP NAV (ON)"
             t_col = (210, 245, 255) if top_hover else (160, 205, 235)
             t_bw = 1
 
@@ -423,19 +417,13 @@ class EnvRenderer:
         if is_lt_active:
             m_bg = (16, 60, 42) if m_hover else (10, 42, 30)
             m_border = (0, 255, 170)
-            m_text = "Mode: Line-Trace (ACTIVE)"
+            m_text = "Mode: Line-Trace (ON)"
             m_tcol = (0, 255, 180)
-            border_w = 2
-        elif is_lt_queued:
-            m_bg = (70, 52, 14) if m_hover else (48, 36, 8)
-            m_border = (255, 215, 40)
-            m_text = "Line-Trace: ARMED (Next Ep)"
-            m_tcol = (255, 225, 70)
             border_w = 2
         else:
             m_bg = (24, 45, 72) if m_hover else (16, 30, 50)
             m_border = (0, 210, 255) if m_hover else (0, 130, 175)
-            m_text = "Mode: Gap Nav (Default)"
+            m_text = "Mode: Gap Nav (ON)"
             m_tcol = (220, 245, 255) if m_hover else (150, 195, 225)
             border_w = 1
 

@@ -502,25 +502,24 @@ def line_trace_steering(boat_pos, boat_heading, target_pos, dists, rel_angles, b
     """
     [라인트레이싱 원리 반응형 항법 알고리즘]
     1순위: 목적지 방향 직행 조향
-    2순위: 전방 탐지 범위 내 장애물 조우 시 가장 가까운 히트점 각도의 반대 방향으로 회피 조향
+    2순위: 전방 탐지 범위 내 장애물 조우 시 가장 가까운 히트점 각도의 반대 방향으로 회피 편향각 부여
+           (목표 방향 기준 최대 편향각을 50도로 엄격 제한하여 절대 뒤로 돌지 않고 완만하고 안정적인 회피)
     """
     bx, by = boat_pos
     tx, ty = target_pos
     
-    # 1. 목적지 방향 (1순위)
+    # 1. 목적지 방향 (1순위 기본 방향)
     dx = tx - bx
     dy = ty - by
     goal_angle = math.atan2(dy, dx)
-    heading_err = wrap(goal_angle - boat_heading)
-    steer_goal = float(np.clip(heading_err * 1.15, -1.0, 1.0))
     
-    # 2. 전방 라이다 히트점 기반 장애물 감지 (2순위)
-    # 전방 220도 범위 (|rel_angle| <= 110도) 내 빔 탐색
-    fwd_mask = np.abs(rel_angles) <= 1.9198621771937625  # deg2rad(110)
+    # 2. 전방 감시 구역 (|rel_angle| <= 65도) 내 장애물 탐지
+    # 65도를 벗어난 측면/후방 장애물은 배의 전진을 가로막지 않으므로 과도한 회전 방지
+    fwd_fov = 1.134464  # np.deg2rad(65)
+    fwd_mask = np.abs(rel_angles) <= fwd_fov
     fwd_indices = np.where(fwd_mask)[0]
     
-    SAFE_DIST = 185.0       # 장애물 감지 및 회피 개시 거리 (px)
-    CRITICAL_DIST = 75.0    # 긴급 완전 회피 거리 (px)
+    SAFE_DIST = 160.0       # 장애물 감지 및 회피 개시 거리 (px)
     
     if len(fwd_indices) > 0:
         fwd_dists = dists[fwd_indices]
@@ -532,39 +531,38 @@ def line_trace_steering(boat_pos, boat_heading, target_pos, dists, rel_angles, b
         min_dist = 999.0
         closest_ang = 0.0
         
+    deflection = 0.0
     if min_dist < SAFE_DIST:
-        # 장애물 조우: 라인트레이싱 원리로 가장 가까운 히트점의 반대 방향으로 선회
-        # 우현(closest_ang > 0)에 장애물 -> 좌회전(steer < 0)
-        # 좌현(closest_ang < 0)에 장애물 -> 우회전(steer > 0)
-        if abs(closest_ang) > 0.05:
+        # 장애물 조우: 가장 가까운 히트점의 반대 방향으로 회피 편향각(deflection) 부여
+        # 우현(closest_ang > 0)에 장애물 -> 좌회전(deflection < 0)
+        # 좌현(closest_ang < 0)에 장애물 -> 우회전(deflection > 0)
+        if abs(closest_ang) > 0.04:
             avoid_dir = -float(np.sign(closest_ang))
         else:
-            # 정면 정중앙 장애물인 경우: 좌/우 여유 공간 비교하여 더 열린 쪽으로 선회
-            left_mask = (rel_angles < -0.1) & fwd_mask
-            right_mask = (rel_angles > 0.1) & fwd_mask
+            # 정면 정중앙 장애물인 경우: 좌/우 여유 공간 비교하여 더 열린 쪽으로 회피
+            left_mask = (rel_angles < -0.08) & fwd_mask
+            right_mask = (rel_angles > 0.08) & fwd_mask
             left_clear = float(np.min(dists[left_mask])) if np.any(left_mask) else 0.0
             right_clear = float(np.min(dists[right_mask])) if np.any(right_mask) else 0.0
             avoid_dir = -1.0 if left_clear >= right_clear else 1.0
             
-        # 거리가 가까워질수록 회피 강도 증가 (라인트레이서의 센서 감응 특성)
-        urgency = float(np.clip((SAFE_DIST - min_dist) / (SAFE_DIST - CRITICAL_DIST), 0.0, 1.0))
-        avoid_steer = avoid_dir * (0.65 + 0.35 * urgency)
+        # 거리가 가까울수록, 정면에 가까울수록 편향각 증가
+        dist_factor = float(np.clip((SAFE_DIST - min_dist) / (SAFE_DIST - 40.0), 0.0, 1.0))
+        front_factor = float(max(0.0, math.cos(closest_ang)))
         
-        # 1순위(목표 추종)와 2순위(장애물 반대 회피) 가중치 블렌딩
-        avoid_weight = urgency ** 1.1
-        steer_cmd = (1.0 - avoid_weight) * steer_goal + avoid_weight * avoid_steer
-        if min_dist < CRITICAL_DIST + 10.0:
-            steer_cmd = avoid_steer  # 초근접 시 100% 회피 우선
-    else:
-        steer_cmd = steer_goal
-        
-    # 3. 각속도 댐핑 및 이동 평균 평활화 (선체 오버슈트/도리도리 방지)
-    d_term = -0.32 * float(boat_ang_vel)
-    steer_raw = steer_cmd + d_term
-    alpha = 0.50
+        # 최대 편향각을 50도(0.87rad)로 엄격히 제한하여 절대 뒤로 돌지(U-Turn) 않도록 방지
+        MAX_DEFLECTION = 0.87266  # np.deg2rad(50)
+        deflection = avoid_dir * (dist_factor ** 0.85) * (0.25 + 0.75 * front_factor) * MAX_DEFLECTION
+
+    # 목표 헤딩각 = 목적지 방향 + 장애물 회피 편향각
+    # 목적지 방향에서 최대 50도 이내로만 틀어지므로 전방 전진성을 완벽히 보장
+    cmd_heading = goal_angle + deflection
+    heading_err = wrap(cmd_heading - boat_heading)
+    
+    # 3. 각속도 댐핑 및 지수 이동 평균 평활화 (오버슈트 및 지그재그 진동 방지)
+    d_term = -0.28 * float(boat_ang_vel)
+    steer_raw = float(np.clip(heading_err * 1.15, -1.0, 1.0)) + d_term
+    alpha = 0.45
     steer_f = float(np.clip(alpha * steer_raw + (1.0 - alpha) * prev_steer, -1.0, 1.0))
     
-    # HUD 표출용 목표 헤딩각
-    heading_target = boat_heading + steer_f * 0.75
-    
-    return steer_f, heading_target, min_dist
+    return steer_f, cmd_heading, min_dist

@@ -224,15 +224,9 @@ class BoatEnv:
         is_mode_click = (getattr(self, 'mode_btn_rect', None) and self.mode_btn_rect.collidepoint(pos)) or \
                         (getattr(self, 'mode_btn_top_rect', None) and self.mode_btn_top_rect.collidepoint(pos))
         if is_mode_click:
-            if getattr(self, 'linetrace_mode', False):
-                # Currently in line-trace mode -> turn OFF
-                # 버튼을 끄면 에피소드 종료가 아니라 동일한 에피소드에서 알고리즘만 즉시 기존으로 변경
-                self.linetrace_mode = False
-                self.linetrace_queued = False
-            else:
-                # Currently in gap nav mode -> toggle queue for next episode
-                # 버튼을 누르면 다음 에피소드가 그 모드가 켜지도록
-                self.linetrace_queued = not getattr(self, 'linetrace_queued', False)
+            # 버튼 클릭 시 다음 에피소드 예약이 아니라 현재 실행 중인 에피소드에서 실시간으로 알고리즘 즉시 변경
+            self.linetrace_mode = not getattr(self, 'linetrace_mode', False)
+            self.linetrace_queued = False
         elif getattr(self, 'cb1_row_rect', self.cb1_rect).collidepoint(pos) or self.cb1_rect.collidepoint(pos):
             self.show_1st_path = not getattr(self, 'show_1st_path', True)
             self.show_paths = self.show_1st_path or getattr(self, 'show_2nd_path', True)
