@@ -760,72 +760,77 @@ class EnvRenderer:
         # 패널 타이틀
         self.cam_surf.blit(self.font.render("LiDAR Gauge View", True, (255, 255, 255)), (10, 8))
 
-        # 현재 고려 중인 모든 갭의 개수 표시 HUD 토글 버튼 (전방 180도 기준)
-        front_gaps_count = 0
-        if getattr(env, 'all_gaps', None):
-            for g in env.all_gaps:
-                mid = g["pos"]
-                if (mid[0] - bx) * f_vec[0] + (mid[1] - by) * f_vec[1] >= 0:
-                    front_gaps_count += 1
-        total_gaps = front_gaps_count
-        show_all = getattr(env, 'show_all_gaps', False)
+        is_lt = getattr(env, 'linetrace_mode', False)
 
-        # 자리수 변화(1자리, 2자리)에 관계없이 버튼 크기 고정 (Fixed Width)
-        btn_w = 94
-        btn_h = 24
-        bx_pos = cam_w - btn_w - 10
-        by_pos = 7
-        badge_rect = pygame.Rect(bx_pos, by_pos, btn_w, btn_h)
-        # 화면 절대 좌표로 버튼 클릭 영역 저장 (환경 handle_click 연동)
-        env.gaps_btn_rect = pygame.Rect(700 + bx_pos, env.sim_h + 35 + by_pos, btn_w, btn_h)
+        if not is_lt:
+            # 현재 고려 중인 모든 갭의 개수 표시 HUD 토글 버튼 (전방 180도 기준)
+            front_gaps_count = 0
+            if getattr(env, 'all_gaps', None):
+                for g in env.all_gaps:
+                    mid = g["pos"]
+                    if (mid[0] - bx) * f_vec[0] + (mid[1] - by) * f_vec[1] >= 0:
+                        front_gaps_count += 1
+            total_gaps = front_gaps_count
+            show_all = getattr(env, 'show_all_gaps', False)
 
-        mpos = pygame.mouse.get_pos()
-        is_hover = env.gaps_btn_rect.collidepoint(mpos)
+            # 자리수 변화(1자리, 2자리)에 관계없이 버튼 크기 고정 (Fixed Width)
+            btn_w = 94
+            btn_h = 24
+            bx_pos = cam_w - btn_w - 10
+            by_pos = 7
+            badge_rect = pygame.Rect(bx_pos, by_pos, btn_w, btn_h)
+            # 화면 절대 좌표로 버튼 클릭 영역 저장 (환경 handle_click 연동)
+            env.gaps_btn_rect = pygame.Rect(700 + bx_pos, env.sim_h + 35 + by_pos, btn_w, btn_h)
 
-        if getattr(env, 'current_wp', None) is not None and total_gaps > 0:
-            gap_txt = f"Gaps: {total_gaps:02d}" if total_gaps < 100 else f"Gaps: {total_gaps}"
-            
-            if show_all:
-                # 활성화(ON) 상태: 갭 중간점 표시 켜짐 - 네온 시안 하이라이트
-                bg_col = (18, 55, 95, 240) if is_hover else (14, 42, 75, 230)
-                border_col = (0, 255, 255)
-                text_col = (0, 255, 255)
-                border_w = 2
-            else:
-                # 비활성화(OFF) 상태: 차분한 다크 블루
-                bg_col = (20, 38, 62, 230) if is_hover else (12, 24, 42, 210)
-                border_col = (0, 200, 255) if is_hover else (0, 130, 180, 180)
-                text_col = (220, 245, 255) if is_hover else (145, 190, 220)
-                border_w = 1
+            mpos = pygame.mouse.get_pos()
+            is_hover = env.gaps_btn_rect.collidepoint(mpos)
 
-            pygame.draw.rect(self.cam_surf, bg_col, badge_rect, border_radius=4)
-            pygame.draw.rect(self.cam_surf, border_col, badge_rect, border_w, border_radius=4)
+            if getattr(env, 'current_wp', None) is not None and total_gaps > 0:
+                gap_txt = f"Gaps: {total_gaps:02d}" if total_gaps < 100 else f"Gaps: {total_gaps}"
+                
+                if show_all:
+                    # 활성화(ON) 상태: 갭 중간점 표시 켜짐 - 네온 시안 하이라이트
+                    bg_col = (18, 55, 95, 240) if is_hover else (14, 42, 75, 230)
+                    border_col = (0, 255, 255)
+                    text_col = (0, 255, 255)
+                    border_w = 2
+                else:
+                    # 비활성화(OFF) 상태: 차분한 다크 블루
+                    bg_col = (20, 38, 62, 230) if is_hover else (12, 24, 42, 210)
+                    border_col = (0, 200, 255) if is_hover else (0, 130, 180, 180)
+                    text_col = (220, 245, 255) if is_hover else (145, 190, 220)
+                    border_w = 1
 
-            # 버튼 내부 수직/수평 완벽한 정중앙 정렬
-            lbl_gap = self.small_font.render(gap_txt, True, text_col)
-            text_rect = lbl_gap.get_rect(center=badge_rect.center)
-            self.cam_surf.blit(lbl_gap, text_rect)
+                pygame.draw.rect(self.cam_surf, bg_col, badge_rect, border_radius=4)
+                pygame.draw.rect(self.cam_surf, border_col, badge_rect, border_w, border_radius=4)
 
-        elif getattr(env, 'current_wp', None) is None:
-            dir_txt = "Direct"
-            bg_col = (14, 48, 30, 240) if is_hover else (10, 36, 22, 225)
-            border_col = (20, 255, 90) if is_hover else (20, 220, 80)
-            text_col = (30, 255, 100) if is_hover else (20, 250, 80)
+                # 버튼 내부 수직/수평 완벽한 정중앙 정렬
+                lbl_gap = self.small_font.render(gap_txt, True, text_col)
+                text_rect = lbl_gap.get_rect(center=badge_rect.center)
+                self.cam_surf.blit(lbl_gap, text_rect)
 
-            pygame.draw.rect(self.cam_surf, bg_col, badge_rect, border_radius=4)
-            pygame.draw.rect(self.cam_surf, border_col, badge_rect, 1, border_radius=4)
+            elif getattr(env, 'current_wp', None) is None:
+                dir_txt = "Direct"
+                bg_col = (14, 48, 30, 240) if is_hover else (10, 36, 22, 225)
+                border_col = (20, 255, 90) if is_hover else (20, 220, 80)
+                text_col = (30, 255, 100) if is_hover else (20, 250, 80)
 
-            # 버튼 내부 수직/수평 완벽한 정중앙 정렬
-            lbl_dir = self.small_font.render(dir_txt, True, text_col)
-            text_rect = lbl_dir.get_rect(center=badge_rect.center)
-            self.cam_surf.blit(lbl_dir, text_rect)
+                pygame.draw.rect(self.cam_surf, bg_col, badge_rect, border_radius=4)
+                pygame.draw.rect(self.cam_surf, border_col, badge_rect, 1, border_radius=4)
+
+                # 버튼 내부 수직/수평 완벽한 정중앙 정렬
+                lbl_dir = self.small_font.render(dir_txt, True, text_col)
+                text_rect = lbl_dir.get_rect(center=badge_rect.center)
+                self.cam_surf.blit(lbl_dir, text_rect)
+        else:
+            env.gaps_btn_rect = None
 
         # 모든 갭 표시 활성화 시 각도 바로 위쪽 좌우 일렬 선상에 각 갭 및 웨이포인트(WP1, WP2)의 각도 위치를 점으로 표출
         legend_bar_y = cam_h - 25
         sample_lh = self.small_font.render("0°", True, (0, 0, 0)).get_height()
         dot_y = legend_bar_y - sample_lh - 9
 
-        if getattr(env, 'show_all_gaps', False):
+        if not is_lt and getattr(env, 'show_all_gaps', False):
             # 좌우 일렬 수평 가이드선
             pygame.draw.line(self.cam_surf, (0, 180, 240, 90), (8, dot_y), (cam_w - 8, dot_y), 1)
 
