@@ -40,9 +40,7 @@ def lidar_hits_np(boat_pos, boat_heading, rel_angles, obstacles, lidar_range):
 
     d_final = np.min(t, axis=1).astype(np.float32)
     
-    # 전방 180도 (헤딩 기준 좌우 ±90도: |rel_angles| <= pi/2) 내의 빔만 히트점(hits) 생성
-    front_mask = np.abs(rel_angles) <= (np.pi / 2.0 + 1e-4)
-    valid = (d_final < lidar_range) & front_mask
+    valid = d_final < lidar_range
     hits_x = x0 + vx[:, 0] * d_final
     hits_y = y0 + vy[:, 0] * d_final
     hits = [None] * len(d_final)
@@ -70,7 +68,7 @@ def update_grid(grid, hits):
 
 from sklearn.cluster import DBSCAN
 
-def extract_clusters_from_grid(grid, boat_pos=None, boat_heading=None):
+def extract_clusters_from_grid(grid):
     OCC = 1.0
     gy, gx = np.where(grid >= OCC)
     if len(gx) == 0:
@@ -78,23 +76,8 @@ def extract_clusters_from_grid(grid, boat_pos=None, boat_heading=None):
     
     world_x = gx * GRID + GRID / 2.0
     world_y = gy * GRID + GRID / 2.0
-
-    # 전방 180도(헤딩 기준 좌우 ±90도)에 해당하는 점유 격자만 사용
-    if boat_pos is not None and boat_heading is not None:
-        dx = world_x - boat_pos[0]
-        dy = world_y - boat_pos[1]
-        ch = math.cos(boat_heading)
-        sh = math.sin(boat_heading)
-        front_mask = (dx * ch + dy * sh) >= 0
-        if not np.any(front_mask):
-            return []
-        world_x = world_x[front_mask]
-        world_y = world_y[front_mask]
-        weights = grid[gy[front_mask], gx[front_mask]]
-    else:
-        weights = grid[gy, gx]
-    
     pts = np.column_stack((world_x, world_y))
+    weights = grid[gy, gx]
     
     # DBSCAN 클러스터링: 장애물 반경 17px(지름 34px) 내에 찍힌 모든 라이다 히트점을 하나의 덩어리로 병합
     db = DBSCAN(eps=42.0, min_samples=1).fit(pts)
@@ -113,6 +96,8 @@ def extract_clusters_from_grid(grid, boat_pos=None, boat_heading=None):
     return clusters
 
 def match_clusters(prev_clusters, prev_ids, new_clusters, max_dist=28.0):
+    if len(new_clusters) == 0:
+        return [], []
     if len(prev_clusters) == 0 or len(prev_ids) == 0:
         return new_clusters, list(range(len(new_clusters)))
     
@@ -120,8 +105,8 @@ def match_clusters(prev_clusters, prev_ids, new_clusters, max_dist=28.0):
     n_prev = len(prev_clusters)
     
     # 거리 행렬을 벡터 연산으로 일괄 계산
-    new_arr = np.array(new_clusters)    # (n_new, 2)
-    prev_arr = np.array(prev_clusters)  # (n_prev, 2)
+    new_arr = np.array(new_clusters).reshape(n_new, 2)
+    prev_arr = np.array(prev_clusters).reshape(n_prev, 2)
     diff = new_arr[:, None, :] - prev_arr[None, :, :]
     dist_mat = np.sqrt(np.sum(diff * diff, axis=2))
     

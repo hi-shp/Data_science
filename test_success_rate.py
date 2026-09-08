@@ -104,18 +104,23 @@ Estimated ETA:   {eta_str}
                 # 연산 부하 절감을 위한 적응형 인지/탐색 주기
                 should_plan = (step_idx % plan_interval == 0 or step_idx == sub_steps - 1)
                 if should_plan:
-                    new_c = extract_clusters_from_grid(env.grid, env.boat_pos, env.boat_heading)
+                    new_c = extract_clusters_from_grid(env.grid)
                     env.clusters, env.cluster_ids = match_clusters(
                         env.clusters, env.cluster_ids, new_c
                     )
 
-                    # [Gaps 버튼 전용 데이터] 필터링 없이 탐지된 모든 클러스터 쌍 사이의 모든 가능한 틈새(N C 2) 생성
+                    # [Gaps 버튼 전용 데이터] 전방 180도(헤딩 기준 좌우 ±90도: 전방 내적 >= 0) 장애물만 기준으로 모든 갭(N C 2) 생성
+                    bx, by = env.boat_pos
+                    ch = math.cos(env.boat_heading)
+                    sh = math.sin(env.boat_heading)
+                    front_clusters = [c for c in env.clusters if (c[0] - bx) * ch + (c[1] - by) * sh >= 0]
+
                     gui_all_gaps = []
-                    n_c = len(env.clusters)
-                    for i in range(n_c):
-                        c1 = env.clusters[i]
-                        for j in range(i + 1, n_c):
-                            c2 = env.clusters[j]
+                    n_fc = len(front_clusters)
+                    for i in range(n_fc):
+                        c1 = front_clusters[i]
+                        for j in range(i + 1, n_fc):
+                            c2 = front_clusters[j]
                             mid_pt = (c1 + c2) / 2.0
                             gui_all_gaps.append({
                                 "pos": mid_pt.copy(),
