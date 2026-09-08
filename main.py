@@ -111,10 +111,9 @@ def run():
             else:
                 if should_plan:
                     dist_to_target = math.hypot(env.target[0] - env.boat_pos[0], env.target[1] - env.boat_pos[1])
-                    boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
-                    clear_to_target = is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params)
+                    clear_to_target = (dist_to_target <= 400.0) and is_direct_target_safe(env.boat_pos, env.boat_heading, env.target, env.dynamic_obstacles, env.boat_radius, boat_spd, params=env.params)
 
-                    # 목적지 방향 직선 시야(경로)에 장애물이 없으면 즉시 목적지 직행
+                    # 목적지와 400픽셀 이하로 가까워졌고, 목적지 방향 직선 경로에 장애물이 없으면 즉시 목적지 직행
                     if clear_to_target:
                         new_wp = None
                         env.current_wp = None

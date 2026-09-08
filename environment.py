@@ -635,6 +635,11 @@ class BoatEnv:
         if (steer_f * avoid < 0) and abs(steer_f) > 0.15:
             avoid *= 0.25
 
+        # 후방 반원(|rel_angle| >= 90도) 내 선체 360도 회전 히트박스 반경(약 45.3px) 이내 장애물 감지 시 회전 억제 (조향 0)
+        rear_mask = np.abs(self.rel_angles) >= (np.pi / 2.0 - 1e-5)
+        if np.any(rear_mask) and np.min(dists[rear_mask]) <= 45.3:
+            return 0.0
+
         return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
 
     def render(self, hits):
