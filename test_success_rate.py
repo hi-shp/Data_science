@@ -15,7 +15,7 @@ def main():
     env = BoatEnv()
     env.sim_speed = 4
     
-    total_episodes = 10000
+    total_episodes = int(sys.argv[1]) if len(sys.argv) > 1 else 10000
     completed_episodes = 0
     success_count = 0
     collision_count = 0
