@@ -61,7 +61,7 @@ def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_ra
     if np.any(front_close):
         ang_f = np.arctan2(dy_f[front_close], dx_f[front_close])
         rel_f = np.abs(wrap(ang_f - boat_heading))
-        if np.any(rel_f < 0.6981317007977318):  # np.deg2rad(40.0)
+        if np.any(rel_f < 0.2617993877991494):  # np.deg2rad(15.0)
             return False
 
     # 2. 목적지 방향 직선 경로(시야) 확보 여부 1차 검사
