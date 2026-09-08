@@ -536,8 +536,16 @@ def line_trace_steering(boat_pos, boat_heading, target_pos, dists, rel_angles, b
     else:
         min_dist = 999.0
         closest_ang = 0.0
+        closest_idx = None
         
+    closest_hit_world = None
     if min_dist < SAFE_DIST:
+        # 가장 가까운 회피 대상 장애물 히트점 월드 좌표 계산 (빨간색 SHOW 표출용)
+        closest_hit_world = (
+            float(bx + math.cos(boat_heading + closest_ang) * min_dist),
+            float(by + math.sin(boat_heading + closest_ang) * min_dist)
+        )
+        
         # 장애물 조우: 가장 가까운 히트점의 반대 방향으로 회피 조향
         # 우현(closest_ang > 0)에 장애물 -> 좌회전(avoid_dir < 0)
         # 좌현(closest_ang < 0)에 장애물 -> 우회전(avoid_dir > 0)
@@ -588,4 +596,4 @@ def line_trace_steering(boat_pos, boat_heading, target_pos, dists, rel_angles, b
     # HUD 표출용 지향 헤딩각
     cmd_heading = boat_heading + steer_f * 0.8
     
-    return steer_f, cmd_heading, min_wide
+    return steer_f, cmd_heading, min_wide, closest_hit_world

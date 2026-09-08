@@ -119,6 +119,15 @@ class EnvRenderer:
                 if p is not None:
                     pygame.draw.circle(env.screen, (225, 220, 130), (int(p[0]), int(p[1])), 2)
 
+        # 라인트레이싱 모드: 가장 가까운 회피 대상 장애물 히트지점 빨간색 강조 표출 (Show Closest Obstacle)
+        if getattr(env, 'linetrace_mode', False) and getattr(env, 'show_closest_obstacle', True):
+            c_hit = getattr(env, 'closest_avoid_hit', None)
+            if c_hit is not None:
+                cx, cy = int(c_hit[0]), int(c_hit[1])
+                pygame.draw.circle(env.screen, (255, 30, 30, 90), (cx, cy), 9)
+                pygame.draw.circle(env.screen, (255, 40, 40), (cx, cy), 5)
+                pygame.draw.circle(env.screen, (255, 255, 255), (cx, cy), 2)
+
         # Safety Envelope (8acbd56 버전의 소프트 반투명 안전 원, 120x120 로컬 버퍼)
         self.safety_surf.fill((0, 0, 0, 0))
         safety_r = int(env.boat_radius + 18)
@@ -407,55 +416,92 @@ class EnvRenderer:
         mpos = pygame.mouse.get_pos()
 
         # 체크박스 렌더링
-        # 1. Show 1st Path (시안)
-        cb1_row = getattr(env, 'cb1_row_rect', env.cb1_rect)
-        cb1_hover = cb1_row.collidepoint(mpos)
-        if cb1_hover:
-            pygame.draw.rect(env.screen, (28, 56, 88), cb1_row, border_radius=4)
-        pygame.draw.rect(env.screen, (255, 255, 255), env.cb1_rect, 2)
-        if getattr(env, 'show_1st_path', True): pygame.draw.rect(env.screen, (0, 255, 200), env.cb1_rect.inflate(-6, -6))
-        txt_col1 = (120, 255, 230) if cb1_hover else (255, 255, 255)
-        env.screen.blit(self.font.render("Show 1st Path", True, txt_col1), (70, 670))
+        is_lt = getattr(env, 'linetrace_mode', False)
+        if is_lt:
+            # [라인트레이싱 전용 UI] 3개 버튼 구성
+            # 1. 가장 가까운 회피 장애물 지점 빨간색 SHOW 버튼
+            cb1_row = getattr(env, 'cb1_row_rect', env.cb1_rect)
+            cb1_hover = cb1_row.collidepoint(mpos)
+            if cb1_hover:
+                pygame.draw.rect(env.screen, (28, 56, 88), cb1_row, border_radius=4)
+            pygame.draw.rect(env.screen, (255, 255, 255), env.cb1_rect, 2)
+            if getattr(env, 'show_closest_obstacle', True):
+                pygame.draw.rect(env.screen, (255, 50, 50), env.cb1_rect.inflate(-6, -6))
+            txt_col1 = (255, 130, 130) if cb1_hover else (255, 255, 255)
+            env.screen.blit(self.font.render("Show Closest Obstacle", True, txt_col1), (70, 670))
 
-        # 2. Show 2nd Path (오렌지)
-        cb2_row = getattr(env, 'cb2_row_rect', env.cb2_rect)
-        cb2_hover = cb2_row.collidepoint(mpos)
-        if cb2_hover:
-            pygame.draw.rect(env.screen, (28, 56, 88), cb2_row, border_radius=4)
-        pygame.draw.rect(env.screen, (255, 255, 255), env.cb2_rect, 2)
-        if getattr(env, 'show_2nd_path', True): pygame.draw.rect(env.screen, (255, 140, 0), env.cb2_rect.inflate(-6, -6))
-        txt_col2 = (255, 185, 95) if cb2_hover else (255, 255, 255)
-        env.screen.blit(self.font.render("Show 2nd Path", True, txt_col2), (70, 706))
+            # 2. Show LiDAR Hits (소프트 옐로우)
+            cb2_row = getattr(env, 'cb2_row_rect', env.cb2_rect)
+            cb2_hover = cb2_row.collidepoint(mpos)
+            if cb2_hover:
+                pygame.draw.rect(env.screen, (28, 56, 88), cb2_row, border_radius=4)
+            pygame.draw.rect(env.screen, (255, 255, 255), env.cb2_rect, 2)
+            if env.show_lidar:
+                pygame.draw.rect(env.screen, (225, 220, 130), env.cb2_rect.inflate(-6, -6))
+            txt_col2 = (250, 245, 175) if cb2_hover else (255, 255, 255)
+            env.screen.blit(self.font.render("Show LiDAR Hits", True, txt_col2), (70, 706))
 
-        # 3. Show Candidate WPs (연보라)
-        cb3_row = getattr(env, 'cb3_row_rect', env.cb3_rect)
-        cb3_hover = cb3_row.collidepoint(mpos)
-        if cb3_hover:
-            pygame.draw.rect(env.screen, (28, 56, 88), cb3_row, border_radius=4)
-        pygame.draw.rect(env.screen, (255, 255, 255), env.cb3_rect, 2)
-        if getattr(env, 'show_candidates', True): pygame.draw.rect(env.screen, (160, 180, 255), env.cb3_rect.inflate(-6, -6))
-        txt_col3 = (195, 215, 255) if cb3_hover else (255, 255, 255)
-        env.screen.blit(self.font.render("Show Candidate WPs", True, txt_col3), (70, 742))
+            # 3. Show LiDAR Range (세이지 그린)
+            cb3_row = getattr(env, 'cb3_row_rect', env.cb3_rect)
+            cb3_hover = cb3_row.collidepoint(mpos)
+            if cb3_hover:
+                pygame.draw.rect(env.screen, (28, 56, 88), cb3_row, border_radius=4)
+            pygame.draw.rect(env.screen, (255, 255, 255), env.cb3_rect, 2)
+            if env.show_lidar_range:
+                pygame.draw.rect(env.screen, (80, 175, 140), env.cb3_rect.inflate(-6, -6))
+            txt_col3 = (130, 225, 180) if cb3_hover else (255, 255, 255)
+            env.screen.blit(self.font.render("Show LiDAR Range", True, txt_col3), (70, 742))
+        else:
+            # [기본 갭 항법 모드 UI] 5개 체크박스 구성
+            # 1. Show 1st Path (시안)
+            cb1_row = getattr(env, 'cb1_row_rect', env.cb1_rect)
+            cb1_hover = cb1_row.collidepoint(mpos)
+            if cb1_hover:
+                pygame.draw.rect(env.screen, (28, 56, 88), cb1_row, border_radius=4)
+            pygame.draw.rect(env.screen, (255, 255, 255), env.cb1_rect, 2)
+            if getattr(env, 'show_1st_path', True): pygame.draw.rect(env.screen, (0, 255, 200), env.cb1_rect.inflate(-6, -6))
+            txt_col1 = (120, 255, 230) if cb1_hover else (255, 255, 255)
+            env.screen.blit(self.font.render("Show 1st Path", True, txt_col1), (70, 670))
 
-        # 4. Show LiDAR Hits (소프트 옐로우)
-        cb4_row = getattr(env, 'cb4_row_rect', env.cb4_rect)
-        cb4_hover = cb4_row.collidepoint(mpos)
-        if cb4_hover:
-            pygame.draw.rect(env.screen, (28, 56, 88), cb4_row, border_radius=4)
-        pygame.draw.rect(env.screen, (255, 255, 255), env.cb4_rect, 2)
-        if env.show_lidar: pygame.draw.rect(env.screen, (225, 220, 130), env.cb4_rect.inflate(-6, -6))
-        txt_col4 = (250, 245, 175) if cb4_hover else (255, 255, 255)
-        env.screen.blit(self.font.render("Show LiDAR Hits", True, txt_col4), (70, 778))
+            # 2. Show 2nd Path (오렌지)
+            cb2_row = getattr(env, 'cb2_row_rect', env.cb2_rect)
+            cb2_hover = cb2_row.collidepoint(mpos)
+            if cb2_hover:
+                pygame.draw.rect(env.screen, (28, 56, 88), cb2_row, border_radius=4)
+            pygame.draw.rect(env.screen, (255, 255, 255), env.cb2_rect, 2)
+            if getattr(env, 'show_2nd_path', True): pygame.draw.rect(env.screen, (255, 140, 0), env.cb2_rect.inflate(-6, -6))
+            txt_col2 = (255, 185, 95) if cb2_hover else (255, 255, 255)
+            env.screen.blit(self.font.render("Show 2nd Path", True, txt_col2), (70, 706))
 
-        # 5. Show LiDAR Range (세이지 그린)
-        cb5_row = getattr(env, 'cb5_row_rect', env.cb5_rect)
-        cb5_hover = cb5_row.collidepoint(mpos)
-        if cb5_hover:
-            pygame.draw.rect(env.screen, (28, 56, 88), cb5_row, border_radius=4)
-        pygame.draw.rect(env.screen, (255, 255, 255), env.cb5_rect, 2)
-        if env.show_lidar_range: pygame.draw.rect(env.screen, (80, 175, 140), env.cb5_rect.inflate(-6, -6))
-        txt_col5 = (130, 225, 180) if cb5_hover else (255, 255, 255)
-        env.screen.blit(self.font.render("Show LiDAR Range", True, txt_col5), (70, 814))
+            # 3. Show Candidate WPs (연보라)
+            cb3_row = getattr(env, 'cb3_row_rect', env.cb3_rect)
+            cb3_hover = cb3_row.collidepoint(mpos)
+            if cb3_hover:
+                pygame.draw.rect(env.screen, (28, 56, 88), cb3_row, border_radius=4)
+            pygame.draw.rect(env.screen, (255, 255, 255), env.cb3_rect, 2)
+            if getattr(env, 'show_candidates', True): pygame.draw.rect(env.screen, (160, 180, 255), env.cb3_rect.inflate(-6, -6))
+            txt_col3 = (195, 215, 255) if cb3_hover else (255, 255, 255)
+            env.screen.blit(self.font.render("Show Candidate WPs", True, txt_col3), (70, 742))
+
+            # 4. Show LiDAR Hits (소프트 옐로우)
+            cb4_row = getattr(env, 'cb4_row_rect', env.cb4_rect)
+            cb4_hover = cb4_row.collidepoint(mpos)
+            if cb4_hover:
+                pygame.draw.rect(env.screen, (28, 56, 88), cb4_row, border_radius=4)
+            pygame.draw.rect(env.screen, (255, 255, 255), env.cb4_rect, 2)
+            if env.show_lidar: pygame.draw.rect(env.screen, (225, 220, 130), env.cb4_rect.inflate(-6, -6))
+            txt_col4 = (250, 245, 175) if cb4_hover else (255, 255, 255)
+            env.screen.blit(self.font.render("Show LiDAR Hits", True, txt_col4), (70, 778))
+
+            # 5. Show LiDAR Range (세이지 그린)
+            cb5_row = getattr(env, 'cb5_row_rect', env.cb5_rect)
+            cb5_hover = cb5_row.collidepoint(mpos)
+            if cb5_hover:
+                pygame.draw.rect(env.screen, (28, 56, 88), cb5_row, border_radius=4)
+            pygame.draw.rect(env.screen, (255, 255, 255), env.cb5_rect, 2)
+            if env.show_lidar_range: pygame.draw.rect(env.screen, (80, 175, 140), env.cb5_rect.inflate(-6, -6))
+            txt_col5 = (130, 225, 180) if cb5_hover else (255, 255, 255)
+            env.screen.blit(self.font.render("Show LiDAR Range", True, txt_col5), (70, 814))
         
         # 일시정지(PAUSE) 버튼
         is_paused = getattr(env, 'paused', False)
@@ -562,6 +608,19 @@ class EnvRenderer:
                     hlr = hdx * r_vec[0] + hdy * r_vec[1]
                     if hlf >= -10:
                         pygame.draw.circle(self.pov_surf, (225, 220, 130), (int(pcx + hlr * scale_r), int(pcy - hlf * scale_r)), 2)
+
+        # 라인트레이싱 모드: POV 뷰에서 가장 가까운 장애물 히트지점 빨간색 표출
+        if getattr(env, 'linetrace_mode', False) and getattr(env, 'show_closest_obstacle', True):
+            c_hit = getattr(env, 'closest_avoid_hit', None)
+            if c_hit is not None:
+                hdx = c_hit[0] - bx; hdy = c_hit[1] - by
+                hlf = hdx * f_vec[0] + hdy * f_vec[1]
+                hlr = hdx * r_vec[0] + hdy * r_vec[1]
+                if hlf >= -10:
+                    cx_p = int(pcx + hlr * scale_r)
+                    cy_p = int(pcy - hlf * scale_r)
+                    pygame.draw.circle(self.pov_surf, (255, 40, 40), (cx_p, cy_p), 5)
+                    pygame.draw.circle(self.pov_surf, (255, 255, 255), (cx_p, cy_p), 2)
 
         # --- 목적지 인디케이터 & 테두리 트래킹 컴퍼스 ---
         dx_t = env.target[0] - bx; dy_t = env.target[1] - by
@@ -742,8 +801,7 @@ class EnvRenderer:
             self.cam_surf.blit(lbl_gap, text_rect)
 
         elif getattr(env, 'current_wp', None) is None:
-            is_lt = getattr(env, 'linetrace_mode', False)
-            dir_txt = "L-Trace" if is_lt else "Direct"
+            dir_txt = "Direct"
             bg_col = (14, 48, 30, 240) if is_hover else (10, 36, 22, 225)
             border_col = (20, 255, 90) if is_hover else (20, 220, 80)
             text_col = (30, 255, 100) if is_hover else (20, 250, 80)

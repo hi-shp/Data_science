@@ -122,6 +122,8 @@ class BoatEnv:
         self.linetrace_queued = False
         self.needs_break = False
         self.mode_btn_top_rect = pygame.Rect(25, 16, 165, 28)
+        self.show_closest_obstacle = True
+        self.closest_avoid_hit = None
         
         self.cb1_rect = pygame.Rect(40, 668, 20, 20)
         self.cb2_rect = pygame.Rect(40, 704, 20, 20)
@@ -225,28 +227,46 @@ class BoatEnv:
             # 버튼 클릭 시 현재 실행 중인 에피소드에서 실시간으로 알고리즘 즉시 변경 (GAP NAVIGATION <-> LINE TRACING)
             self.linetrace_mode = not getattr(self, 'linetrace_mode', False)
             self.linetrace_queued = False
-        elif getattr(self, 'cb1_row_rect', self.cb1_rect).collidepoint(pos) or self.cb1_rect.collidepoint(pos):
-            self.show_1st_path = not getattr(self, 'show_1st_path', True)
-            self.show_paths = self.show_1st_path or getattr(self, 'show_2nd_path', True)
-        elif getattr(self, 'cb2_row_rect', self.cb2_rect).collidepoint(pos) or self.cb2_rect.collidepoint(pos):
-            self.show_2nd_path = not getattr(self, 'show_2nd_path', True)
-            self.show_paths = getattr(self, 'show_1st_path', True) or self.show_2nd_path
-        elif getattr(self, 'cb3_row_rect', self.cb3_rect).collidepoint(pos) or self.cb3_rect.collidepoint(pos):
-            self.show_candidates = not self.show_candidates
-        elif getattr(self, 'cb4_row_rect', self.cb4_rect).collidepoint(pos) or self.cb4_rect.collidepoint(pos):
-            self.show_lidar = not self.show_lidar
-        elif getattr(self, 'cb5_row_rect', self.cb5_rect).collidepoint(pos) or self.cb5_rect.collidepoint(pos):
-            self.show_lidar_range = not self.show_lidar_range
-        elif self.pause_btn.collidepoint(pos):
-            self.paused = not self.paused
-        elif getattr(self, 'gaps_btn_rect', None) and self.gaps_btn_rect.collidepoint(pos):
-            self.show_all_gaps = not getattr(self, 'show_all_gaps', False)
+        elif getattr(self, 'linetrace_mode', False):
+            # 라인트레이싱 모드: 3개 버튼 (1. 가장 가까운 장애물 SHOW / 2. 라이다 히트 / 3. 라이다 레인지)
+            if getattr(self, 'cb1_row_rect', self.cb1_rect).collidepoint(pos) or self.cb1_rect.collidepoint(pos):
+                self.show_closest_obstacle = not getattr(self, 'show_closest_obstacle', True)
+            elif getattr(self, 'cb2_row_rect', self.cb2_rect).collidepoint(pos) or self.cb2_rect.collidepoint(pos):
+                self.show_lidar = not self.show_lidar
+            elif getattr(self, 'cb3_row_rect', self.cb3_rect).collidepoint(pos) or self.cb3_rect.collidepoint(pos):
+                self.show_lidar_range = not self.show_lidar_range
+            elif self.pause_btn.collidepoint(pos):
+                self.paused = not self.paused
+            else:
+                for spd, rect in self.speed_btns.items():
+                    if rect.collidepoint(pos):
+                        self.sim_speed = spd
+                        self.paused = False
+                        break
         else:
-            for spd, rect in self.speed_btns.items():
-                if rect.collidepoint(pos):
-                    self.sim_speed = spd
-                    self.paused = False
-                    break
+            # 갭 항법 모드: 5개 체크박스
+            if getattr(self, 'cb1_row_rect', self.cb1_rect).collidepoint(pos) or self.cb1_rect.collidepoint(pos):
+                self.show_1st_path = not getattr(self, 'show_1st_path', True)
+                self.show_paths = self.show_1st_path or getattr(self, 'show_2nd_path', True)
+            elif getattr(self, 'cb2_row_rect', self.cb2_rect).collidepoint(pos) or self.cb2_rect.collidepoint(pos):
+                self.show_2nd_path = not getattr(self, 'show_2nd_path', True)
+                self.show_paths = getattr(self, 'show_1st_path', True) or self.show_2nd_path
+            elif getattr(self, 'cb3_row_rect', self.cb3_rect).collidepoint(pos) or self.cb3_rect.collidepoint(pos):
+                self.show_candidates = not self.show_candidates
+            elif getattr(self, 'cb4_row_rect', self.cb4_rect).collidepoint(pos) or self.cb4_rect.collidepoint(pos):
+                self.show_lidar = not self.show_lidar
+            elif getattr(self, 'cb5_row_rect', self.cb5_rect).collidepoint(pos) or self.cb5_rect.collidepoint(pos):
+                self.show_lidar_range = not self.show_lidar_range
+            elif self.pause_btn.collidepoint(pos):
+                self.paused = not self.paused
+            elif getattr(self, 'gaps_btn_rect', None) and self.gaps_btn_rect.collidepoint(pos):
+                self.show_all_gaps = not getattr(self, 'show_all_gaps', False)
+            else:
+                for spd, rect in self.speed_btns.items():
+                    if rect.collidepoint(pos):
+                        self.sim_speed = spd
+                        self.paused = False
+                        break
 
     def update_dynamic_obstacles(self):
         ox = self.obstacles[:, 0]
@@ -396,6 +416,13 @@ class BoatEnv:
         bx, by = self.boat_pos
         ch = math.cos(self.boat_heading)
         sh = math.sin(self.boat_heading)
+
+        # 라인트레이싱 모드: 외곽 벽(Boundary Walls)을 장애물로 인식 및 충돌 판정
+        if getattr(self, 'linetrace_mode', False):
+            hull_margin = 18.0
+            if bx <= hull_margin or bx >= (self.w - hull_margin) or \
+               by <= hull_margin or by >= (self.sim_h - hull_margin):
+                return True
 
         # 장애물 충돌: 선체 로컬 좌표계로 변환하여 3개 선체 폴리곤(좌/우 선체, 데크)과 원형 장애물 정밀 표면 충돌 검사
         if len(self.dynamic_obstacles) == 0:

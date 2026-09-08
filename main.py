@@ -27,10 +27,12 @@ def run():
                         break
 
         if getattr(env, 'paused', False):
+            map_bounds = (0, 0, env.w, env.sim_h) if getattr(env, 'linetrace_mode', False) else None
             dists, hits = lidar_hits_np(
                 env.boat_pos, env.boat_heading,
                 env.rel_angles, env.dynamic_obstacles,
-                env.lidar_range
+                env.lidar_range,
+                map_bounds=map_bounds
             )
             env.render(hits)
             env.clock.tick(60)
@@ -46,10 +48,12 @@ def run():
             env.frame += 1
             env.update_dynamic_obstacles()
 
+            map_bounds = (0, 0, env.w, env.sim_h) if getattr(env, 'linetrace_mode', False) else None
             dists, hits = lidar_hits_np(
                 env.boat_pos, env.boat_heading,
                 env.rel_angles, env.dynamic_obstacles,
-                env.lidar_range
+                env.lidar_range,
+                map_bounds=map_bounds
             )
 
             update_grid(env.grid, hits)
@@ -85,13 +89,14 @@ def run():
                 env.total_gaps_count = len(gui_all_gaps)
 
             if getattr(env, 'linetrace_mode', False):
-                steer, h_target, min_front = line_trace_steering(
+                steer, h_target, min_front, c_hit = line_trace_steering(
                     env.boat_pos, env.boat_heading, env.target,
                     dists, env.rel_angles,
                     env.boat_ang_vel, env.prev_steer
                 )
                 env.heading_target = h_target
                 env.min_wide_dist = min_front
+                env.closest_avoid_hit = c_hit
                 env.prev_steer = steer
                 env.current_wp = None
                 env.next_wp = None

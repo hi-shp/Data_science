@@ -12,33 +12,50 @@ _REL_ANGLES = np.linspace(-np.pi, np.pi, 180, endpoint=False, dtype=np.float32)
 _COS_REL = np.cos(_REL_ANGLES)[:, None]
 _SIN_REL = np.sin(_REL_ANGLES)[:, None]
 
-def lidar_hits_np(boat_pos, boat_heading, rel_angles, obstacles, lidar_range):
-    if len(obstacles) == 0:
-        n = len(rel_angles)
-        return np.full(n, lidar_range, np.float32), [None] * n
-
-    ox = obstacles[:, 0:1].T
-    oy = obstacles[:, 1:2].T
-    orad = obstacles[:, 2:3].T
-
+def lidar_hits_np(boat_pos, boat_heading, rel_angles, obstacles, lidar_range, map_bounds=None):
+    n = len(rel_angles)
     ch = math.cos(boat_heading)
     sh = math.sin(boat_heading)
     vx = ch * _COS_REL - sh * _SIN_REL
     vy = sh * _COS_REL + ch * _SIN_REL
 
     x0, y0 = boat_pos
-    px = ox - x0
-    py = oy - y0
 
-    b = px * vx + py * vy
-    perp2 = (px - b * vx)**2 + (py - b * vy)**2
-    disc = orad**2 - perp2
+    if len(obstacles) > 0:
+        ox = obstacles[:, 0:1].T
+        oy = obstacles[:, 1:2].T
+        orad = obstacles[:, 2:3].T
 
-    mask = (b > 0) & (disc >= 0)
-    t = np.where(mask, b - np.sqrt(np.maximum(0, disc)), lidar_range)
-    t = np.where(t > 0, t, lidar_range)
+        px = ox - x0
+        py = oy - y0
 
-    d_final = np.min(t, axis=1).astype(np.float32)
+        b = px * vx + py * vy
+        perp2 = (px - b * vx)**2 + (py - b * vy)**2
+        disc = orad**2 - perp2
+
+        mask = (b > 0) & (disc >= 0)
+        t = np.where(mask, b - np.sqrt(np.maximum(0, disc)), lidar_range)
+        t = np.where(t > 0, t, lidar_range)
+
+        d_final = np.min(t, axis=1).astype(np.float32)
+    else:
+        d_final = np.full(n, lidar_range, dtype=np.float32)
+
+    # 맵 외곽 벽(Boundary Walls)을 장애물로 인식
+    if map_bounds is not None:
+        xmin, ymin, xmax, ymax = map_bounds
+        t_left = np.where(vx < -1e-5, (xmin - x0) / np.minimum(vx, -1e-5), lidar_range)
+        t_right = np.where(vx > 1e-5, (xmax - x0) / np.maximum(vx, 1e-5), lidar_range)
+        t_top = np.where(vy < -1e-5, (ymin - y0) / np.minimum(vy, -1e-5), lidar_range)
+        t_bottom = np.where(vy > 1e-5, (ymax - y0) / np.maximum(vy, 1e-5), lidar_range)
+
+        t_left = np.where(t_left > 0, t_left, lidar_range)
+        t_right = np.where(t_right > 0, t_right, lidar_range)
+        t_top = np.where(t_top > 0, t_top, lidar_range)
+        t_bottom = np.where(t_bottom > 0, t_bottom, lidar_range)
+
+        t_wall = np.minimum(np.minimum(t_left, t_right), np.minimum(t_top, t_bottom))
+        d_final = np.minimum(d_final, t_wall[:, 0].astype(np.float32))
     
     valid = d_final < lidar_range
     hits_x = x0 + vx[:, 0] * d_final
