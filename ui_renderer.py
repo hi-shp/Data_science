@@ -204,8 +204,15 @@ class EnvRenderer:
             else:
                 gaps_surf.fill((0, 0, 0, 0))
 
-            for idx, g in enumerate(env.all_gaps):
+            visible_idx = 1
+            for g in env.all_gaps:
                 mid = g["pos"]
+                # 전방 180도 (헤딩 기준 좌우 ±90도, 전방 성분 >= 0) 검사
+                dx = mid[0] - bx
+                dy = mid[1] - by
+                if dx * ch + dy * sh < 0:
+                    continue
+
                 c1, c2 = g.get("c1"), g.get("c2")
                 # 갭 부표 사이 얇은 가이드 라인
                 if c1 is not None and c2 is not None:
@@ -216,8 +223,9 @@ class EnvRenderer:
                 pygame.draw.circle(gaps_surf, (255, 255, 255, 230), (int(mid[0]), int(mid[1])), 2)
 
                 # 갭 인덱스 라벨 (G1, G2, ...)
-                lbl_g = self.micro_font.render(f"G{idx + 1}", True, (0, 240, 255))
+                lbl_g = self.micro_font.render(f"G{visible_idx}", True, (0, 240, 255))
                 gaps_surf.blit(lbl_g, (int(mid[0]) + 8, int(mid[1]) - 6))
+                visible_idx += 1
 
             env.screen.blit(gaps_surf, (0, 0))
 
@@ -662,8 +670,14 @@ class EnvRenderer:
         # 패널 타이틀
         self.cam_surf.blit(self.font.render("LiDAR Gauge View", True, (255, 255, 255)), (10, 8))
 
-        # 현재 고려 중인 모든 갭의 개수 표시 HUD 토글 버튼 (우측 상단)
-        total_gaps = getattr(env, 'total_gaps_count', 0)
+        # 현재 고려 중인 모든 갭의 개수 표시 HUD 토글 버튼 (전방 180도 기준)
+        front_gaps_count = 0
+        if getattr(env, 'all_gaps', None):
+            for g in env.all_gaps:
+                mid = g["pos"]
+                if (mid[0] - bx) * f_vec[0] + (mid[1] - by) * f_vec[1] >= 0:
+                    front_gaps_count += 1
+        total_gaps = front_gaps_count
         show_all = getattr(env, 'show_all_gaps', False)
 
         # 자리수 변화(1자리, 2자리)에 관계없이 버튼 크기 고정 (Fixed Width)
