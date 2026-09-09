@@ -108,10 +108,11 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
         min_idx_all = np.argmin(dists_all, axis=0)          # (M,)
         min_dist_all = dists_all[min_idx_all, np.arange(len(obs_rad_all))]  # (M,)
         
-        safe_margins = obs_rad_all + boat_radius + min_clearance
-        encroach_all = safe_margins - min_dist_all
+        # 먼 거리(약 125px)부터 서서히 감지하여 특정 지점에서 휙 꺾이지 않고 멀리서부터 부드러운 호를 그리며 조기 우회
+        far_margins = obs_rad_all + boat_radius + 80.0   # 약 122px (원거리 감지 범위)
+        safe_margins = obs_rad_all + boat_radius + 35.0  # 약 77px (안전 마진)
         
-        active = encroach_all > 0
+        active = min_dist_all < far_margins
         if np.any(active):
             active_idx = np.where(active)[0]
             for k in active_idx:
@@ -119,7 +120,14 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
                 t_idx = min_idx / 29.0
                 if start_tangent_fixed and t_idx < 0.2:
                     continue
-                encroach = encroach_all[k]
+                
+                d_cur = min_dist_all[k]
+                # 122px부터 0으로 시작하여 거리가 좁혀질수록 2차 곡선으로 점진적이고 매끄럽게 반발력 증가
+                ratio = float(np.clip((far_margins[k] - d_cur) / (far_margins[k] - safe_margins[k] + 12.0), 0.0, 1.0))
+                push_mag = 52.0 * (ratio ** 1.6)
+                if d_cur < safe_margins[k]:
+                    push_mag += (safe_margins[k] - d_cur) * 1.1
+                push_mag = min(130.0, push_mag)
                 
                 pt = nominal_pts[min_idx]
                 obs_pos = obs_pos_all[k]
@@ -131,7 +139,6 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
                     side = (obs_pos[0] - p0[0]) * n_dir[0] + (obs_pos[1] - p0[1]) * n_dir[1]
                     push_dir = -n_dir if side >= 0 else n_dir
                     
-                push_mag = min(160.0, encroach * 1.4)
                 w1 = max(0.2, 1.0 - t_idx * 0.7)
                 w2 = max(0.2, t_idx * 0.7 + 0.3)
                 

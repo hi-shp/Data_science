@@ -551,10 +551,10 @@ class BoatEnv:
         self.heading_target = heading_target
         heading_error = wrap(heading_target - self.boat_heading)
 
-        # 거리에 따라 연속적으로 조향 및 회피력 스케일링
-        clear_ratio = np.clip((min_front_dist - 130.0) / 200.0, 0.0, 1.0)
+        # 280px 원거리부터 60px 근접 거리까지 매끄럽고 점진적으로 조향 및 회피력 스케일링
+        clear_ratio = float(np.clip((min_front_dist - 60.0) / 220.0, 0.0, 1.0))
         steer_gain = self.params['steer_gain'] + (1.0 - clear_ratio) * 0.12
-        avoid_multiplier = self.params['avoid_normal'] + (1.0 - clear_ratio) * (self.params['avoid_em'] * 0.25)
+        avoid_multiplier = 0.08 + (1.0 - clear_ratio) * 0.35
             
         # 각속도 댐핑을 강화하여 관성 오버슈트 및 휙휙 도는 회전 억제
         d_term = -0.32 * getattr(self, 'boat_ang_vel', 0.0)
@@ -632,9 +632,9 @@ class BoatEnv:
 
         avoid = reactive_avoidance(dists, self.rel_angles)
 
-        # 반발력과 조향이 반대로 충돌할 때 조향력 상쇄(직진 현상)를 방지하기 위해 반발력 소프트 감쇠(0.25) 적용
+        # 반발력과 조향이 반대로 충돌할 때 조향력 상쇄(직진 현상)를 방지하기 위해 반발력 소프트 감쇠(0.45) 적용
         if (steer_f * avoid < 0) and abs(steer_f) > 0.15:
-            avoid *= 0.25
+            avoid *= 0.45
 
         # 후방 반원(|rel_angle| >= 90도) 내 선체 360도 회전 히트박스 반경(약 45.3px) 이내 장애물 감지 시 회전 억제 (조향 0)
         rear_mask = np.abs(self.rel_angles) >= (np.pi / 2.0 - 1e-5)
