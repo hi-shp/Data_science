@@ -552,9 +552,9 @@ class BoatEnv:
         heading_error = wrap(heading_target - self.boat_heading)
 
         # 거리에 따라 연속적으로 조향 및 회피력 스케일링
-        # 250px부터 조기 탐지를 시작하며, 거리가 좁혀질 때 위험도(danger_ratio)가 초반부터 가파르게 급상승 (지수 0.65)
+        # 250px부터 조기 탐지를 시작하며, 장애물에 가까워질수록 회피 가중치(danger_ratio)가 점진적으로 상승
         clear_ratio = float(np.clip((min_front_dist - 55.0) / 195.0, 0.0, 1.0))
-        danger_ratio = (1.0 - clear_ratio) ** 0.65
+        danger_ratio = float((1.0 - clear_ratio) ** 0.75)
         steer_gain = self.params['steer_gain'] + danger_ratio * 0.15
         avoid_multiplier = self.params['avoid_normal'] + danger_ratio * (self.params['avoid_em'] * 0.50)
             
@@ -638,16 +638,38 @@ class BoatEnv:
 
         avoid = reactive_avoidance(dists, self.rel_angles)
 
-        # 반발력과 조향이 반대로 충돌할 때 조향력 상쇄(직진 현상)를 방지하기 위해 반발력 소프트 감쇠(0.25) 적용
-        if (steer_f * avoid < 0) and abs(steer_f) > 0.15:
-            avoid *= 0.25
+        # 정면 근접 장애물(거리 < 220px) 대칭 상쇄 방지: 회피 신호가 미미할 경우 여유 공간 또는 목표 방향으로 편향 부여
+        if abs(avoid) < 0.20 and min_front_dist < 220.0:
+            fov_mask = np.abs(self.rel_angles) <= 1.05  # 전방 60도
+            left_mask = (self.rel_angles < -0.05) & fov_mask
+            right_mask = (self.rel_angles > 0.05) & fov_mask
+            d_left = float(np.min(dists[left_mask])) if np.any(left_mask) else 300.0
+            d_right = float(np.min(dists[right_mask])) if np.any(right_mask) else 300.0
+            if abs(d_left - d_right) > 15.0:
+                bias_dir = -1.0 if d_left > d_right else 1.0
+            elif abs(steer_f) > 0.05:
+                bias_dir = float(np.sign(steer_f))
+            else:
+                bias_dir = -1.0
+            avoid += bias_dir * 0.80
+
+        # 웨이포인트 추종 방향(steer_f)과 장애물 회피 방향(steer_avoid)의 가중치 블렌딩
+        # 장애물이 가까워질수록 회피 비중(w_avoid)을 점진적으로 최대 80%까지 높여 미리 부드럽게 우회 (55px 이하 극근접 시 95%)
+        steer_avoid = float(np.tanh(avoid * 1.20))
+        if min_front_dist < 55.0:
+            w_avoid = 0.80 + float(np.clip((55.0 - min_front_dist) / 25.0, 0.0, 1.0)) * 0.15
+        else:
+            w_avoid = danger_ratio * 0.80
+        w_wp = 1.0 - w_avoid
+        steer_blended = w_wp * steer_f + w_avoid * steer_avoid
+        self.prev_steer = steer_blended
 
         # 후방 반원(|rel_angle| >= 90도) 내 선체 360도 회전 히트박스 반경(약 45.3px) 이내 장애물 감지 시 회전 억제 (조향 0)
         rear_mask = np.abs(self.rel_angles) >= (np.pi / 2.0 - 1e-5)
         if np.any(rear_mask) and np.min(dists[rear_mask]) <= 45.3:
             return 0.0
 
-        return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
+        return float(np.clip(steer_blended, -1.0, 1.0))
 
     def render(self, hits):
         self.renderer.render(hits)

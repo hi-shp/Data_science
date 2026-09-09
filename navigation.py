@@ -493,7 +493,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
 
 def reactive_avoidance(dists, angles):
     SAFE = 450.0
-    sigma = 150.0
+    sigma = 190.0
     mask = dists < SAFE
     if not np.any(mask):
         return 0.0
