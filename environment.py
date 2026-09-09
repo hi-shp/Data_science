@@ -552,9 +552,9 @@ class BoatEnv:
         heading_error = wrap(heading_target - self.boat_heading)
 
         # 거리에 따라 연속적으로 조향 및 회피력 스케일링
-        clear_ratio = np.clip((min_front_dist - 50.0) / 350.0, 0.0, 3.0)
+        clear_ratio = np.clip((min_front_dist - 50.0) / 350.0, 0.0, 0.5)
         steer_gain = self.params['steer_gain'] + (1.0 - clear_ratio) * 0.12
-        avoid_multiplier = self.params['avoid_normal'] + (1.0 - clear_ratio) * (self.params['avoid_em'] * 0.25)
+        avoid_multiplier = self.params['avoid_normal'] + (1.0 - clear_ratio) * (self.params['avoid_em'] * 0.40)
             
         # 각속도 댐핑을 강화하여 관성 오버슈트 및 휙휙 도는 회전 억제
         d_term = -0.12 * getattr(self, 'boat_ang_vel', 0.0)
@@ -570,8 +570,8 @@ class BoatEnv:
             fwd_mask = np.abs(self.rel_angles) <= fov_rad
             fwd_indices = np.where(fwd_mask)[0]
 
-            SAFE_DIST = 95.0        # 회피 개시 거리 (원거리 불필요한 대우회 방지)
-            CRIT_DIST = 55.0        # 근접 긴급 회피 기준 거리 (선체 반경 25px + 장애물 반경 17px = 42px 충돌선)
+            SAFE_DIST = 100.0        # 회피 개시 거리 (원거리 불필요한 대우회 방지)
+            CRIT_DIST = 60.0        # 근접 긴급 회피 기준 거리 (선체 반경 25px + 장애물 반경 17px = 42px 충돌선)
 
             if len(fwd_indices) > 0:
                 fwd_dists = dists[fwd_indices]
