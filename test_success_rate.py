@@ -83,7 +83,7 @@ Estimated ETA:   {eta_str}
                         env.handle_click(e.pos)
 
             sub_steps = max(1, int(getattr(env, 'sim_speed', 4)))
-            plan_interval = 1 if sub_steps <= 2 else (2 if sub_steps <= 4 else 3)
+            plan_interval = 1 if sub_steps <= 4 else 3
             hits = None
             new_wp = None
             
