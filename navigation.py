@@ -51,7 +51,7 @@ def bezier_path_is_blocked(path, obstacles, boat_radius=25, margin=10):
 def is_direct_target_safe(boat_pos, boat_heading, target_pos, obstacles, boat_radius=25, boat_speed=0.0, params=None):
     # 0. 목적지와 400픽셀 이하로 가까워졌을 때만 다이렉트 모드 허용
     dist_to_target = math.hypot(target_pos[0] - boat_pos[0], target_pos[1] - boat_pos[1])
-    if dist_to_target > 400.0:
+    if dist_to_target > 600.0:
         return False
 
     if obstacles is None or len(obstacles) == 0:

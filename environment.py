@@ -288,7 +288,10 @@ class BoatEnv:
         tR = self.pwm_to_thrust(R)
         # 220도 범위 내 최소 장애물 거리에 따른 순수 연속 함수 속도 제어 (장애물 근접 시 최소 속도를 더욱 낮추어 서행)
         em_dist = float(getattr(self, 'min_wide_dist', 999.0))
-        speed_factor = (math.tanh(em_dist / 50.0)) ** 1.35
+        speed_factor = (math.tanh(em_dist / 100.0)) ** 1.35
+        # 라인트레이싱 모드에서는 갭 내비 대비 살짝 느린 속도 (85%)로 주행하여 반응형 회피에 여유 확보
+        if getattr(self, 'linetrace_mode', False):
+            speed_factor *= 0.85
         target_fwd = ((tL + tR) / 6.0) * speed_factor
             
         if not hasattr(self, 'current_fwd'):
@@ -549,12 +552,12 @@ class BoatEnv:
         heading_error = wrap(heading_target - self.boat_heading)
 
         # 거리에 따라 연속적으로 조향 및 회피력 스케일링
-        clear_ratio = np.clip((min_front_dist - 80.0) / 200.0, 0.0, 1.0)
+        clear_ratio = np.clip((min_front_dist - 50.0) / 350.0, 0.0, 3.0)
         steer_gain = self.params['steer_gain'] + (1.0 - clear_ratio) * 0.12
         avoid_multiplier = self.params['avoid_normal'] + (1.0 - clear_ratio) * (self.params['avoid_em'] * 0.25)
             
         # 각속도 댐핑을 강화하여 관성 오버슈트 및 휙휙 도는 회전 억제
-        d_term = -0.32 * getattr(self, 'boat_ang_vel', 0.0)
+        d_term = -0.12 * getattr(self, 'boat_ang_vel', 0.0)
         steer_raw = heading_error * steer_gain + d_term
         alpha = self.params['steer_alpha']
         steer_f = alpha * steer_raw + (1.0 - alpha) * self.prev_steer
