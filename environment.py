@@ -569,8 +569,8 @@ class BoatEnv:
             fwd_mask = np.abs(self.rel_angles) <= fov_rad
             fwd_indices = np.where(fwd_mask)[0]
 
-            SAFE_DIST = 160.0       # 장애물 감지 및 회피 개시 거리 (px)
-            CRIT_DIST = 55.0        # 긴급 완전 회피 기준 거리 (px)
+            SAFE_DIST = 130.0       # 장애물 감지 및 회피 개시 거리 (160px -> 130px 완화)
+            CRIT_DIST = 50.0        # 긴급 완전 회피 기준 거리 (px)
 
             if len(fwd_indices) > 0:
                 fwd_dists = dists[fwd_indices]
@@ -606,23 +606,24 @@ class BoatEnv:
                 front_f = max(0.0, math.cos(closest_ang * (np.pi / 2.0 / fov_rad)))
                 urgency = float(np.clip((SAFE_DIST - min_dist) / (SAFE_DIST - CRIT_DIST), 0.0, 1.0))
 
-                avoid_steer = avoid_dir * (0.75 + 0.25 * urgency)
-                avoid_weight = urgency * front_f
+                # 다이렉트 모드 반발력 완화: 급선회(0.75~1.0)를 부드러운 가중치(0.40~0.75)로 조절
+                avoid_steer = avoid_dir * (0.40 + 0.35 * urgency)
+                avoid_weight = urgency * front_f * 0.70
 
-                if min_dist < CRIT_DIST + 15.0:
-                    steer_cmd = avoid_dir * 1.0
+                if min_dist < CRIT_DIST + 6.0:
+                    steer_cmd = avoid_dir * (0.65 + 0.35 * urgency)
                 else:
                     steer_cmd = (1.0 - avoid_weight) * steer_f + avoid_weight * avoid_steer
 
-                # 측면 근접 보호(Flank Guard): 배 옆(65~95도)에 장애물이 45px 이내로 근접 시 외측 선체 찰과 방지
+                # 측면 근접 보호(Flank Guard): 반발력 완화 (45px -> 38px, 0.45 -> 0.22)
                 flank_mask = (np.abs(self.rel_angles) > fov_rad) & (np.abs(self.rel_angles) <= 1.658)
                 if np.any(flank_mask):
                     f_dists = dists[flank_mask]
                     f_min = float(np.min(f_dists))
-                    if f_min < 45.0:
+                    if f_min < 38.0:
                         f_idx = np.where(flank_mask)[0][np.argmin(f_dists)]
                         f_ang = float(self.rel_angles[f_idx])
-                        f_push = -float(np.sign(f_ang)) * (45.0 - f_min) / 45.0 * 0.45
+                        f_push = -float(np.sign(f_ang)) * (38.0 - f_min) / 38.0 * 0.22
                         steer_cmd = float(np.clip(steer_cmd + f_push, -1.0, 1.0))
 
                 return float(np.clip(steer_cmd, -1.0, 1.0))
