@@ -11,8 +11,8 @@
   "em_hold_frames": 18,
   "align_exp": 6,
   "heading_exp": 4.0,
-  "fwd_exp": 3,
-  "width_exp": 8,
+  "fwd_exp": 5,
+  "width_exp": 9,
   "clear_exp": 10,
   "wp_switch_thresh": 1.1
 }
