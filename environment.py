@@ -36,8 +36,8 @@ class BoatEnv:
             'align_exp': 6.0,
             'heading_exp': 2.0,
             'fwd_exp': 4.0,
-            'clear_exp': 5.0,
-            'width_exp': 0.2,
+            'width_exp': 8.0,
+            'clear_exp': 3.0,
             'wp_switch_thresh': 1.1,
             'perp_exp': 6.0,
             'prox_exp': 2.0,
@@ -50,7 +50,7 @@ class BoatEnv:
         self.rel_angles = np.linspace(-np.pi, np.pi, self.lidar_beams, endpoint=False)
         
         self.mass = 14
-        self.inertia = 4.2
+        self.inertia = 4.8
         self.drag = 0.2
         self.rot_drag = 0.8
         self.boat_radius = 25
@@ -80,7 +80,7 @@ class BoatEnv:
         
         self.obs_n = 80
         self.obs_r = 17
-        self.min_obs = 110
+        self.min_obs = 120
         
         self.grid = init_grid()
         self.clusters = []
@@ -291,7 +291,7 @@ class BoatEnv:
         tR = self.pwm_to_thrust(R)
         # 220도 범위 내 최소 장애물 거리에 따른 순수 연속 함수 속도 제어 (장애물 근접 시 최소 속도를 더욱 낮추어 서행)
         em_dist = float(getattr(self, 'min_wide_dist', 999.0))
-        speed_factor = (math.tanh(em_dist / 100.0)) ** 1.35
+        speed_factor = (math.tanh(em_dist / 50.0)) ** 1.35
         target_fwd = ((tL + tR) / 6.0) * speed_factor
             
         if not hasattr(self, 'current_fwd'):
@@ -552,7 +552,7 @@ class BoatEnv:
         heading_error = wrap(heading_target - self.boat_heading)
 
         # 거리에 따라 연속적으로 조향 및 회피력 스케일링
-        clear_ratio = np.clip((min_front_dist - 130.0) / 200.0, 0.0, 1.0)
+        clear_ratio = np.clip((min_front_dist - 80.0) / 200.0, 0.0, 1.0)
         steer_gain = self.params['steer_gain'] + (1.0 - clear_ratio) * 0.12
         avoid_multiplier = self.params['avoid_normal'] + (1.0 - clear_ratio) * (self.params['avoid_em'] * 0.25)
             

@@ -164,13 +164,13 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     gps_heading = math.atan2(dy_t, dx_t)
 
     align_exp = params.get('align_exp', 6.0) if params else 6.0
-    fwd_exp = params.get('fwd_exp', 6.6) if params else 6.6
-    clear_exp = params.get('clear_exp', 5.0) if params else 5.0
-    width_exp = params.get('width_exp', 0.2) if params else 0.2
-    heading_exp = params.get('heading_exp', params.get('boat_align_exp', params.get('head_exp', 2.0))) if params else 2.0
-    perp_exp = params.get('perp_exp', 3.0) if params else 3.0
-    prox_exp = params.get('prox_exp', 4.0) if params else 4.0
-    center_exp = params.get('center_exp', 1.5) if params else 1.5
+    fwd_exp = params.get('fwd_exp', 6.0) if params else 6.0
+    width_exp = params.get('width_exp', 8.0) if params else 8.0
+    clear_exp = params.get('clear_exp', 3.0) if params else 3.0
+    heading_exp = params.get('heading_exp', params.get('boat_align_exp', params.get('head_exp', 4.0))) if params else 4.0
+    perp_exp = params.get('perp_exp', 2.0) if params else 2.0
+    prox_exp = params.get('prox_exp', 2.0) if params else 2.0
+    center_exp = params.get('center_exp', 1.0) if params else 1.0
 
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])
     
@@ -336,8 +336,15 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
                 cy = by + t * vy
                 dists_to_seg = np.sqrt((obs_path[:, 0] - cx)**2 + (obs_path[:, 1] - cy)**2) - obs_path[:, 2]
                 min_clear = float(np.min(dists_to_seg))
+                
+                # 경로 통로(Corridor) 내 침범하는 근접 장애물들의 밀도 및 분포 비율 계산 (신규 CLEAR 점수)
+                # 경로에 바짝 붙은 장애물일수록 높은 침범 가중치(Gaussian decay, sigma=40px)
+                intrusion = np.exp(-((np.maximum(0.0, dists_to_seg) / 40.0)**2))
+                obs_density = float(np.sum(intrusion))
+                clear_score = float(math.exp(-obs_density / 1.5))
             else:
                 min_clear = 9999.0
+                clear_score = 1.0
             
             near_clear_penalty = 1.0
             depth_pen = 1.0
@@ -345,6 +352,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
             min_clear = 9999.0
             near_clear_penalty = 1.0
             depth_pen = 1.0
+            clear_score = 1.0
                 
         min_clear = max(min_clear, 0)
         if min_clear < 15.0:
@@ -387,7 +395,11 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         if effective_width < 42.0 or rel_width < 0.22:
             continue
             
-        clear_score = rel_width
+        # [WIDTH 파라미터 (기존 Clear에서 이름 변경)] 게이트 유효 개방 상대너비 점수
+        width_score = rel_width
+        width_factor = width_score ** width_exp
+        
+        # [CLEAR 파라미터 (신규 추가)] 직선 경로 상 장애물 밀도 및 클리어런스 점수
         clear_factor = clear_score ** clear_exp
         
         # 갭 선분(c1->c2)과 현재 위치에서 목적지까지의 방향(gps_vec) 간의 수직도(Orthogonality) 계산
@@ -407,19 +419,11 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         eff_center_exp = center_exp * (0.4 + 0.8 * dev_ratio)
         center_factor = max(center_closeness, 0.05) ** eff_center_exp
         
-        width_w = min(gap_w / 90, 1)
+        width_w = min(gap_w / 90.0, 1.0)
         
-        sc = (heading_align**align_exp) * head_factor * (forward_proj**fwd_exp) * (lateral_full**0.5) * clear_factor * (width_w**width_exp) * depth_pen * near_clear_penalty * perp_factor * prox_factor * center_factor
+        sc = (heading_align**align_exp) * head_factor * (forward_proj**fwd_exp) * (lateral_full**0.5) * width_factor * (width_w**0.2) * clear_factor * depth_pen * near_clear_penalty * perp_factor * prox_factor * center_factor
         
         if sc > 0:
-            term_align = float(heading_align**align_exp)
-            term_head = float(head_factor)
-            term_fwd = float(forward_proj**fwd_exp)
-            term_clear = float(clear_factor)
-            term_perp = float(perp_factor)
-            term_prox = float(prox_factor)
-            term_center = float(center_factor)
-            
             valid_gaps.append({
                 "pos": mid,
                 "c1": c1.copy(),
@@ -430,6 +434,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
                     "Align": {"raw": float(heading_align), "w": float(align_exp)},
                     "Heading": {"raw": float(head_score), "w": float(heading_exp)},
                     "Forward": {"raw": float(forward_proj), "w": float(fwd_exp)},
+                    "Width": {"raw": float(width_score), "w": float(width_exp)},
                     "Clear": {"raw": float(clear_score), "w": float(clear_exp)},
                     "Perpend": {"raw": float(perp_score), "w": float(perp_exp)},
                     "Proxim": {"raw": float(prox_score), "w": float(prox_exp)},
