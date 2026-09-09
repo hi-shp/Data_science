@@ -251,9 +251,9 @@ def run():
                     
                     boat_spd = math.hypot(env.boat_vel[0], env.boat_vel[1])
                     if env.current_wp is None:
-                        # 목적지 직행 상황에서도 회전 궤적 주변 장애물을 넉넉히 우회할 수 있도록 obstacles 전달
+                        # 목적지 직행 상황: 과도한 160px 외측 대우회를 방지하고 틈새로 직진 진입하도록 클리어런스 완화 (min_clearance=8.0)
                         goal = env.target
-                        env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
+                        env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, min_clearance=8.0, boat_speed=boat_spd)
                     else:
                         # 웨이포인트(갭) 우회 통과 구간: 속도 기반 선행 회전 및 장애물 외측 굴곡 곡률 부여
                         goal = env.current_wp["pos"]
