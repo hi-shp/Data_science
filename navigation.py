@@ -319,25 +319,70 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         obs_f = obstacles[mask]
         
         if len(obs_f) > 0:
-            # c1, c2(게이트 기둥) 자체는 통과 대상이므로 보트->중점 선분 장애물 간섭 검사에서 제외
+            # c1, c2(게이트 기둥) 자체는 통과 대상이므로 삼각형 내 장애물 밀도 검사에서 제외
             d_to_c1 = (obs_f[:, 0] - c1[0])**2 + (obs_f[:, 1] - c1[1])**2
             d_to_c2 = (obs_f[:, 0] - c2[0])**2 + (obs_f[:, 1] - c2[1])**2
             other_mask = (d_to_c1 > 28.0**2) & (d_to_c2 > 28.0**2)
             obs_path = obs_f[other_mask]
 
             if len(obs_path) > 0:
+                # 직선 경로(boat→mid) 기준 최소 클리어런스 (기존 min_clear 유지)
                 px = obs_path[:, 0] - bx
                 py = obs_path[:, 1] - by
                 t = np.clip((px * vx + py * vy) / seg2, 0.0, 1.0)
-                cx = bx + t * vx
-                cy = by + t * vy
-                dists_to_seg = np.sqrt((obs_path[:, 0] - cx)**2 + (obs_path[:, 1] - cy)**2) - obs_path[:, 2]
+                cx_seg = bx + t * vx
+                cy_seg = by + t * vy
+                dists_to_seg = np.sqrt((obs_path[:, 0] - cx_seg)**2 + (obs_path[:, 1] - cy_seg)**2) - obs_path[:, 2]
                 min_clear = float(np.min(dists_to_seg))
                 
-                # 경로 통로(Corridor) 내 침범하는 근접 장애물들의 밀도 및 분포 비율 계산 (신규 CLEAR 점수)
-                # 경로에 바짝 붙은 장애물일수록 높은 침범 가중치(Gaussian decay, sigma=40px)
-                intrusion = np.exp(-((np.maximum(0.0, dists_to_seg) / 40.0)**2))
-                obs_density = float(np.sum(intrusion))
+                # [CLEAR 점수] 보트-c1-c2 삼각형 영역 기반 장애물 밀도 계산
+                # 삼각형 꼭짓점: A=boat_pos, B=c1, C=c2
+                ax_, ay_ = float(bx), float(by)
+                bx_, by_ = float(c1[0]), float(c1[1])
+                cx_, cy_ = float(c2[0]), float(c2[1])
+                
+                # 삼각형 면적 (부호면적, 2배)
+                tri_area2 = abs((bx_ - ax_) * (cy_ - ay_) - (cx_ - ax_) * (by_ - ay_))
+                
+                if tri_area2 > 1.0:  # 퇴화 삼각형(면적=0) 방지
+                    # 각 장애물의 바리센트릭 좌표 계산 (삼각형 내부: 0<=u,v, u+v<=1)
+                    opx = obs_path[:, 0]
+                    opy = obs_path[:, 1]
+                    v0x = bx_ - ax_;  v0y = by_ - ay_
+                    v1x = cx_ - ax_;  v1y = cy_ - ay_
+                    v2x = opx - ax_;  v2y = opy - ay_
+                    
+                    dot00 = v0x * v0x + v0y * v0y
+                    dot01 = v0x * v1x + v0y * v1y
+                    dot11 = v1x * v1x + v1y * v1y
+                    dot20 = v2x * v0x + v2y * v0y
+                    dot21 = v2x * v1x + v2y * v1y
+                    
+                    inv_denom = 1.0 / (dot00 * dot11 - dot01 * dot01 + 1e-12)
+                    u = (dot11 * dot20 - dot01 * dot21) * inv_denom
+                    v = (dot00 * dot21 - dot01 * dot20) * inv_denom
+                    
+                    # 삼각형 내부: u>=0, v>=0, u+v<=1
+                    # 삼각형 가장자리로부터의 거리 비율 (0=경계, 양수=내부, 음수=외부)
+                    margin = np.minimum(np.minimum(u, v), 1.0 - u - v)
+                    
+                    # 삼각형 내부(margin>=0) 및 근접 외부(margin>=-0.15) 장애물에 가우시안 가중치
+                    # margin이 클수록(삼각형 깊숙이) 높은 침범 가중치
+                    near_mask = margin > -0.15
+                    if np.any(near_mask):
+                        m_vals = margin[near_mask]
+                        r_obs = obs_path[near_mask, 2]
+                        # 내부 장애물: 가중치 1.0, 경계 근처~외부: 가우시안 감쇠
+                        inside = m_vals >= 0
+                        weights = np.where(inside, 1.0, np.exp(-((m_vals / 0.08)**2)))
+                        # 장애물 반경이 클수록 더 위험
+                        weights *= np.clip(r_obs / 17.0, 0.5, 2.0)
+                        obs_density = float(np.sum(weights))
+                    else:
+                        obs_density = 0.0
+                else:
+                    obs_density = 0.0
+                
                 clear_score = float(math.exp(-obs_density / 1.5))
             else:
                 min_clear = 9999.0
