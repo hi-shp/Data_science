@@ -80,7 +80,7 @@ class BoatEnv:
         
         self.obs_n = 80
         self.obs_r = 17
-        self.min_obs = 120
+        self.min_obs = 110
         
         self.grid = init_grid()
         self.clusters = []
@@ -564,51 +564,71 @@ class BoatEnv:
         self.prev_steer = steer_f
         
         # [갭 내비게이션 다이렉트 모드 전용 회피]
-        # 반발력을 대폭 축소하고 양측 밸런싱을 적용하여, 직진 시 불필요한 대우회를 방지하고 좁은 갭 통과 시 좌우 떨림(채터링) 원천 제거
+        # 원거리 불필요한 대우회 및 갭 사이 떨림을 방지하되, 근접 장애물(< 55px)에 대해서는 강력한 기존 회피력 완전 유지
         if self.current_wp is None:
-            fov_rad = 1.047198  # np.deg2rad(60)
+            fov_rad = 1.134464  # np.deg2rad(65)
             fwd_mask = np.abs(self.rel_angles) <= fov_rad
+            fwd_indices = np.where(fwd_mask)[0]
 
-            SAFE_DIST = 80.0        # 감지 거리 160px -> 80px로 대폭 축소 (원거리 불필요 우회 방지)
-            
-            left_mask = (self.rel_angles < -0.05) & fwd_mask
-            right_mask = (self.rel_angles > 0.05) & fwd_mask
+            SAFE_DIST = 95.0        # 회피 개시 거리 (원거리 불필요한 대우회 방지)
+            CRIT_DIST = 55.0        # 근접 긴급 회피 기준 거리 (선체 반경 25px + 장애물 반경 17px = 42px 충돌선)
 
-            d_left = float(np.min(dists[left_mask])) if np.any(left_mask) else 999.0
-            d_right = float(np.min(dists[right_mask])) if np.any(right_mask) else 999.0
-            min_dist = min(d_left, d_right)
+            if len(fwd_indices) > 0:
+                fwd_dists = dists[fwd_indices]
+                min_i = int(np.argmin(fwd_dists))
+                closest_idx = fwd_indices[min_i]
+                min_dist = float(dists[closest_idx])
+                closest_ang = float(self.rel_angles[closest_idx])
+            else:
+                min_dist = 999.0
+                closest_ang = 0.0
 
             if min_dist < SAFE_DIST:
-                # UI 렌더링용 최근접 히트점
+                # UI 렌더링용 최근접 회피 히트점
                 bx, by = self.boat_pos
-                fwd_indices = np.where(fwd_mask)[0]
-                closest_idx = fwd_indices[np.argmin(dists[fwd_indices])]
-                closest_ang = float(self.rel_angles[closest_idx])
                 self.closest_avoid_hit = (
                     float(bx + math.cos(self.boat_heading + closest_ang) * min_dist),
                     float(by + math.sin(self.boat_heading + closest_ang) * min_dist)
                 )
 
-                # 양측 장애물 힘 상쇄 (Bilateral Force Balancing):
-                # 좁은 갭 통과 시 좌우 장애물 반발력이 서로 상쇄되어 떨림 없이 정중앙으로 직진 진입
-                push_r = max(0.0, (SAFE_DIST - d_left) / SAFE_DIST) ** 1.5   # 좌측 장애물 -> 우측 반발 (+)
-                push_l = max(0.0, (SAFE_DIST - d_right) / SAFE_DIST) ** 1.5  # 우측 장애물 -> 좌측 반발 (-)
-                net_avoid = push_r - push_l
+                left_mask = (self.rel_angles < -0.05) & fwd_mask
+                right_mask = (self.rel_angles > 0.05) & fwd_mask
+                d_left = float(np.min(dists[left_mask])) if np.any(left_mask) else 999.0
+                d_right = float(np.min(dists[right_mask])) if np.any(right_mask) else 999.0
 
-                # 반발력 가중치를 대폭 축소 (기존 0.75~1.0 급선회 제거, 목표 직행 조향을 최우선 유지)
-                avoid_steer = np.clip(net_avoid * 0.22, -0.28, 0.28)
-                steer_cmd = steer_f + avoid_steer
+                # 1. 좁은 갭 사이 중앙 통과 시 좌우 대칭 밸런싱으로 떨림 방지
+                push_r = max(0.0, (SAFE_DIST - d_left) / SAFE_DIST) ** 1.5   # 좌측 장애물 -> 우측 반발
+                push_l = max(0.0, (SAFE_DIST - d_right) / SAFE_DIST) ** 1.5  # 우측 장애물 -> 좌측 반발
+                net_dir = push_r - push_l
 
-                # 측면 근접 보호(Flank Guard): 45px -> 26px 초근접 시에만 미세 보정 (떨림 방지)
+                # 2. 근접 위험도(Urgency) 계산: 55px 이하 근접 시 기존의 강력한 반발력(0.75~1.0)으로 즉각 회피
+                urgency = float(np.clip((SAFE_DIST - min_dist) / (SAFE_DIST - CRIT_DIST), 0.0, 1.0))
+                front_f = max(0.0, math.cos(closest_ang * (np.pi / 2.0 / fov_rad)))
+
+                if min_dist < CRIT_DIST:
+                    # [근접 위험 구간] 기존의 강력한 회피력 완전 유지
+                    avoid_dir = -float(np.sign(closest_ang)) if abs(closest_ang) > 0.04 else (-1.0 if d_left >= d_right else 1.0)
+                    avoid_steer = avoid_dir * (0.75 + 0.25 * urgency)
+                    if min_dist < CRIT_DIST - 5.0:  # 50px 이하 극근접 충돌 위험 시 100% 완전 회피
+                        steer_cmd = avoid_dir * 1.0
+                    else:
+                        avoid_weight = min(0.90, urgency * front_f)
+                        steer_cmd = (1.0 - avoid_weight) * steer_f + avoid_weight * avoid_steer
+                else:
+                    # [중거리(55px ~ 95px) 접근 구간] 양측 밸런싱을 적용하여 크게 돌지 않고 틈새 중앙으로 안정적 진입
+                    avoid_steer = np.clip(net_dir * 0.35, -0.45, 0.45)
+                    steer_cmd = steer_f + avoid_steer
+
+                # 측면 근접 보호(Flank Guard): 배 옆(65~95도) 42px 이내 장애물 근접 시 측면 찰과 충돌 강력 방지 (기존 반발력 0.40 유지)
                 flank_mask = (np.abs(self.rel_angles) > fov_rad) & (np.abs(self.rel_angles) <= 1.658)
                 if np.any(flank_mask):
                     f_dists = dists[flank_mask]
                     f_min = float(np.min(f_dists))
-                    if f_min < 26.0:
+                    if f_min < 42.0:
                         f_idx = np.where(flank_mask)[0][np.argmin(f_dists)]
                         f_ang = float(self.rel_angles[f_idx])
-                        f_push = -float(np.sign(f_ang)) * (26.0 - f_min) / 26.0 * 0.10
-                        steer_cmd = steer_cmd + f_push
+                        f_push = -float(np.sign(f_ang)) * (42.0 - f_min) / 42.0 * 0.40
+                        steer_cmd = float(np.clip(steer_cmd + f_push, -1.0, 1.0))
 
                 return float(np.clip(steer_cmd, -1.0, 1.0))
             else:
