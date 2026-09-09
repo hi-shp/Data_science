@@ -11,11 +11,11 @@
   "em_hold_frames": 18,
   "align_exp": 6,
   "heading_exp": 6.0,
-  "fwd_exp": 4,
+  "fwd_exp": 3,
   "clear_exp": 8,
   "width_exp": 0.2,
   "wp_switch_thresh": 1.1,
-  "perp_exp": 4,
+  "perp_exp": 2,
   "prox_exp": 2,
   "center_exp": 1
 }
