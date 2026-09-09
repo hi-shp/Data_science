@@ -5,3 +5,4 @@ __pycache__/
 data/
 *.pth
 *.npz
+commit_*/

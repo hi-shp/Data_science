@@ -80,7 +80,7 @@ class BoatEnv:
         
         self.obs_n = 80
         self.obs_r = 17
-        self.min_obs = 110
+        self.min_obs = 120
         
         self.grid = init_grid()
         self.clusters = []
@@ -291,7 +291,7 @@ class BoatEnv:
         tR = self.pwm_to_thrust(R)
         # 220도 범위 내 최소 장애물 거리에 따른 순수 연속 함수 속도 제어 (장애물 근접 시 최소 속도를 더욱 낮추어 서행)
         em_dist = float(getattr(self, 'min_wide_dist', 999.0))
-        speed_factor = (math.tanh(em_dist / 100.0)) ** 1.35
+        speed_factor = (math.tanh(em_dist / 50.0)) ** 1.35
         target_fwd = ((tL + tR) / 6.0) * speed_factor
             
         if not hasattr(self, 'current_fwd'):
@@ -640,7 +640,7 @@ class BoatEnv:
 
         # 웨이포인트 추종 조향(steer_f)을 90% 비중으로 확고히 유지하면서, 장애물 접근 시 전체 조향의 약 10% 비중으로 회피 조향 가미
         steer_avoid = float(np.tanh(avoid * 2.0))
-        w_avoid = danger_ratio * 0.10
+        w_avoid = danger_ratio * 0.30
         w_wp = 1.0 - w_avoid
         steer_blended = w_wp * steer_f + w_avoid * steer_avoid
 
