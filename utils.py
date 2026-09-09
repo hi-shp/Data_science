@@ -18,7 +18,7 @@ def cubic_bezier(p0, p1, p2, p3, n=90):
     B = (1-T)**3 * p0 + 3*(1-T)**2*T*p1 + 3*(1-T)*T**2*p2 + T**3*p3
     return B
 
-def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=25, min_clearance=35.0, boat_speed=0.0, start_tangent_fixed=False):
+def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=25, min_clearance=35.0, boat_speed=0.0, start_tangent_fixed=False, next_goal=None):
     d = np.linalg.norm(goal - boat_pos)
     if d < 1:
         return None
@@ -35,12 +35,12 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     # 1. 장애물이 없는 목적지 직행 상황: 곡률을 대폭 줄여 목적지를 향해 직선에 가깝게 직행
     if obstacles is None or len(obstacles) == 0:
         if start_tangent_fixed:
-            forward_dist = min(93.0, d * 0.40)
+            forward_dist = min(60.0, d * 0.40)
             p1 = boat_pos + forward * forward_dist
             v_goal = p3 - p1
             norm_v_goal = np.linalg.norm(v_goal)
             v_goal_n = np.zeros(2) if norm_v_goal < 1e-6 else v_goal / norm_v_goal
-            p2 = p3 - v_goal_n * min(85.0, d * 0.38)
+            p2 = p3 - v_goal_n * min(60.0, d * 0.38)
             return cubic_bezier(p0, p1, p2, p3, n=90)
         else:
             speed_ratio = np.clip(boat_speed / 80.0, 0.0, 1.0)
@@ -56,25 +56,39 @@ def make_bezier_path(boat_pos, boat_heading, goal, obstacles=None, boat_radius=2
     # 2. 웨이포인트 추종 및 장애물 통과 구간: 선박 속도 및 각도 편차에 따른 선행 회전(Inward Lead) 및 관성 보정
     if start_tangent_fixed:
         # C1 연속성 유지를 위해 시작 접선 방향(forward)을 엄격히 고정
-        forward_dist = min(93.0, d * 0.40)
+        forward_dist = min(45.0, d * 0.35)
         p1 = boat_pos + forward * forward_dist
     else:
         speed_ratio = np.clip(boat_speed / 80.0, 0.0, 1.0)
         lead_shrink = max(0.4, 1.0 - 0.50 * speed_ratio * math.sin(ang_diff * 0.5))
-        forward_dist = min(93.0, d * 0.40) * lead_shrink
+        forward_dist = min(45.0, d * 0.35) * lead_shrink
 
         # P1 방향을 목표 방향 안쪽으로 미리 편향하여 조기 선회 유도 (Inward Lead Vector)
-        blend = min(0.3, 0.40 * speed_ratio * math.sin(ang_diff * 0.5))
+        blend = min(0.35, 0.45 * speed_ratio * math.sin(ang_diff * 0.5))
         lead_dir = (1.0 - blend) * forward + blend * u_goal
         norm_lead = np.linalg.norm(lead_dir)
         lead_dir = forward if norm_lead < 1e-6 else lead_dir / norm_lead
 
         p1 = boat_pos + lead_dir * forward_dist
 
+    # P2 제어점: 다음 웨이포인트(next_goal) 방향으로 접선 방향을 미리 비스듬히 유도하여 C1 연속 S자 곡선 생성
     v_goal = p3 - p1
     norm_v_goal = np.linalg.norm(v_goal)
     v_goal_n = np.zeros(2) if norm_v_goal < 1e-6 else v_goal / norm_v_goal
-    p2 = p3 - v_goal_n * min(85.0, d * 0.38)
+
+    if next_goal is not None:
+        v_next = next_goal - p3
+        norm_v_next = np.linalg.norm(v_next)
+        if norm_v_next > 1e-3:
+            u_next = v_next / norm_v_next
+            # 진입 방향(v_goal_n)과 다음 목표 방향(u_next)을 완만하게 블렌딩 (가중치 35%)
+            t_blend = 0.35
+            t_mid = (1.0 - t_blend) * v_goal_n + t_blend * u_next
+            norm_t = np.linalg.norm(t_mid)
+            if norm_t > 1e-6:
+                v_goal_n = t_mid / norm_t
+
+    p2 = p3 - v_goal_n * min(60.0, d * 0.35)
 
     nominal_pts = cubic_bezier(p0, p1, p2, p3, n=30)
     u_dir = (p3 - p0) / d

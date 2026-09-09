@@ -257,10 +257,11 @@ def run():
                     else:
                         # 웨이포인트(갭) 우회 통과 구간: 속도 기반 선행 회전 및 장애물 외측 굴곡 곡률 부여
                         goal = env.current_wp["pos"]
-                        env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd)
+                        next_goal = env.next_wp["pos"] if env.next_wp is not None else env.target
+                        env.bezier_path = make_bezier_path(env.boat_pos, env.boat_heading, goal, obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd, next_goal=next_goal)
                         
                     if env.bezier_path is not None:
-                        env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=60)
+                        env.pursuit_target = pure_pursuit(env.bezier_path, env.boat_pos, lookahead=70)
                         
                     if env.current_wp is not None and env.next_wp is not None:
                         if env.bezier_path is not None and len(env.bezier_path) >= 2:
@@ -277,10 +278,10 @@ def run():
                         env.next_bezier_path = make_bezier_path(
                             env.current_wp["pos"], next_start_head, env.next_wp["pos"],
                             obstacles=env.dynamic_obstacles, boat_radius=env.boat_radius, boat_speed=boat_spd,
-                            start_tangent_fixed=True
+                            start_tangent_fixed=True, next_goal=env.target
                         )
                         if env.next_bezier_path is not None:
-                            env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=60)
+                            env.next_pursuit_target = pure_pursuit(env.next_bezier_path, env.current_wp["pos"], lookahead=75)
                     else:
                         env.next_bezier_path = None
                         env.next_pursuit_target = None
