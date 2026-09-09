@@ -14,7 +14,5 @@
   "fwd_exp": 3,
   "width_exp": 8,
   "clear_exp": 10,
-  "wp_switch_thresh": 1.1,
-  "perp_exp": 2,
-  "prox_exp": 2
+  "wp_switch_thresh": 1.1
 }

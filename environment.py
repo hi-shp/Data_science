@@ -38,9 +38,7 @@ class BoatEnv:
             'fwd_exp': 4.0,
             'width_exp': 8.0,
             'clear_exp': 3.0,
-            'wp_switch_thresh': 1.1,
-            'perp_exp': 6.0,
-            'prox_exp': 2.0
+            'wp_switch_thresh': 1.1
         }
         self.load_params()
          

@@ -168,8 +168,6 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     width_exp = params.get('width_exp', 8.0) if params else 8.0
     clear_exp = params.get('clear_exp', 3.0) if params else 3.0
     heading_exp = params.get('heading_exp', params.get('boat_align_exp', params.get('head_exp', 4.0))) if params else 4.0
-    perp_exp = params.get('perp_exp', 2.0) if params else 2.0
-    prox_exp = params.get('prox_exp', 2.0) if params else 2.0
 
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])
     
@@ -401,17 +399,9 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         # [CLEAR 파라미터 (신규 추가)] 직선 경로 상 장애물 밀도 및 클리어런스 점수
         clear_factor = clear_score ** clear_exp
         
-        # 갭 선분(c1->c2)과 현재 위치에서 목적지까지의 방향(gps_vec) 간의 수직도(Orthogonality) 계산
-        perp_score = abs(gps_vec[0] * u_gap[1] - gps_vec[1] * u_gap[0])
-        perp_factor = max(perp_score, 0.05) ** perp_exp
-        
-        # 선박과의 근접도 (Proximity to Boat): 배와 가까울수록 높은 점수 부여
-        prox_score = min(1.0, 65.0 / max(distm, 35.0))
-        prox_factor = max(prox_score, 0.05) ** prox_exp
-        
         width_w = min(gap_w / 90.0, 1.0)
         
-        sc = (heading_align**align_exp) * head_factor * (forward_proj**fwd_exp) * (lateral_full**0.5) * width_factor * (width_w**0.2) * clear_factor * depth_pen * near_clear_penalty * perp_factor * prox_factor
+        sc = (heading_align**align_exp) * head_factor * (forward_proj**fwd_exp) * (lateral_full**0.5) * width_factor * (width_w**0.2) * clear_factor * depth_pen * near_clear_penalty
         
         if sc > 0:
             valid_gaps.append({
@@ -425,9 +415,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
                     "Heading": {"raw": float(head_score), "w": float(heading_exp)},
                     "Forward": {"raw": float(forward_proj), "w": float(fwd_exp)},
                     "Width": {"raw": float(width_score), "w": float(width_exp)},
-                    "Clear": {"raw": float(clear_score), "w": float(clear_exp)},
-                    "Perpend": {"raw": float(perp_score), "w": float(perp_exp)},
-                    "Proxim": {"raw": float(prox_score), "w": float(prox_exp)}
+                    "Clear": {"raw": float(clear_score), "w": float(clear_exp)}
                 }
             })
             
