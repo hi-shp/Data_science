@@ -552,11 +552,11 @@ class BoatEnv:
         heading_error = wrap(heading_target - self.boat_heading)
 
         # 거리에 따라 연속적으로 조향 및 회피력 스케일링
-        # 250px부터 조기 탐지를 시작하며, 장애물에 가까워질수록 위험도(danger_ratio)가 훨씬 가파르게 상승하여 미리 여유 있게 우회
+        # 250px부터 조기 탐지를 시작하며, 거리가 좁혀질 때 위험도(danger_ratio)가 초반부터 가파르게 급상승 (지수 0.65)
         clear_ratio = float(np.clip((min_front_dist - 55.0) / 195.0, 0.0, 1.0))
-        danger_ratio = (1.0 - clear_ratio) ** 1.6
-        steer_gain = self.params['steer_gain'] + danger_ratio * 0.18
-        avoid_multiplier = self.params['avoid_normal'] + danger_ratio * (self.params['avoid_em'] * 0.70)
+        danger_ratio = (1.0 - clear_ratio) ** 0.65
+        steer_gain = self.params['steer_gain'] + danger_ratio * 0.15
+        avoid_multiplier = self.params['avoid_normal'] + danger_ratio * (self.params['avoid_em'] * 0.50)
             
         # 각속도 댐핑을 강화하여 관성 오버슈트 및 휙휙 도는 회전 억제
         d_term = -0.32 * getattr(self, 'boat_ang_vel', 0.0)
