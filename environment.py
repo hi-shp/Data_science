@@ -638,16 +638,18 @@ class BoatEnv:
 
         avoid = reactive_avoidance(dists, self.rel_angles)
 
-        # 반발력과 조향이 반대로 충돌할 때 조향력 상쇄(직진 현상)를 방지하기 위해 반발력 소프트 감쇠(0.25) 적용
-        if (steer_f * avoid < 0) and abs(steer_f) > 0.15:
-            avoid *= 0.25
+        # 웨이포인트 추종 조향(steer_f)을 90% 비중으로 확고히 유지하면서, 장애물 접근 시 전체 조향의 약 10% 비중으로 회피 조향 가미
+        steer_avoid = float(np.tanh(avoid * 2.0))
+        w_avoid = danger_ratio * 0.10
+        w_wp = 1.0 - w_avoid
+        steer_blended = w_wp * steer_f + w_avoid * steer_avoid
 
         # 후방 반원(|rel_angle| >= 90도) 내 선체 360도 회전 히트박스 반경(약 45.3px) 이내 장애물 감지 시 회전 억제 (조향 0)
         rear_mask = np.abs(self.rel_angles) >= (np.pi / 2.0 - 1e-5)
         if np.any(rear_mask) and np.min(dists[rear_mask]) <= 45.3:
             return 0.0
 
-        return np.clip(steer_f + avoid_multiplier * avoid, -1, 1)
+        return float(np.clip(steer_blended, -1.0, 1.0))
 
     def render(self, hits):
         self.renderer.render(hits)
