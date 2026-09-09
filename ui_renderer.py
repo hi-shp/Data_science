@@ -1206,11 +1206,10 @@ class EnvRenderer:
             ("Align", (0, 230, 255)),      # GPS Alignment (align_exp)
             ("Heading", (170, 130, 255)),  # Boat Heading Alignment (heading_exp)
             ("Forward", (40, 225, 120)),   # Progress toward GPS (fwd_exp)
-            ("Width", (255, 215, 40)),     # Gate Aperture Width (width_exp, 기존 Clear)
-            ("Clear", (50, 220, 200)),     # Path Obstacle Clearance / Density (clear_exp, 신규)
+            ("Width", (255, 215, 40)),     # Gate Aperture Width (width_exp)
+            ("Clear", (50, 220, 200)),     # Path Obstacle Clearance / Density (clear_exp)
             ("Perpend", (255, 140, 40)),   # Orthogonality to GPS (perp_exp)
-            ("Proxim", (255, 90, 190)),    # Proximity to Boat (prox_exp)
-            ("Center", (100, 220, 255))    # Baseline Restoring Tendency (center_exp)
+            ("Proxim", (255, 90, 190))     # Proximity to Boat (prox_exp)
         ]
         
         bar_x = 64
@@ -1235,7 +1234,7 @@ class EnvRenderer:
             ratios = [v / tot if tot > 1e-6 else 0.0 for v in weighted_vals]
             
             for i, (name, col) in enumerate(FACTOR_ITEMS):
-                y_pos = 32 + i * 22
+                y_pos = 36 + i * 25
                 lbl = self.small_font.render(name, True, (210, 225, 240))
                 surf.blit(lbl, (10, y_pos - 2))
                 
@@ -1252,7 +1251,7 @@ class EnvRenderer:
         else:
             # 웨이포인트가 없을 때 (대기 상태 UI 유지)
             for i, (name, col) in enumerate(FACTOR_ITEMS):
-                y_pos = 32 + i * 22
+                y_pos = 36 + i * 25
                 lbl = self.small_font.render(name, True, (120, 145, 170))
                 surf.blit(lbl, (10, y_pos - 2))
                 

@@ -170,7 +170,6 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
     heading_exp = params.get('heading_exp', params.get('boat_align_exp', params.get('head_exp', 4.0))) if params else 4.0
     perp_exp = params.get('perp_exp', 2.0) if params else 2.0
     prox_exp = params.get('prox_exp', 2.0) if params else 2.0
-    center_exp = params.get('center_exp', 1.0) if params else 1.0
 
     gps_vec = np.array([math.cos(gps_heading), math.sin(gps_heading)])
     
@@ -410,18 +409,9 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
         prox_score = min(1.0, 65.0 / max(distm, 35.0))
         prox_factor = max(prox_score, 0.05) ** prox_exp
         
-        # 기준 위도(시작점-목적지 연결 직선: target_pos[1])에서 벗어난 정도에 따라 가운데로 복귀하려는 성질
-        base_y = target_pos[1]
-        boat_dev = abs(by - base_y)
-        gap_dev = abs(my - base_y)
-        center_closeness = math.exp(-((gap_dev / 160.0)**2))
-        dev_ratio = min(boat_dev / 150.0, 2.0)
-        eff_center_exp = center_exp * (0.4 + 0.8 * dev_ratio)
-        center_factor = max(center_closeness, 0.05) ** eff_center_exp
-        
         width_w = min(gap_w / 90.0, 1.0)
         
-        sc = (heading_align**align_exp) * head_factor * (forward_proj**fwd_exp) * (lateral_full**0.5) * width_factor * (width_w**0.2) * clear_factor * depth_pen * near_clear_penalty * perp_factor * prox_factor * center_factor
+        sc = (heading_align**align_exp) * head_factor * (forward_proj**fwd_exp) * (lateral_full**0.5) * width_factor * (width_w**0.2) * clear_factor * depth_pen * near_clear_penalty * perp_factor * prox_factor
         
         if sc > 0:
             valid_gaps.append({
@@ -437,8 +427,7 @@ def find_gap(clusters, ids, boat_pos, boat_heading, target_pos, visited, grid, o
                     "Width": {"raw": float(width_score), "w": float(width_exp)},
                     "Clear": {"raw": float(clear_score), "w": float(clear_exp)},
                     "Perpend": {"raw": float(perp_score), "w": float(perp_exp)},
-                    "Proxim": {"raw": float(prox_score), "w": float(prox_exp)},
-                    "Center": {"raw": float(center_closeness), "w": float(eff_center_exp)}
+                    "Proxim": {"raw": float(prox_score), "w": float(prox_exp)}
                 }
             })
             

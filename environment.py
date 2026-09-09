@@ -40,8 +40,7 @@ class BoatEnv:
             'clear_exp': 3.0,
             'wp_switch_thresh': 1.1,
             'perp_exp': 6.0,
-            'prox_exp': 2.0,
-            'center_exp': 1.5
+            'prox_exp': 2.0
         }
         self.load_params()
          
@@ -80,7 +79,7 @@ class BoatEnv:
         
         self.obs_n = 80
         self.obs_r = 17
-        self.min_obs = 120
+        self.min_obs = 110
         
         self.grid = init_grid()
         self.clusters = []
